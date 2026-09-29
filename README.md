@@ -93,3 +93,26 @@ suffixes above.
 Contributions are welcome — please branch from **`dev`** and open your PR against **`dev`** (not
 `main`). See [CONTRIBUTING.md](./CONTRIBUTING.md) for the branch model, CI checks, and how releases
 are cut.
+
+### Decoded property readings
+
+With a bridge implementing [decoded readings](https://github.com/mega-yfue/ha-eufy-sdk-bridge/pull/85),
+the client uses the SDK's namespaced getter values for mapped properties. For example,
+recording quality can arrive as a structured raw configuration while the SDK getter
+returns the active tier; the select then shows the tier's label instead of `unknown`.
+Entity property identities and the `device.set` write route stay the same. This
+addresses one source of unknown settings, not every device or connectivity issue.
+
+The client fetches `device.properties` metadata once per device and reuses it for
+setup and later polls. It refetches after a connection change or `ready` event, or
+when a device's model, capabilities, or decoded accessor keys change. Metadata
+requests are serialized and concurrent callers share cached results. Invalid or
+failed metadata requests fail that coordinator refresh and are retried on the next
+refresh; raw structured values are not substituted for decoded values. If a model
+change adds or removes entities, reload the integration to rebuild those entities.
+
+Missing, invalid, or ambiguous mapped readings become unknown. Unrelated raw
+properties and write-only settings retain their existing behavior. Older bridges
+without `decodedState` continue through the legacy raw-state path. This does not
+add a decoded event stream, increase the configured polling frequency, or guarantee
+that a snapshot is a fresh physical device confirmation.
