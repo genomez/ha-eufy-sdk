@@ -13,7 +13,12 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from .manifest_reads import normalize_properties, normalize_snapshot, snapshot_signature
+from .manifest_reads import (
+    normalize_properties,
+    normalize_snapshot,
+    snapshot_signature,
+    valid_read_metadata,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -223,9 +228,7 @@ class EufySdkApiClient:
                 continue
             reply = await self._property_reply(device["sn"], snapshot_signature(device))
             manifest = reply.get("decodedProperties")
-            if not isinstance(manifest, dict) or not isinstance(
-                manifest.get("details"), list
-            ):
+            if not valid_read_metadata(manifest):
                 self._property_cache.pop(device["sn"], None)
                 msg = "decoded snapshot has no compatible property metadata"
                 raise EufySdkApiClientCommunicationError(msg)

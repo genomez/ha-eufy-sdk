@@ -6,6 +6,35 @@ from math import isfinite
 from typing import Any
 
 
+def valid_read_metadata(manifest: Any) -> bool:
+    """Require usable descriptor identities without requiring matching snapshot keys."""
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("details"), list):
+        return False
+    for capability in manifest["details"]:
+        if not isinstance(capability, dict):
+            return False
+        namespace = capability.get("accessor")
+        reads = capability.get("reads")
+        if (
+            not isinstance(namespace, str)
+            or not namespace
+            or not isinstance(reads, list)
+        ):
+            return False
+        for read in reads:
+            if not isinstance(read, dict):
+                return False
+            name, accessor = read.get("property"), read.get("accessor")
+            if (
+                not isinstance(name, str)
+                or not name
+                or not isinstance(accessor, str)
+                or not accessor
+            ):
+                return False
+    return True
+
+
 def _reads(manifest: Any) -> dict[str, tuple[str, dict] | None]:
     """Index flat property names, refusing ambiguous capability mappings."""
     result: dict[str, tuple[str, dict] | None] = {}

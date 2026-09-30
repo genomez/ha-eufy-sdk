@@ -111,6 +111,15 @@ failed metadata requests fail that coordinator refresh and are retried on the ne
 refresh; raw structured values are not substituted for decoded values. If a model
 change adds or removes entities, reload the integration to rebuild those entities.
 
+During decoded snapshot refreshes, each metadata capability must identify its
+accessor and provide a read list; each read must identify both its getter accessor
+and flat property name. Malformed
+descriptors discard that device's cached metadata and fail the refresh, so the next
+refresh requests metadata again. Empty read lists and valid unmatched reads are
+allowed: metadata and values arrive separately, and getter names can differ from
+flat property names. The client does not guess a missing alias or clear unrelated
+raw properties. Metadata matching an absent snapshot reading produces unknown.
+
 Missing, invalid, or ambiguous mapped readings become unknown. Unrelated raw
 properties and write-only settings retain their existing behavior. Older bridges
 without `decodedState` continue through the legacy raw-state path. This does not
