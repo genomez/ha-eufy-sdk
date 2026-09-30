@@ -79,6 +79,21 @@ class ManifestReadTests(unittest.TestCase):
             normalize_snapshot(device, METADATA)["state"]["recordingQuality"]
         )
 
+    def test_missing_null_or_invalid_decoded_read_does_not_use_raw_scalar(self):
+        for decoded in (
+            {},
+            {"camera": {}},
+            {"camera": {"recordingQuality": None}},
+            {"camera": {"recordingQuality": 9}},
+        ):
+            with self.subTest(decoded=decoded):
+                device = deepcopy(DEVICE)
+                device["state"]["recordingQuality"] = 2
+                device["decodedState"] = decoded
+                self.assertIsNone(
+                    normalize_snapshot(device, METADATA)["state"]["recordingQuality"]
+                )
+
     def test_false_zero_empty_string_and_text_enum_survive(self):
         for kind, value in (
             ("bool", False),
@@ -97,6 +112,7 @@ class ManifestReadTests(unittest.TestCase):
                 ]
                 device = deepcopy(DEVICE)
                 device["decodedState"]["camera"]["recordingQuality"] = value
+                device["state"]["recordingQuality"] = "legacy scalar"
                 self.assertEqual(
                     normalize_snapshot(device, metadata)["state"]["recordingQuality"],
                     value,
@@ -235,7 +251,7 @@ class MetadataCacheTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(EufySdkApiClientCommunicationError):
             await self.client.list_devices()
 
-    async def test_decoded_snapshot_without_metadata_does_not_publish_raw(self):
+    async def test_decoded_snapshot_without_metadata_preserves_raw_and_refetches(self):
         original = self.client.rpc
 
         async def rpc(cmd: str, **kwargs: Any) -> dict:
@@ -245,8 +261,7 @@ class MetadataCacheTests(unittest.IsolatedAsyncioTestCase):
             return reply
 
         self.client.rpc = AsyncMock(side_effect=rpc)
-        with self.assertRaises(EufySdkApiClientCommunicationError):
-            await self.client.list_devices()
+        self.assertEqual(await self.client.list_devices(), [self.device])
 
         self.assertNotIn(SN, self.client._property_cache)
         self.client.rpc = original

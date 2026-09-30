@@ -9,6 +9,7 @@ unsolicited `{event}` messages go to `on_event`. See the bridge's `docs/ws-proto
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
@@ -22,6 +23,8 @@ from .manifest_reads import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EufySdkApiClientError(Exception):
@@ -67,6 +70,7 @@ class EufySdkApiClient:
         self._property_cache: dict[str, tuple[tuple | None, dict[str, Any]]] = {}
         self._property_lock = asyncio.Lock()
         self._metadata_generation = 0
+        self._invalid_metadata_devices: set[str] = set()
 
     @property
     def connected(self) -> bool:
@@ -219,19 +223,29 @@ class EufySdkApiClient:
         generation = self._metadata_generation
         devices = (await self.rpc("devices.list"))["devices"]
         present = {device["sn"] for device in devices}
+        self._invalid_metadata_devices.intersection_update(present)
         for sn in self._property_cache.keys() - present:
             del self._property_cache[sn]
         result = []
         for device in devices:
             if "decodedState" not in device:
+                self._invalid_metadata_devices.discard(device["sn"])
                 result.append(device)
                 continue
             reply = await self._property_reply(device["sn"], snapshot_signature(device))
             manifest = reply.get("decodedProperties")
             if not valid_read_metadata(manifest):
                 self._property_cache.pop(device["sn"], None)
-                msg = "decoded snapshot has no compatible property metadata"
-                raise EufySdkApiClientCommunicationError(msg)
+                if device["sn"] not in self._invalid_metadata_devices:
+                    _LOGGER.warning(
+                        "Device %s has incompatible decoded property metadata; "
+                        "preserving its raw snapshot until metadata is repaired",
+                        device["sn"],
+                    )
+                    self._invalid_metadata_devices.add(device["sn"])
+                result.append(device)
+                continue
+            self._invalid_metadata_devices.discard(device["sn"])
             result.append(normalize_snapshot(device, reply))
         if generation != self._metadata_generation:
             msg = "device snapshot belongs to a previous bridge session"

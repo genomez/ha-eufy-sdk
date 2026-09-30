@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, D100, D101, D102, INP001, PT009, PT027, SLF001
+# ruff: noqa: ANN201, D100, D101, D102, INP001, PT009, SLF001
 
 import unittest
 from copy import deepcopy
@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, Mock
 
 from custom_components.eufy_sdk.api import (
     EufySdkApiClient,
-    EufySdkApiClientCommunicationError,
 )
 from custom_components.eufy_sdk.manifest_reads import normalize_properties
 
@@ -65,8 +64,8 @@ class MalformedMetadataTests(MetadataClientTests):
             with self.subTest(detail=detail):
                 self.metadata["decodedProperties"]["details"] = [detail]
                 self.client._invalidate_properties()
-                with self.assertRaises(EufySdkApiClientCommunicationError):
-                    await self.client.list_devices()
+                self.assertEqual(await self.client.list_devices(), [self.device])
+                self.assertNotIn(SN, self.client._property_cache)
 
     async def test_unusable_capability_accessor_is_rejected(self):
         for namespace in (None, "", 1):
@@ -75,8 +74,8 @@ class MalformedMetadataTests(MetadataClientTests):
                     {"accessor": namespace, "reads": [READ]},
                 ]
                 self.client._invalidate_properties()
-                with self.assertRaises(EufySdkApiClientCommunicationError):
-                    await self.client.list_devices()
+                self.assertEqual(await self.client.list_devices(), [self.device])
+                self.assertNotIn(SN, self.client._property_cache)
 
     async def test_unusable_read_list_is_rejected(self):
         for reads in (None, {}, "reads"):
@@ -85,8 +84,8 @@ class MalformedMetadataTests(MetadataClientTests):
                     {"accessor": "camera", "reads": reads},
                 ]
                 self.client._invalidate_properties()
-                with self.assertRaises(EufySdkApiClientCommunicationError):
-                    await self.client.list_devices()
+                self.assertEqual(await self.client.list_devices(), [self.device])
+                self.assertNotIn(SN, self.client._property_cache)
 
     async def test_non_object_read_is_rejected(self):
         for read in (None, "recordingQuality", []):
@@ -95,8 +94,8 @@ class MalformedMetadataTests(MetadataClientTests):
                     {"accessor": "camera", "reads": [read]},
                 ]
                 self.client._invalidate_properties()
-                with self.assertRaises(EufySdkApiClientCommunicationError):
-                    await self.client.list_devices()
+                self.assertEqual(await self.client.list_devices(), [self.device])
+                self.assertNotIn(SN, self.client._property_cache)
 
     async def test_unusable_read_identities_are_rejected(self):
         for key in ("accessor", "property"):
@@ -106,15 +105,14 @@ class MalformedMetadataTests(MetadataClientTests):
                         {"accessor": "camera", "reads": [{**READ, key: value}]},
                     ]
                     self.client._invalidate_properties()
-                    with self.assertRaises(EufySdkApiClientCommunicationError):
-                        await self.client.list_devices()
+                    self.assertEqual(await self.client.list_devices(), [self.device])
+                    self.assertNotIn(SN, self.client._property_cache)
 
     async def test_bad_metadata_is_evicted_and_repaired_on_the_next_poll(self):
         self.metadata["decodedProperties"]["details"] = [
             {"accessor": "camera", "reads": [{"property": "recordingQuality"}]},
         ]
-        with self.assertRaises(EufySdkApiClientCommunicationError):
-            await self.client.list_devices()
+        self.assertEqual(await self.client.list_devices(), [self.device])
         self.assertNotIn(SN, self.client._property_cache)
         self.metadata = deepcopy(METADATA)
         device = (await self.client.list_devices())[0]
