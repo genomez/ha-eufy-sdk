@@ -207,6 +207,79 @@ class MetadataCacheTests(unittest.IsolatedAsyncioTestCase):
         await self.client.list_devices()
         self.assertEqual(self.metadata_calls, 2)
 
+    async def test_reset_discards_metadata_before_socket_teardown_finishes(self):
+        await self.client.list_devices()
+        close_started = asyncio.Event()
+        finish_close = asyncio.Event()
+
+        async def close_socket() -> None:
+            close_started.set()
+            await finish_close.wait()
+
+        original = self.client.rpc
+
+        async def rpc(cmd: str, **kwargs: Any) -> dict:
+            if not self.client.connected:
+                message = "not connected"
+                raise EufySdkApiClientCommunicationError(message)
+            return await original(cmd, **kwargs)
+
+        socket = Mock(closed=False, close=AsyncMock(side_effect=close_socket))
+        self.client._ws = socket
+        self.client.rpc = AsyncMock(side_effect=rpc)
+        reset = asyncio.create_task(self.client.reset_connection())
+        try:
+            await close_started.wait()
+            self.assertFalse(self.client.connected)
+            self.assertFalse(self.client._closing)
+            with self.assertRaises(EufySdkApiClientCommunicationError):
+                await self.client.get_properties(SN)
+            self.assertNotIn(SN, self.client._property_cache)
+        finally:
+            finish_close.set()
+            await reset
+            self.client.rpc = original
+        self.assertIsNone(self.client._ws)
+        await self.client.list_devices()
+        self.assertEqual(self.metadata_calls, 2)
+
+    async def test_reset_rejects_inflight_metadata_before_socket_teardown_finishes(
+        self,
+    ):
+        metadata_started = asyncio.Event()
+        finish_metadata = asyncio.Event()
+        close_started = asyncio.Event()
+        finish_close = asyncio.Event()
+
+        async def metadata_rpc(_cmd: str, **_kwargs: Any) -> dict:
+            metadata_started.set()
+            await finish_metadata.wait()
+            return deepcopy(METADATA)
+
+        async def close_socket() -> None:
+            close_started.set()
+            await finish_close.wait()
+
+        self.client.rpc = AsyncMock(side_effect=metadata_rpc)
+        self.client._ws = Mock(closed=False, close=AsyncMock(side_effect=close_socket))
+        metadata = asyncio.create_task(self.client.get_properties(SN))
+        await metadata_started.wait()
+        reset = asyncio.create_task(self.client.reset_connection())
+        try:
+            await close_started.wait()
+            finish_metadata.set()
+            with self.assertRaises(EufySdkApiClientCommunicationError):
+                await metadata
+            self.assertNotIn(SN, self.client._property_cache)
+        finally:
+            finish_metadata.set()
+            finish_close.set()
+            await asyncio.gather(metadata, reset, return_exceptions=True)
+        self.client.rpc = AsyncMock(return_value=deepcopy(METADATA))
+        properties = await self.client.get_properties(SN)
+        self.assertEqual(properties[0]["name"], "recordingQuality")
+        self.client.rpc.assert_awaited_once_with("device.properties", sn=SN)
+
     async def test_concurrent_polls_share_one_metadata_request(self):
         await asyncio.gather(self.client.list_devices(), self.client.list_devices())
         self.assertEqual(self.metadata_calls, 1)

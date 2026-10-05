@@ -50,6 +50,15 @@
     "select": {
       "preset": {
         "name": "Voorinstelling"
+      },
+      "snapshot_policy": {
+        "name": "Snapshotbeleid",
+        "state": {
+          "default": "Standaard",
+          "auto": "Automatisch",
+          "stored": "Opgeslagen",
+          "live": "Live"
+        }
       }
     },
     "sensor": {
@@ -64,6 +73,9 @@
       },
       "light_effect": {
         "name": "Lichteffect"
+      },
+      "current_mode": {
+        "name": "Huidige modus"
       }
     },
     "switch": {

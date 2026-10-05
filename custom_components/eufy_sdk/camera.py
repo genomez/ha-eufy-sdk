@@ -19,6 +19,7 @@ from .const import (
     DOMAIN,
 )
 from .entity import device_offline
+from .snapshot_policy import snapshot_url
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -98,7 +99,12 @@ class EufySdkCamera(CoordinatorEntity["EufySdkDataUpdateCoordinator"], Camera):
     ) -> bytes | None:
         """Return a still from the bridge's /snapshot endpoint."""
         session = async_get_clientsession(self.hass)
-        url = f"http://{self._host}:{self._port}/snapshot/{self._sn}"
+        url = snapshot_url(
+            self._host,
+            self._port,
+            self._sn,
+            self.coordinator.config_entry.runtime_data.snapshot_policy.get(self._sn),
+        )
         try:
             async with session.get(url, timeout=20) as resp:
                 if resp.status == HTTPStatus.OK:

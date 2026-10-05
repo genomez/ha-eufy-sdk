@@ -9,6 +9,7 @@ unsolicited `{event}` messages go to `on_event`. See the bridge's `docs/ws-proto
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -76,6 +77,21 @@ class EufySdkApiClient:
     def connected(self) -> bool:
         """Whether the WebSocket is open."""
         return self._ws is not None and not self._ws.closed
+
+    async def reset_connection(self) -> None:
+        """
+        Drop a wedged socket so the receive loop reconnects it fresh.
+
+        A request that times out doesn't close the WebSocket: `connected` stays True
+        and the next attempt hangs on the same dead socket. Unlike `close()`, this
+        keeps the reconnect supervisor running, so it reopens the connection.
+        """
+        ws = self._ws
+        self._ws = None
+        self._invalidate_properties()
+        if ws is not None:
+            with contextlib.suppress(Exception):  # best-effort teardown
+                await ws.close()
 
     async def connect(self) -> None:
         """Open the WebSocket + receive loop (serialized against reconnect)."""

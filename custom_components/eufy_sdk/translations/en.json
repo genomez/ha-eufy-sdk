@@ -50,6 +50,15 @@
     "select": {
       "preset": {
         "name": "Preset"
+      },
+      "snapshot_policy": {
+        "name": "Snapshot policy",
+        "state": {
+          "default": "Default",
+          "auto": "Automatic",
+          "stored": "Stored",
+          "live": "Live"
+        }
       }
     },
     "sensor": {
@@ -64,6 +73,9 @@
       },
       "light_effect": {
         "name": "Light Effect"
+      },
+      "current_mode": {
+        "name": "Current mode"
       }
     },
     "switch": {

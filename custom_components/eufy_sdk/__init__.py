@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from homeassistant.core import CALLBACK_TYPE, HomeAssistant
+    from homeassistant.helpers.device_registry import DeviceEntry
 
     from .data import EufySdkConfigEntry
 
@@ -196,6 +197,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.runtime_data.properties = properties
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,  # noqa: ARG001
+    entry: EufySdkConfigEntry,
+    device_entry: DeviceEntry,
+) -> bool:
+    """
+    Allow deleting a device from the UI once the bridge no longer reports it.
+
+    A camera or HomeBase removed from (or unshared with) the eufy account stays in
+    the device registry with nothing behind it, and without this hook it could never
+    be deleted. A device the bridge still lists is refused: it would only come back
+    on the next poll. Solix devices (`solix:<sn>`) are checked against the Solix list.
+
+    Nothing is deleted while the last poll failed: the device list is then empty or
+    stale, and every device would read as "no longer reported".
+    """
+    coordinator = entry.runtime_data.coordinator
+    if not coordinator.last_update_success:
+        return False
+    eufy = coordinator.data or {}
+    solix = coordinator.solix_devices or {}
+    for domain, identifier in device_entry.identifiers:
+        if domain != DOMAIN:
+            continue
+        if identifier.startswith("solix:"):
+            if identifier.removeprefix("solix:") in solix:
+                return False
+        elif identifier in eufy:
+            return False
     return True
 
 
