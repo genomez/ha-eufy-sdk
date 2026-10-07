@@ -36,6 +36,10 @@ class EufySdkApiClientCommunicationError(EufySdkApiClientError):
     """The bridge could not be reached / spoke unexpectedly."""
 
 
+class EufySdkApiClientReplyTimeoutError(EufySdkApiClientCommunicationError):
+    """A sent bridge request did not receive its reply before the deadline."""
+
+
 class EufySdkApiClientAuthenticationError(EufySdkApiClientError):
     """The bridge is not authenticated (needs 2FA/captcha) or rejected a command."""
 
@@ -204,14 +208,18 @@ class EufySdkApiClient:
         mid = self._next_id
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
         self._pending[mid] = fut
-        await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
         try:
-            async with asyncio.timeout(timeout):
-                reply = await fut
-        except TimeoutError as err:
+            await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
+            try:
+                async with asyncio.timeout(timeout):
+                    reply = await fut
+            except TimeoutError as err:
+                msg = f"{cmd}: timed out"
+                raise EufySdkApiClientReplyTimeoutError(msg) from err
+        finally:
             self._pending.pop(mid, None)
-            msg = f"{cmd}: timed out"
-            raise EufySdkApiClientCommunicationError(msg) from err
+            if not fut.done():
+                fut.cancel()
         if not reply.get("ok"):
             raise EufySdkApiClientError(reply.get("error", f"{cmd} failed"))
         return reply
@@ -248,10 +256,14 @@ class EufySdkApiClient:
                 self._invalid_metadata_devices.discard(device["sn"])
                 result.append(device)
                 continue
+            ws = self._ws
             try:
                 reply = await self._property_reply(
                     device["sn"], snapshot_signature(device)
                 )
+            except EufySdkApiClientReplyTimeoutError:
+                await self._probe_metadata_connection(ws, generation)
+                reply = None
             except (
                 EufySdkApiClientAuthenticationError,
                 EufySdkApiClientCommunicationError,
@@ -259,6 +271,8 @@ class EufySdkApiClient:
                 raise
             except EufySdkApiClientError:
                 self._check_metadata_generation(generation, "device snapshot")
+                reply = None
+            if reply is None:
                 self._property_cache.pop(device["sn"], None)
                 if device["sn"] not in self._invalid_metadata_devices:
                     _LOGGER.warning(
@@ -285,6 +299,43 @@ class EufySdkApiClient:
             result.append(normalize_snapshot(device, reply))
         self._check_metadata_generation(generation, "device snapshot")
         return result
+
+    def _check_metadata_connection(
+        self, ws: aiohttp.ClientWebSocketResponse | None, generation: int
+    ) -> None:
+        """Require the same open connection and metadata session for a probe."""
+        if not self.connected or self._ws is not ws:
+            msg = "property metadata connection changed"
+            raise EufySdkApiClientCommunicationError(msg)
+        self._check_metadata_generation(generation, "property metadata")
+
+    async def _probe_metadata_connection(
+        self, ws: aiohttp.ClientWebSocketResponse | None, generation: int
+    ) -> None:
+        """Allow raw fallback only after a fresh reply on the same session."""
+        self._check_metadata_connection(ws, generation)
+        try:
+            async with asyncio.timeout(15):
+                reply = await self.rpc("auth.status")
+        except (TimeoutError, aiohttp.ClientError, OSError) as err:
+            msg = "metadata connection probe failed"
+            raise EufySdkApiClientCommunicationError(msg) from err
+        self._check_metadata_connection(ws, generation)
+        auth = reply.get("auth")
+        if reply.get("ok") is not True or not isinstance(auth, dict):
+            msg = "metadata connection probe returned malformed auth status"
+            raise EufySdkApiClientCommunicationError(msg)
+        state = auth.get("state")
+        if state == "ok":
+            return
+        if state in ("require_2fa", "require_captcha"):
+            msg = "bridge authentication required during metadata collection"
+            raise EufySdkApiClientAuthenticationError(msg)
+        if state == "pending":
+            msg = "bridge authentication pending during metadata collection"
+            raise EufySdkApiClientError(msg)
+        msg = "metadata connection probe returned unknown auth state"
+        raise EufySdkApiClientCommunicationError(msg)
 
     async def refresh_event_image(self, sn: str) -> bool:
         """Force a 'Last event' image refresh; returns True if a newer image landed."""
