@@ -248,6 +248,42 @@ class DecodedSecondsTests(unittest.IsolatedAsyncioTestCase):
                     (entity.native_min_value, entity.native_max_value), (15, 7200)
                 )
 
+    async def test_real_snooze_seconds_number_sends_numeric_device_set(self):
+        metadata, device = self._fixture("T8425", "motion", 3600)
+        metadata["properties"][0] = {
+            "name": "snoozeTime",
+            "type": "string",
+            "writable": True,
+        }
+        metadata["decodedProperties"]["details"][0]["reads"][0] = {
+            "property": "snoozeTime",
+            "accessor": "snoozeTime",
+            "type": "string",
+            "kind": "seconds",
+            "writable": True,
+        }
+        device["state"] = {"snoozeTime": "encoded-config", "battery": 75}
+        device["decodedState"] = {"motion": {"snoozeTime": 3600}}
+        added, coordinator, _ = await self._setup_numbers(metadata, device)
+        self.assertEqual(len(added), 1)
+        client = EufySdkApiClient("example.invalid", 3000, Mock())
+        client.rpc = AsyncMock(return_value={"ok": True})
+        coordinator.config_entry.runtime_data.client = client
+        entity = added[0]
+        entity.hass = Mock()
+        entity.async_write_ha_state = Mock()
+        for value in (3600.0, 0.0):
+            with (
+                self.subTest(value=value),
+                patch("custom_components.eufy_sdk.entity.async_call_later"),
+            ):
+                client.rpc.reset_mock()
+                await entity.async_set_native_value(value)
+                client.rpc.assert_awaited_once_with(
+                    "device.set", sn=SN, name="snoozeTime", value=int(value)
+                )
+                self.assertIs(type(client.rpc.await_args.kwargs["value"]), int)
+
     async def test_seconds_preserve_finite_values_and_existing_default_bounds(self):
         for value in (0, 120, 1.5, -0.5, 100000):
             with self.subTest(value=value):
@@ -443,8 +479,8 @@ class MetadataCacheTests(unittest.IsolatedAsyncioTestCase):
         await self.client.list_devices()
         self.device["model"] = "other"
         self.fail_metadata = True
-        with self.assertRaises(EufySdkApiClientError):
-            await self.client.list_devices()
+        with self.assertLogs("custom_components.eufy_sdk.api", level="WARNING"):
+            self.assertEqual(await self.client.list_devices(), [self.device])
         self.assertNotIn(SN, self.client._property_cache)
         self.fail_metadata = False
         await self.client.list_devices()

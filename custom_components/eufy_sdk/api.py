@@ -248,7 +248,27 @@ class EufySdkApiClient:
                 self._invalid_metadata_devices.discard(device["sn"])
                 result.append(device)
                 continue
-            reply = await self._property_reply(device["sn"], snapshot_signature(device))
+            try:
+                reply = await self._property_reply(
+                    device["sn"], snapshot_signature(device)
+                )
+            except (
+                EufySdkApiClientAuthenticationError,
+                EufySdkApiClientCommunicationError,
+            ):
+                raise
+            except EufySdkApiClientError:
+                self._check_metadata_generation(generation, "device snapshot")
+                self._property_cache.pop(device["sn"], None)
+                if device["sn"] not in self._invalid_metadata_devices:
+                    _LOGGER.warning(
+                        "Device %s property metadata request failed; "
+                        "preserving its raw snapshot until metadata is repaired",
+                        device["sn"],
+                    )
+                    self._invalid_metadata_devices.add(device["sn"])
+                result.append(device)
+                continue
             manifest = reply.get("decodedProperties")
             if not valid_read_metadata(manifest):
                 self._property_cache.pop(device["sn"], None)
@@ -263,9 +283,7 @@ class EufySdkApiClient:
                 continue
             self._invalid_metadata_devices.discard(device["sn"])
             result.append(normalize_snapshot(device, reply))
-        if generation != self._metadata_generation:
-            msg = "device snapshot belongs to a previous bridge session"
-            raise EufySdkApiClientCommunicationError(msg)
+        self._check_metadata_generation(generation, "device snapshot")
         return result
 
     async def refresh_event_image(self, sn: str) -> bool:
@@ -336,6 +354,14 @@ class EufySdkApiClient:
         self._metadata_generation += 1
         self._property_cache.clear()
 
+    def _check_metadata_generation(self, generation: int, subject: str) -> None:
+        """Reject stale data without resetting a socket merely for a ready event."""
+        if generation != self._metadata_generation:
+            msg = f"{subject} belongs to a previous bridge session"
+            if not self.connected:
+                raise EufySdkApiClientCommunicationError(msg)
+            raise EufySdkApiClientError(msg)
+
     async def _property_reply(
         self, sn: str, signature: tuple | None = None
     ) -> dict[str, Any]:
@@ -347,9 +373,7 @@ class EufySdkApiClient:
             self._property_cache.pop(sn, None)
             generation = self._metadata_generation
             reply = await self.rpc("device.properties", sn=sn)
-            if generation != self._metadata_generation:
-                msg = "property metadata belongs to a previous bridge session"
-                raise EufySdkApiClientCommunicationError(msg)
+            self._check_metadata_generation(generation, "property metadata")
             self._property_cache[sn] = (signature, reply)
             return reply
 

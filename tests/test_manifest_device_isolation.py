@@ -195,7 +195,6 @@ class DeviceIsolationTests(unittest.IsolatedAsyncioTestCase):
         for error_type in (
             EufySdkApiClientCommunicationError,
             EufySdkApiClientAuthenticationError,
-            EufySdkApiClientError,
         ):
             for sn in (FIRST_SN, BAD_SN):
                 with self.subTest(error_type=error_type, sn=sn):
@@ -218,7 +217,6 @@ class DeviceIsolationTests(unittest.IsolatedAsyncioTestCase):
         for error_type in (
             EufySdkApiClientCommunicationError,
             EufySdkApiClientAuthenticationError,
-            EufySdkApiClientError,
         ):
             with self.subTest(error_type=error_type):
                 failure = error_type("property RPC failed after malformed metadata")
@@ -274,3 +272,87 @@ class DeviceIsolationTests(unittest.IsolatedAsyncioTestCase):
         ):
             await self.client.list_devices()
         self.assertEqual(self.metadata_calls[LAST_SN], 1)
+
+    async def test_rejected_rpc_continues_and_recovers(self):
+        self.failures[BAD_SN] = EufySdkApiClientError("synthetic rejection")
+        with self.assertLogs(LOGGER, level="WARNING") as logs:
+            for _ in range(3):
+                await self.assert_fleet_isolated()
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(
+            self.metadata_calls, Counter({FIRST_SN: 1, BAD_SN: 3, LAST_SN: 1})
+        )
+        self.failures.clear()
+        self.metadata[BAD_SN] = deepcopy(METADATA)
+        with self.assertNoLogs(LOGGER, level="WARNING"):
+            devices = await self.client.list_devices()
+        self.assertEqual(devices[1]["state"]["recordingQuality"], 2)
+        self.assertNotIn(BAD_SN, self.client._invalid_metadata_devices)
+
+    async def test_rejection_after_malformed_metadata_keeps_warning_suppressed(self):
+        with self.assertLogs(LOGGER, level="WARNING"):
+            await self.assert_fleet_isolated()
+        self.failures[BAD_SN] = EufySdkApiClientError("synthetic rejection")
+        with self.assertNoLogs(LOGGER, level="WARNING"):
+            await self.assert_fleet_isolated()
+
+    async def test_ready_during_property_reply_rejects_without_communication_error(
+        self,
+    ):
+        self.client._ws = Mock(closed=False)
+        original = self.client.rpc
+
+        async def rpc(cmd: str, **kwargs: Any) -> dict:
+            reply = await original(cmd, **kwargs)
+            if cmd == "device.properties":
+                self.client._dispatch_event({"event": "ready"})
+            return reply
+
+        self.client.rpc = AsyncMock(side_effect=rpc)
+        with self.assertRaises(EufySdkApiClientError) as raised:
+            await self.client.list_devices()
+        self.assertIs(type(raised.exception), EufySdkApiClientError)
+        self.assertFalse(self.client._property_cache)
+        self.assertEqual(self.metadata_calls[BAD_SN], 0)
+
+    async def test_ready_during_failed_property_reply_is_not_device_local(self):
+        self.client._ws = Mock(closed=False)
+        original = self.client.rpc
+
+        async def rpc(cmd: str, **kwargs: Any) -> dict:
+            if cmd == "device.properties":
+                self.client._dispatch_event({"event": "ready"})
+                message = "synthetic rejection"
+                raise EufySdkApiClientError(message)
+            return await original(cmd, **kwargs)
+
+        self.client.rpc = AsyncMock(side_effect=rpc)
+        with (
+            self.assertNoLogs(LOGGER, level="WARNING"),
+            self.assertRaisesRegex(
+                EufySdkApiClientError, "previous bridge session"
+            ) as raised,
+        ):
+            await self.client.list_devices()
+        self.assertIs(type(raised.exception), EufySdkApiClientError)
+        self.assertFalse(self.client._property_cache)
+
+    async def test_open_socket_timeout_still_propagates(self):
+        self.client._ws = Mock(closed=False)
+        failure = EufySdkApiClientCommunicationError("synthetic timeout")
+        failure.__cause__ = TimeoutError()
+        self.failures[BAD_SN] = failure
+        with self.assertRaises(EufySdkApiClientCommunicationError) as raised:
+            await self.client.list_devices()
+        self.assertIs(raised.exception, failure)
+
+    async def test_list_failure_and_public_property_failure_remain_fatal(self):
+        failure = EufySdkApiClientError("synthetic failure")
+        self.client.rpc = AsyncMock(side_effect=failure)
+        for operation in (
+            self.client.list_devices,
+            lambda: self.client.get_properties(BAD_SN),
+        ):
+            with self.assertRaises(EufySdkApiClientError) as raised:
+                await operation()
+            self.assertIs(raised.exception, failure)
