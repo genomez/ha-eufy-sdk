@@ -4,19 +4,22 @@ import asyncio
 import unittest
 from copy import deepcopy
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
+from custom_components.eufy_sdk import number
 from custom_components.eufy_sdk.api import (
     EufySdkApiClient,
     EufySdkApiClientCommunicationError,
     EufySdkApiClientError,
 )
+from custom_components.eufy_sdk.entity import classify
 from custom_components.eufy_sdk.manifest_reads import (
     normalize_properties,
     normalize_snapshot,
     snapshot_signature,
 )
 from custom_components.eufy_sdk.select import EufySdkSelect
+from custom_components.eufy_sdk.sensor import EufySdkPropertySensor
 
 SN = "EXAMPLE-CAM-0001"
 READ = {
@@ -148,6 +151,252 @@ class ManifestReadTests(unittest.TestCase):
         self.assertNotEqual(snapshot_signature(device), snapshot_signature(DEVICE))
         device = {**DEVICE, "model": "other"}
         self.assertNotEqual(snapshot_signature(device), snapshot_signature(DEVICE))
+
+
+class DecodedSecondsTests(unittest.IsolatedAsyncioTestCase):
+    def _fixture(
+        self, model: str = "T9000", namespace: str = "station", value: object = 90
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        metadata = {
+            "properties": [
+                {
+                    "name": "snoozeDuration",
+                    "type": "string",
+                    "raw": True,
+                    "unexposed": True,
+                },
+                {"name": "battery", "type": "number"},
+            ],
+            "decodedProperties": {
+                "details": [
+                    {
+                        "accessor": namespace,
+                        "reads": [
+                            {
+                                "property": "snoozeDuration",
+                                "accessor": "snoozeSeconds",
+                                "type": "string",
+                                "kind": "seconds",
+                                "unit": "s",
+                                "writable": True,
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+        device = {
+            "sn": SN,
+            "name": "Example device",
+            "model": model,
+            "capabilities": [namespace],
+            "state": {"snoozeDuration": 900, "battery": 75},
+            "decodedState": {namespace: {"snoozeSeconds": value}},
+        }
+        return metadata, device
+
+    async def _setup_numbers(
+        self, metadata: dict[str, Any], device: dict[str, Any]
+    ) -> tuple[list[number.EufySdkNumber], Mock, dict[str, Any]]:
+        original_metadata, original_device = deepcopy(metadata), deepcopy(device)
+        coordinator = Mock()
+        coordinator.data = {SN: normalize_snapshot(device, metadata)}
+        coordinator.async_request_refresh = AsyncMock()
+        entry = Mock()
+        entry.runtime_data.coordinator = coordinator
+        entry.runtime_data.properties = {SN: normalize_properties(metadata)}
+        coordinator.config_entry = entry
+        added: list[number.EufySdkNumber] = []
+        with patch.object(number, "solix_devices_with", return_value=[]):
+            await number.async_setup_entry(Mock(), entry, added.extend)
+        self.assertEqual(entry.runtime_data.client.mock_calls, [])
+        coordinator.async_request_refresh.assert_not_called()
+        self.assertEqual(metadata, original_metadata)
+        self.assertEqual(device, original_device)
+        self.assertEqual(coordinator.data[SN]["state"]["battery"], 75)
+        self.assertEqual(
+            entry.runtime_data.properties[SN][1], metadata["properties"][1]
+        )
+        return added, coordinator, entry.runtime_data.properties[SN][0]
+
+    async def test_seconds_route_through_number_setup_for_synthetic_device_families(
+        self,
+    ):
+        # These are consumer fixtures, not claims about device or transport support.
+        for model, namespace in (
+            ("T9000", "station"),
+            ("T8010", "station"),
+            ("T8030", "station"),
+            ("T8425", "camera"),
+        ):
+            with self.subTest(model=model):
+                metadata, device = self._fixture(model, namespace)
+                metadata["properties"][0].update({"min": 15, "max": 7200})
+                added, _, spec = await self._setup_numbers(metadata, device)
+                self.assertEqual(len(added), 1)
+                entity = added[0]
+                self.assertIsInstance(entity, number.EufySdkNumber)
+                self.assertEqual(spec["type"], "number")
+                self.assertNotIn("raw", spec)
+                self.assertNotIn("unexposed", spec)
+                self.assertEqual(entity._prop, "snoozeDuration")
+                self.assertEqual(entity.unique_id, f"{SN}_snoozeDuration")
+                self.assertEqual(entity.name, "Snooze Duration")
+                self.assertEqual(entity.native_value, 90.0)
+                self.assertEqual(entity.native_unit_of_measurement, "s")
+                self.assertEqual(
+                    (entity.native_min_value, entity.native_max_value), (15, 7200)
+                )
+
+    async def test_seconds_preserve_finite_values_and_existing_default_bounds(self):
+        for value in (0, 120, 1.5, -0.5, 100000):
+            with self.subTest(value=value):
+                added, _, _ = await self._setup_numbers(*self._fixture(value=value))
+                self.assertEqual(len(added), 1)
+                self.assertEqual(added[0].native_value, float(value))
+                # Presentation defaults neither clamp values nor qualify vendor limits.
+                self.assertEqual(
+                    (added[0].native_min_value, added[0].native_max_value), (0, 86400)
+                )
+
+    async def test_only_exact_true_writable_seconds_route_to_numbers(self):
+        for writable in (False, None, "true"):
+            with self.subTest(writable=writable):
+                metadata, device = self._fixture(value=1.5)
+                read = metadata["decodedProperties"]["details"][0]["reads"][0]
+                if writable is None:
+                    read.pop("writable")
+                else:
+                    read["writable"] = writable
+                added, coordinator, spec = await self._setup_numbers(metadata, device)
+                self.assertEqual(added, [])
+                self.assertFalse(spec["writable"])
+                self.assertEqual(spec["type"], "number")
+                self.assertEqual(classify(spec), "sensor")
+                sensor = EufySdkPropertySensor(coordinator, SN, spec)
+                self.assertEqual(sensor.native_value, 1.5)
+                self.assertEqual(sensor._prop, "snoozeDuration")
+                self.assertEqual(sensor.unique_id, f"{SN}_snoozeDuration")
+                self.assertEqual(sensor.name, "Snooze Duration")
+                self.assertEqual(sensor.native_unit_of_measurement, "s")
+
+    async def test_invalid_seconds_readings_remain_unknown_despite_raw_number(self):
+        for value in (
+            None,
+            True,
+            False,
+            "120",
+            "",
+            [],
+            {"value": 120},
+            {"error": "unavailable"},
+            float("inf"),
+            float("-inf"),
+            float("nan"),
+            10**400,
+        ):
+            with self.subTest(value=value):
+                added, coordinator, _ = await self._setup_numbers(
+                    *self._fixture(value=value)
+                )
+                self.assertEqual(len(added), 1)
+                self.assertIsNone(added[0].native_value)
+                self.assertIsNone(coordinator.data[SN]["state"]["snoozeDuration"])
+
+    async def test_missing_or_malformed_decoded_surfaces_remain_unknown(self):
+        for decoded in (
+            None,
+            [],
+            {},
+            {"station": None},
+            {"station": []},
+            {"station": "120"},
+            {"station": {}},
+            {"station": {"otherAccessor": 120}},
+            {"otherNamespace": {"snoozeSeconds": 120}},
+        ):
+            with self.subTest(decoded=decoded):
+                metadata, device = self._fixture()
+                device["decodedState"] = decoded
+                added, coordinator, _ = await self._setup_numbers(metadata, device)
+                self.assertEqual(len(added), 1)
+                self.assertIsNone(added[0].native_value)
+                self.assertIsNone(coordinator.data[SN]["state"]["snoozeDuration"])
+
+    async def test_duplicate_seconds_namespaces_are_unknown_and_read_only(self):
+        metadata, device = self._fixture()
+        other = deepcopy(metadata["decodedProperties"]["details"][0])
+        other["accessor"] = "other"
+        metadata["decodedProperties"]["details"].append(other)
+        device["decodedState"]["other"] = {"snoozeSeconds": 30}
+        added, coordinator, spec = await self._setup_numbers(metadata, device)
+        self.assertEqual(added, [])
+        self.assertFalse(spec["writable"])
+        self.assertEqual(classify(spec), "sensor")
+        self.assertIsNone(EufySdkPropertySensor(coordinator, SN, spec).native_value)
+
+    def test_unit_or_numeric_sample_alone_does_not_imply_decoded_seconds(self):
+        for kind in (None, "duration"):
+            with self.subTest(kind=kind):
+                metadata, device = self._fixture()
+                read = metadata["decodedProperties"]["details"][0]["reads"][0]
+                if kind is None:
+                    read.pop("kind")
+                else:
+                    read["kind"] = kind
+                spec = normalize_properties(metadata)[0]
+                self.assertEqual(spec["type"], "string")
+                self.assertEqual(classify(spec), "sensor")
+                self.assertIsNone(
+                    normalize_snapshot(device, metadata)["state"]["snoozeDuration"]
+                )
+
+    def test_enum_domains_and_ordinary_storage_types_still_control_validation(self):
+        for read_shape, value, expected_type, expected_platform in (
+            (
+                {"type": "string", "kind": "enum", "values": [0, 120]},
+                120,
+                "number",
+                "select",
+            ),
+            (
+                {"type": "number", "kind": "enum", "values": ["off", "auto"]},
+                "auto",
+                "string",
+                "select",
+            ),
+            ({"type": "bool", "kind": "flag"}, False, "bool", "switch"),
+            ({"type": "number", "kind": "percent"}, 0, "number", "number"),
+            ({"type": "string", "kind": "text"}, "", "string", "sensor"),
+        ):
+            with self.subTest(read_shape=read_shape):
+                metadata, device = self._fixture(value=value)
+                read = metadata["decodedProperties"]["details"][0]["reads"][0]
+                read.update(read_shape)
+                spec = normalize_properties(metadata)[0]
+                self.assertEqual(spec["type"], expected_type)
+                self.assertEqual(classify(spec), expected_platform)
+                self.assertEqual(
+                    normalize_snapshot(device, metadata)["state"]["snoozeDuration"],
+                    value,
+                )
+                if read_shape["kind"] == "enum":
+                    device["decodedState"]["station"]["snoozeSeconds"] = "invalid"
+                    self.assertIsNone(
+                        normalize_snapshot(device, metadata)["state"]["snoozeDuration"]
+                    )
+
+    def test_legacy_seconds_without_decoded_contract_preserve_passthrough(self):
+        metadata, device = self._fixture()
+        legacy_device = deepcopy(device)
+        legacy_device.pop("decodedState")
+        self.assertIs(normalize_snapshot(legacy_device, metadata), legacy_device)
+        legacy_metadata = deepcopy(metadata)
+        legacy_metadata.pop("decodedProperties")
+        self.assertIs(normalize_snapshot(device, legacy_metadata), device)
+        self.assertIs(
+            normalize_properties(legacy_metadata), legacy_metadata["properties"]
+        )
 
 
 class MetadataCacheTests(unittest.IsolatedAsyncioTestCase):

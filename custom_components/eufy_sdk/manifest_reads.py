@@ -68,7 +68,7 @@ def _number(value: Any) -> bool:
 
 
 def _decoded_type(read: dict) -> str | None:
-    """Use the decoded enum domain before a structured storage type."""
+    """Use explicit decoded kinds before the underlying storage type."""
     values = read.get("values")
     if read.get("kind") == "enum" and isinstance(values, list) and values:
         if all(_number(value) for value in values):
@@ -76,6 +76,8 @@ def _decoded_type(read: dict) -> str | None:
         if all(isinstance(value, str) for value in values):
             return "string"
         return None
+    if read.get("kind") == "seconds":
+        return "number"
     return "number" if read.get("type") == "enum" else read.get("type")
 
 

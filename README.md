@@ -124,6 +124,11 @@ returns the active tier; the select then shows the tier's label instead of `unkn
 Entity property identities and the `device.set` write route stay the same. This
 addresses one source of unknown settings, not every device or connectivity issue.
 
+Durations declared as decoded kind `seconds` are interpreted as numbers, even
+when the stored type is a string. Writable durations appear as Number controls;
+read-only durations appear as numeric Sensors. Missing or invalid decoded
+durations remain unknown.
+
 The client fetches `device.properties` metadata once per device and reuses it for
 setup and later polls. It refetches after a connection change or `ready` event, or
 when a device's model, capabilities, or decoded accessor keys change. Metadata
