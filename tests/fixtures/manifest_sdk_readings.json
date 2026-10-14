@@ -1,0 +1,1542 @@
+[
+  {
+    "case": "T9000-synthetic-0",
+    "snapshot": {
+      "state": {
+        "battery": 0,
+        "alarmMode": false,
+        "armingMode": 0
+      },
+      "decodedState": {
+        "battery": {
+          "level": 0
+        },
+        "audio": {},
+        "arming": {
+          "mode": 0
+        },
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": [
+              {
+                "accessor": "level",
+                "property": "battery",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": false
+              }
+            ]
+          },
+          {
+            "capability": "audio",
+            "accessor": "audio",
+            "reads": []
+          },
+          {
+            "capability": "arming",
+            "accessor": "arming",
+            "reads": [
+              {
+                "accessor": "mode",
+                "property": "armingMode",
+                "type": "enum",
+                "kind": "enum",
+                "values": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  47,
+                  63
+                ],
+                "labels": {
+                  "0": "away",
+                  "1": "home",
+                  "2": "schedule",
+                  "3": "custom1",
+                  "4": "custom2",
+                  "5": "custom3",
+                  "6": "off",
+                  "47": "geo",
+                  "63": "disarmed"
+                },
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "armingMode",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "away",
+          "1": "home",
+          "2": "schedule",
+          "3": "custom1",
+          "4": "custom2",
+          "5": "custom3",
+          "6": "off",
+          "47": "geo",
+          "63": "disarmed"
+        }
+      },
+      {
+        "name": "battery",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": false
+      },
+      {
+        "name": "charging",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": false
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "batteryTemperature",
+        "type": "number",
+        "unit": "°C",
+        "kind": "celsius",
+        "writable": false
+      },
+      {
+        "name": "batteryHealth",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": false
+      },
+      {
+        "name": "solarIntensity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false
+      },
+      {
+        "name": "solarConnected24h",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": false
+      },
+      {
+        "name": "batteryPowerStats",
+        "type": "string",
+        "kind": "text",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      }
+    ],
+    "previous": {
+      "armingMode": 0,
+      "battery": 0
+    }
+  },
+  {
+    "case": "T9000-synthetic-1",
+    "snapshot": {
+      "state": {
+        "battery": 1,
+        "alarmMode": true,
+        "armingMode": 1
+      },
+      "decodedState": {
+        "battery": {
+          "level": 1
+        },
+        "audio": {},
+        "arming": {
+          "mode": 63
+        },
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": [
+              {
+                "accessor": "level",
+                "property": "battery",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": false
+              }
+            ]
+          },
+          {
+            "capability": "audio",
+            "accessor": "audio",
+            "reads": []
+          },
+          {
+            "capability": "arming",
+            "accessor": "arming",
+            "reads": [
+              {
+                "accessor": "mode",
+                "property": "armingMode",
+                "type": "enum",
+                "kind": "enum",
+                "values": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  47,
+                  63
+                ],
+                "labels": {
+                  "0": "away",
+                  "1": "home",
+                  "2": "schedule",
+                  "3": "custom1",
+                  "4": "custom2",
+                  "5": "custom3",
+                  "6": "off",
+                  "47": "geo",
+                  "63": "disarmed"
+                },
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "armingMode",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "away",
+          "1": "home",
+          "2": "schedule",
+          "3": "custom1",
+          "4": "custom2",
+          "5": "custom3",
+          "6": "off",
+          "47": "geo",
+          "63": "disarmed"
+        }
+      },
+      {
+        "name": "battery",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": false
+      },
+      {
+        "name": "charging",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": false
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "batteryTemperature",
+        "type": "number",
+        "unit": "°C",
+        "kind": "celsius",
+        "writable": false
+      },
+      {
+        "name": "batteryHealth",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": false
+      },
+      {
+        "name": "solarIntensity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false
+      },
+      {
+        "name": "solarConnected24h",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": false
+      },
+      {
+        "name": "batteryPowerStats",
+        "type": "string",
+        "kind": "text",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      }
+    ],
+    "previous": {
+      "armingMode": 63,
+      "battery": 1
+    }
+  },
+  {
+    "case": "synthetic-floodlight-1-0",
+    "snapshot": {
+      "state": {
+        "unknown_1101": "{\"cur_mode\": 0}",
+        "light": false,
+        "brightness": 0
+      },
+      "decodedState": {
+        "motion": {},
+        "battery": {},
+        "light": {
+          "isOn": false,
+          "brightness": 0
+        },
+        "ptz": {},
+        "camera": {},
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "motion",
+            "accessor": "motion",
+            "reads": []
+          },
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": []
+          },
+          {
+            "capability": "light",
+            "accessor": "light",
+            "reads": [
+              {
+                "accessor": "isOn",
+                "property": "light",
+                "type": "bool",
+                "kind": "boolean",
+                "writable": true
+              },
+              {
+                "accessor": "brightness",
+                "property": "brightness",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "ptz",
+            "accessor": "ptz",
+            "reads": []
+          },
+          {
+            "capability": "camera",
+            "accessor": "camera",
+            "reads": []
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "motionDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "motionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "aiDetectType",
+        "type": "number",
+        "kind": "bitfield",
+        "writable": true
+      },
+      {
+        "name": "soloSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "indoorSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "pirSensitivityRaw",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "snoozeTime",
+        "type": "string",
+        "writable": true,
+        "raw": true
+      },
+      {
+        "name": "humanOnlyAtNight",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "loiteringDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "imageFlipped",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "watermark",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Timestamp",
+          "2": "Timestamp + Logo"
+        }
+      },
+      {
+        "name": "soundDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionType",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Crying",
+          "2": "All Sound"
+        }
+      },
+      {
+        "name": "notificationStyle",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Text Only",
+          "2": "Included Thumbnail",
+          "3": "Text First, Then Thumbnail"
+        }
+      },
+      {
+        "name": "nightVision",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Infrared",
+          "2": "Full Color"
+        }
+      },
+      {
+        "name": "streamingQuality",
+        "type": "number",
+        "kind": "enum",
+        "writable": false,
+        "enumValues": {
+          "0": "Auto",
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        }
+      },
+      {
+        "name": "recordingQuality",
+        "type": "string",
+        "writable": true,
+        "enumValues": {
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        },
+        "raw": true
+      },
+      {
+        "name": "antiTheftDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "statusLed",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "workingMode",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "recordDuration",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordInterval",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordAutoStop",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "light",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "brightness",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": true
+      },
+      {
+        "name": "spotlightEnabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "rotationSpeed",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      }
+    ],
+    "previous": {
+      "light": false,
+      "brightness": 0
+    }
+  },
+  {
+    "case": "synthetic-floodlight-1-1",
+    "snapshot": {
+      "state": {
+        "unknown_1101": "{\"cur_mode\": 1}",
+        "light": true,
+        "brightness": 1
+      },
+      "decodedState": {
+        "motion": {},
+        "battery": {},
+        "light": {
+          "isOn": true,
+          "brightness": 1
+        },
+        "ptz": {},
+        "camera": {},
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "motion",
+            "accessor": "motion",
+            "reads": []
+          },
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": []
+          },
+          {
+            "capability": "light",
+            "accessor": "light",
+            "reads": [
+              {
+                "accessor": "isOn",
+                "property": "light",
+                "type": "bool",
+                "kind": "boolean",
+                "writable": true
+              },
+              {
+                "accessor": "brightness",
+                "property": "brightness",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "ptz",
+            "accessor": "ptz",
+            "reads": []
+          },
+          {
+            "capability": "camera",
+            "accessor": "camera",
+            "reads": []
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "motionDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "motionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "aiDetectType",
+        "type": "number",
+        "kind": "bitfield",
+        "writable": true
+      },
+      {
+        "name": "soloSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "indoorSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "pirSensitivityRaw",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "snoozeTime",
+        "type": "string",
+        "writable": true,
+        "raw": true
+      },
+      {
+        "name": "humanOnlyAtNight",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "loiteringDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "imageFlipped",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "watermark",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Timestamp",
+          "2": "Timestamp + Logo"
+        }
+      },
+      {
+        "name": "soundDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionType",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Crying",
+          "2": "All Sound"
+        }
+      },
+      {
+        "name": "notificationStyle",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Text Only",
+          "2": "Included Thumbnail",
+          "3": "Text First, Then Thumbnail"
+        }
+      },
+      {
+        "name": "nightVision",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Infrared",
+          "2": "Full Color"
+        }
+      },
+      {
+        "name": "streamingQuality",
+        "type": "number",
+        "kind": "enum",
+        "writable": false,
+        "enumValues": {
+          "0": "Auto",
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        }
+      },
+      {
+        "name": "recordingQuality",
+        "type": "string",
+        "writable": true,
+        "enumValues": {
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        },
+        "raw": true
+      },
+      {
+        "name": "antiTheftDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "statusLed",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "workingMode",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "recordDuration",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordInterval",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordAutoStop",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "light",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "brightness",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": true
+      },
+      {
+        "name": "spotlightEnabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "rotationSpeed",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      }
+    ],
+    "previous": {
+      "light": true,
+      "brightness": 1
+    }
+  },
+  {
+    "case": "synthetic-floodlight-2-0",
+    "snapshot": {
+      "state": {
+        "unknown_1101": "{\"cur_mode\": 0}",
+        "light": false,
+        "brightness": 0
+      },
+      "decodedState": {
+        "motion": {},
+        "battery": {},
+        "light": {
+          "isOn": false,
+          "brightness": 0
+        },
+        "camera": {},
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "motion",
+            "accessor": "motion",
+            "reads": []
+          },
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": []
+          },
+          {
+            "capability": "light",
+            "accessor": "light",
+            "reads": [
+              {
+                "accessor": "isOn",
+                "property": "light",
+                "type": "bool",
+                "kind": "boolean",
+                "writable": true
+              },
+              {
+                "accessor": "brightness",
+                "property": "brightness",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "camera",
+            "accessor": "camera",
+            "reads": []
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "motionDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "motionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "aiDetectType",
+        "type": "number",
+        "kind": "bitfield",
+        "writable": true
+      },
+      {
+        "name": "soloSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "indoorSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "pirSensitivityRaw",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "snoozeTime",
+        "type": "string",
+        "writable": true,
+        "raw": true
+      },
+      {
+        "name": "humanOnlyAtNight",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "loiteringDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "imageFlipped",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "watermark",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Timestamp",
+          "2": "Timestamp + Logo"
+        }
+      },
+      {
+        "name": "soundDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionType",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Crying",
+          "2": "All Sound"
+        }
+      },
+      {
+        "name": "notificationStyle",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Text Only",
+          "2": "Included Thumbnail",
+          "3": "Text First, Then Thumbnail"
+        }
+      },
+      {
+        "name": "nightVision",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Infrared",
+          "2": "Full Color"
+        }
+      },
+      {
+        "name": "streamingQuality",
+        "type": "number",
+        "kind": "enum",
+        "writable": false,
+        "enumValues": {
+          "0": "Auto",
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        }
+      },
+      {
+        "name": "recordingQuality",
+        "type": "string",
+        "writable": true,
+        "enumValues": {
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        },
+        "raw": true
+      },
+      {
+        "name": "antiTheftDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "statusLed",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "workingMode",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "recordDuration",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordInterval",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordAutoStop",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "light",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "brightness",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": true
+      },
+      {
+        "name": "spotlightEnabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      }
+    ],
+    "previous": {
+      "light": false,
+      "brightness": 0
+    }
+  },
+  {
+    "case": "synthetic-floodlight-2-1",
+    "snapshot": {
+      "state": {
+        "unknown_1101": "{\"cur_mode\": 1}",
+        "light": true,
+        "brightness": 1
+      },
+      "decodedState": {
+        "motion": {},
+        "battery": {},
+        "light": {
+          "isOn": true,
+          "brightness": 1
+        },
+        "camera": {},
+        "info": {}
+      },
+      "decodedProperties": {
+        "bound": true,
+        "details": [
+          {
+            "capability": "motion",
+            "accessor": "motion",
+            "reads": []
+          },
+          {
+            "capability": "battery",
+            "accessor": "battery",
+            "reads": []
+          },
+          {
+            "capability": "light",
+            "accessor": "light",
+            "reads": [
+              {
+                "accessor": "isOn",
+                "property": "light",
+                "type": "bool",
+                "kind": "boolean",
+                "writable": true
+              },
+              {
+                "accessor": "brightness",
+                "property": "brightness",
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": true
+              }
+            ]
+          },
+          {
+            "capability": "camera",
+            "accessor": "camera",
+            "reads": []
+          },
+          {
+            "capability": "info",
+            "accessor": "info",
+            "reads": []
+          }
+        ]
+      }
+    },
+    "properties": [
+      {
+        "name": "motionDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "motionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "aiDetectType",
+        "type": "number",
+        "kind": "bitfield",
+        "writable": true
+      },
+      {
+        "name": "soloSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "indoorSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "pirSensitivityRaw",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "snoozeTime",
+        "type": "string",
+        "writable": true,
+        "raw": true
+      },
+      {
+        "name": "humanOnlyAtNight",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "loiteringDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "imageFlipped",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "watermark",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Timestamp",
+          "2": "Timestamp + Logo"
+        }
+      },
+      {
+        "name": "soundDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionSensitivity",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "soundDetectionType",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Crying",
+          "2": "All Sound"
+        }
+      },
+      {
+        "name": "notificationStyle",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "1": "Text Only",
+          "2": "Included Thumbnail",
+          "3": "Text First, Then Thumbnail"
+        }
+      },
+      {
+        "name": "nightVision",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Off",
+          "1": "Infrared",
+          "2": "Full Color"
+        }
+      },
+      {
+        "name": "streamingQuality",
+        "type": "number",
+        "kind": "enum",
+        "writable": false,
+        "enumValues": {
+          "0": "Auto",
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        }
+      },
+      {
+        "name": "recordingQuality",
+        "type": "string",
+        "writable": true,
+        "enumValues": {
+          "1": "HD (720P)",
+          "2": "Full HD (1080P)",
+          "3": "Max"
+        },
+        "raw": true
+      },
+      {
+        "name": "antiTheftDetection",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "statusLed",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "powerSource",
+        "type": "enum",
+        "kind": "enum",
+        "writable": true,
+        "enumValues": {
+          "0": "Battery",
+          "1": "External Solar Panel"
+        }
+      },
+      {
+        "name": "workingMode",
+        "type": "number",
+        "kind": "scalar",
+        "writable": true
+      },
+      {
+        "name": "recordDuration",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordInterval",
+        "type": "number",
+        "unit": "s",
+        "kind": "seconds",
+        "writable": true
+      },
+      {
+        "name": "recordAutoStop",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "cameraInfo",
+        "type": "number",
+        "kind": "scalar",
+        "writable": false,
+        "unexposed": true
+      },
+      {
+        "name": "light",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      },
+      {
+        "name": "brightness",
+        "type": "number",
+        "unit": "%",
+        "kind": "percent",
+        "writable": true
+      },
+      {
+        "name": "spotlightEnabled",
+        "type": "bool",
+        "kind": "boolean",
+        "writable": true
+      }
+    ],
+    "previous": {
+      "light": true,
+      "brightness": 1
+    }
+  }
+]
