@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1.dev1",
+  "version": "0.3.1.dev2",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1.dev1.zip",
+  "filename": "eufy-sdk-s1-0.3.1.dev2.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373"
+      "sha256": "c86717b3ac6cb7e5dd7bafc522f874ae3cc8a1da7d1532a72a619ae95fe56b13"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "2163168ffe6666ebedaa264c29aac2ccea8f0e5981943456ad5f89d2e8a78af6"
+      "sha256": "fa9bad80c6b94cecb031b1ca9475db1386056974c3b099f22d70b35d3f2d6bdc"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1"
+      "sha256": "337c2e253b4c9737018cd2bb29c195a5fa8f58acd874077ae3685eeef7bbec2e"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "73a5191e1d64400cac1071259e41c06e973227dcdabf0e0b870343fe76f259f0"
+      "sha256": "a39ede1cade5c773ecad2d5e7baa3b8841eeaaed135ef2a1248b4687eb90e116"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -157,7 +157,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "28b5b8cb942a6f77b646336d73cbb3fd97789403dc3f7a16f56fae6f93957c9c"
+      "sha256": "4e00e2afa86c460ed3704f431900530562160b0a2f8d4ac36719250c62abd7c0"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
@@ -209,7 +209,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
-      "sha256": "16b1208e7c126c9895353296404481d5e80cbef9876c5cbf255e55929231688b"
+      "sha256": "0e7964aad4cb14c65620b1118b7e569765e289115832dc6bf8d7243f44b7c71f"
     },
     {
       "path": "custom_components/eufy_sdk/translations/en.json",
@@ -223,5 +223,6 @@
       "path": "custom_components/eufy_sdk/translations/nl.json",
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
-  ]
+  ],
+  "qualificationScope": "offline packaging only; release availability and installation require separate verification"
 }

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 from .bespoke import BITFIELD_SWITCHES
 from .entity import (
@@ -176,15 +177,21 @@ class EufyBitmaskSwitch(EufySdkPropertyEntity, SwitchEntity):
         self._attr_entity_category = EntityCategory.CONFIG
 
     def _mask(self) -> int:
-        """Return the current full bitmask value (falls back to the enable base)."""
+        """Use a reported mask, falling back only when the value is absent."""
         v = self.prop_value
-        return int(v) if isinstance(v, (int, float)) else self._base
+        if v is None:
+            return self._base
+        mask = _as_mask(v)
+        if mask is None:
+            msg = "Detection setting is not a bitmask; refusing to overwrite it"
+            raise HomeAssistantError(msg)
+        return mask
 
     @property
     def is_on(self) -> bool | None:
-        """On when this bit is set in the current mask."""
-        v = self.prop_value
-        return None if v is None else bool(int(v) & self._bit)
+        """On when this bit is set; unknown for a value that is not a bitmask."""
+        mask = _as_mask(self.prop_value)
+        return None if mask is None else bool(mask & self._bit)
 
     async def async_turn_on(self, **_: Any) -> None:
         """Set this bit using the current mask or existing fallback."""
@@ -193,3 +200,15 @@ class EufyBitmaskSwitch(EufySdkPropertyEntity, SwitchEntity):
     async def async_turn_off(self, **_: Any) -> None:
         """Clear this bit using the current mask or existing fallback."""
         await self.write(self._mask() & ~self._bit)
+
+
+def _as_mask(value: Any) -> int | None:
+    """Read numeric masks consistently without admitting structured values."""
+    if isinstance(value, (int, float)) or (
+        isinstance(value, str) and value.strip().lstrip("-").isdigit()
+    ):
+        try:
+            return int(value)
+        except (ValueError, OverflowError):
+            return None
+    return None

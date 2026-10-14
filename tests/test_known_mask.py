@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock
 
-from homeassistant.const import EntityCategory
-
 from custom_components.eufy_sdk.switch import EufyBitmaskSwitch
+from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 
 def entity_for(value: object, *, bit: int = 4) -> EufyBitmaskSwitch:
@@ -79,8 +79,8 @@ class ExistingMaskCompatibilityTests(IsolatedAsyncioTestCase):
     """Qualify retained coercion/fallback and presentation without expanding policy."""
 
     async def test_unknown_values_keep_fixed_fallback(self) -> None:
-        """Unknown/string/object values use fallback, not reported-mask preservation."""
-        for value in (None, "32775", "invalid", {}, []):
+        """Only an absent value uses the established enable-base fallback."""
+        for value in (None,):
             with self.subTest(value=value):
                 entity = entity_for(value)
                 self.assertEqual(entity._mask(), 0x30000)
@@ -90,6 +90,21 @@ class ExistingMaskCompatibilityTests(IsolatedAsyncioTestCase):
                 await entity.async_turn_off()
                 entity.write.assert_awaited_once_with(0x30000)
 
+    async def test_numeric_strings_preserve_mask_and_nonmasks_refuse(self) -> None:
+        """Reported numeric strings preserve other bits; nonmasks are not replaced."""
+        entity = entity_for("32775")
+        await entity.async_turn_off()
+        entity.write.assert_awaited_once_with(32771)
+        for value in ("invalid", {}, []):
+            with self.subTest(value=value):
+                entity = entity_for(value)
+                self.assertIsNone(entity.is_on)
+                with self.assertRaises(HomeAssistantError):
+                    await entity.async_turn_on()
+                with self.assertRaises(HomeAssistantError):
+                    await entity.async_turn_off()
+                entity.write.assert_not_awaited()
+
     async def test_bool_float_and_negative_conversion_is_unchanged(self) -> None:
         """Existing int conversion accepts booleans and truncates fractional numbers."""
         for value in (True, False, 32775.9, -1, -1.9):
@@ -97,14 +112,15 @@ class ExistingMaskCompatibilityTests(IsolatedAsyncioTestCase):
                 entity = entity_for(value)
                 self.assertEqual(entity._mask(), int(value))
 
-    async def test_nonfinite_float_still_raises_before_write(self) -> None:
-        """No new admission or silent repair of existing nonfinite values occurs."""
-        for value, error in ((float("nan"), ValueError), (float("inf"), OverflowError)):
+    async def test_nonfinite_float_is_unknown_and_refused_before_write(self) -> None:
+        """Nonfinite numeric values remain unwritable with a controlled HA error."""
+        for value in (float("nan"), float("inf")):
             with self.subTest(value=value):
                 entity = entity_for(value)
-                with self.assertRaises(error):
+                self.assertIsNone(entity.is_on)
+                with self.assertRaises(HomeAssistantError):
                     await entity.async_turn_on()
-                with self.assertRaises(error):
+                with self.assertRaises(HomeAssistantError):
                     await entity.async_turn_off()
                 entity.write.assert_not_awaited()
 
@@ -118,5 +134,4 @@ class ExistingMaskCompatibilityTests(IsolatedAsyncioTestCase):
         entity.device["state"]["aiDetectType"] = "4"
         self.assertTrue(entity.is_on)
         entity.device["state"]["aiDetectType"] = "invalid"
-        with self.assertRaises(ValueError):
-            _ = entity.is_on
+        self.assertIsNone(entity.is_on)
