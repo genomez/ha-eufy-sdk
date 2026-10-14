@@ -1,5 +1,6 @@
 {
-    "name": "eufy-sdk",
+    "name": "Eufy SDK S1 Experimental (genomez)",
+    "hide_default_branch": true,
     "homeassistant": "2026.6.4",
     "hacs": "2.0.5"
 }

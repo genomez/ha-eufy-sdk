@@ -113,12 +113,21 @@
       "reauth_confirm": {
         "title": "De eufy-bridge opnieuw verifiëren",
         "description": "De bridge op {host} moet opnieuw inloggen (de sessie is verlopen, waardoor eufy om 2FA/captcha vraagt). Zorg dat de bridge actief en bereikbaar is en verzend daarna om door te gaan."
+      },
+      "reconfigure": {
+        "title": "Bridge-adres wijzigen",
+        "description": "Voer de nieuwe host en poort in voor deze bestaande configuratie. Controleer eerst of dezelfde account en apparaten worden gebruikt. Het oorspronkelijke adres blijft behouden totdat verbinding en authenticatie slagen.",
+        "data": {
+          "host": "Host",
+          "port": "Poort"
+        }
       }
     },
     "error": {
       "cannot_connect": "Kon de bridge niet bereiken op dat host-adres/die poort.",
       "invalid_2fa": "Die verificatiecode werd niet geaccepteerd.",
-      "invalid_captcha": "Die captcha werd niet geaccepteerd."
+      "invalid_captcha": "Die captcha werd niet geaccepteerd.",
+      "invalid_host": "Voer een bridge-host in."
     },
     "abort": {
       "already_configured": "Deze bridge is al geconfigureerd.",

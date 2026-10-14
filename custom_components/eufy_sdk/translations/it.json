@@ -113,12 +113,21 @@
       "reauth_confirm": {
         "title": "Nuova autenticazione del bridge eufy",
         "description": "Il bridge su {host} deve accedere di nuovo: la sua sessione è scaduta, quindi eufy chiede 2FA o captcha. Verifica che il bridge sia in esecuzione e raggiungibile, poi conferma per proseguire."
+      },
+      "reconfigure": {
+        "title": "Modifica indirizzo del bridge",
+        "description": "Inserisci il nuovo host e la porta per questa configurazione esistente. Verifica che usi lo stesso account e gli stessi dispositivi. L’indirizzo originale rimane fino alla connessione e autenticazione riuscite.",
+        "data": {
+          "host": "Host",
+          "port": "Porta"
+        }
       }
     },
     "error": {
       "cannot_connect": "Impossibile raggiungere il bridge su questo host e porta.",
       "invalid_2fa": "Codice di verifica non accettato.",
-      "invalid_captcha": "Captcha non accettato."
+      "invalid_captcha": "Captcha non accettato.",
+      "invalid_host": "Inserisci un host del bridge."
     },
     "abort": {
       "already_configured": "Questo bridge è già configurato.",

@@ -122,12 +122,21 @@
       "reauth_confirm": {
         "title": "Re-authenticate the eufy bridge",
         "description": "The bridge at {host} needs to log in again (its session expired, so eufy is asking for 2FA/captcha). Make sure the bridge is running and reachable, then submit to continue."
+      },
+      "reconfigure": {
+        "title": "Change bridge endpoint",
+        "description": "Enter the new host and port for this existing bridge entry. Confirm it serves the same account and devices before changing it. The original endpoint remains until connection and authentication succeed.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
       }
     },
     "error": {
       "cannot_connect": "Could not reach the bridge at that host/port.",
       "invalid_2fa": "That verification code was not accepted.",
-      "invalid_captcha": "That captcha was not accepted."
+      "invalid_captcha": "That captcha was not accepted.",
+      "invalid_host": "Enter a bridge host."
     },
     "abort": {
       "already_configured": "This bridge is already configured.",

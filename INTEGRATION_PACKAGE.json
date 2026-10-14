@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "version": "0.3.1.dev1",
+  "domain": "eufy_sdk",
+  "owner": "genomez",
+  "filename": "eufy-sdk-s1-0.3.1.dev1.zip",
+  "hacsMode": "normal repository layout; not zip_release",
+  "manualInstallSubtree": "custom_components/eufy_sdk/",
+  "files": [
+    {
+      "path": "CORE_COMPATIBILITY.md",
+      "sha256": "04249ec59d11801ad2cab9712154f7391ec3c0d5807be863dc9658244ce2c2b7"
+    },
+    {
+      "path": "EXPERIMENTAL.md",
+      "sha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373"
+    },
+    {
+      "path": "INSTALL.md",
+      "sha256": "2163168ffe6666ebedaa264c29aac2ccea8f0e5981943456ad5f89d2e8a78af6"
+    },
+    {
+      "path": "INTEGRATION_NOTICES.md",
+      "sha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
+    },
+    {
+      "path": "README.md",
+      "sha256": "73a5191e1d64400cac1071259e41c06e973227dcdabf0e0b870343fe76f259f0"
+    },
+    {
+      "path": "custom_components/eufy_sdk/LICENSE",
+      "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
+    },
+    {
+      "path": "custom_components/eufy_sdk/__init__.py",
+      "sha256": "ab595350b68727b0ac6372d98e9fbb549b58d73fe15b59dfcc42abd026f1eb83"
+    },
+    {
+      "path": "custom_components/eufy_sdk/alarm_control_panel.py",
+      "sha256": "221cef4e3db77ba5982b6e65994868f90900a01a557145943235ec251b057deb"
+    },
+    {
+      "path": "custom_components/eufy_sdk/alarm_logic.py",
+      "sha256": "b78d73ddec1f99177c4a22bba12c4beb22db76d5486365655bf188c429bbd227"
+    },
+    {
+      "path": "custom_components/eufy_sdk/alarm_sync.py",
+      "sha256": "d8846e144fc31b800c1275c035f1f1fc47748ebeba360f8c5577d240e1cd94d5"
+    },
+    {
+      "path": "custom_components/eufy_sdk/api.py",
+      "sha256": "044c47b6f9440fae61f4cb7d73bb4e194f9b14e2c565ce2f3eb00f7750b5356f"
+    },
+    {
+      "path": "custom_components/eufy_sdk/arming_sync.py",
+      "sha256": "57ff180f70c118fe28163cd1bdf510e835fa764baee7c00c5047035467bd6f29"
+    },
+    {
+      "path": "custom_components/eufy_sdk/bespoke.py",
+      "sha256": "7d5d5828d5a5b724349def24cdadb5ba1932e6488216e298d72ddbb373c7c04c"
+    },
+    {
+      "path": "custom_components/eufy_sdk/binary_sensor.py",
+      "sha256": "454cf0cc930991303ac9f8a8359b90a2a40aa6f66442abbe67d82efd592a37c6"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/dark_icon.png",
+      "sha256": "b8d3e1aa2f77401efcbd6899f13bbb587675cd991bcb700afda0e48975261491"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/dark_icon@2x.png",
+      "sha256": "5acb6ba420ab590c7bb9950c65db7eb5c4a7fb77efc7fd6a9152b352400f757b"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/dark_logo.png",
+      "sha256": "5ad7e2d1dbb9d2c5fe456c3f264ddbfa371d071c59a3be3b0efadc90d30c9cea"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/dark_logo@2x.png",
+      "sha256": "a177d29a857d8f95fca8c40cd540ef3931384958bb6c786ffa5cd7f0bc90876a"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/icon.png",
+      "sha256": "d103cdf4527cef4d198720dc976f18d98a4ea1ddcc9fc33815f8c2e744deca1f"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/icon@2x.png",
+      "sha256": "0a74cd3c262fc31e34207400ae1038c22c9b748921bdc01da3854dde4263d9b9"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/logo.png",
+      "sha256": "b3b47f4ef3bfd683ab493c7a61214e81f50a0f33234fe427c5f2c37ecaf2368e"
+    },
+    {
+      "path": "custom_components/eufy_sdk/brand/logo@2x.png",
+      "sha256": "787837385396f5c3b6284fce332d63236ade2e7976d14fda6d49ae53687c3d73"
+    },
+    {
+      "path": "custom_components/eufy_sdk/button.py",
+      "sha256": "cff49d7556e56ff1cc4dc99b8cf501eb3cf0b391178fd81fc8b3d959da6344e4"
+    },
+    {
+      "path": "custom_components/eufy_sdk/camera.py",
+      "sha256": "4b2dacd1aafa3e5c044f9afb7f3d169b7459968111dd9bd232dd5c92115baaa5"
+    },
+    {
+      "path": "custom_components/eufy_sdk/config_flow.py",
+      "sha256": "c2620d34d8cb376aef59a95c1e52c1861a643c772b78531db20bafddac5b67c9"
+    },
+    {
+      "path": "custom_components/eufy_sdk/const.py",
+      "sha256": "fc671b0de67fbff349687349e1e79311fbaf3ea364499d1defc3a72028f4e701"
+    },
+    {
+      "path": "custom_components/eufy_sdk/coordinator.py",
+      "sha256": "18f3745f991ab2723e61a696c649ea1458f3be2c05f3c6abc970aa59f4b88d4c"
+    },
+    {
+      "path": "custom_components/eufy_sdk/data.py",
+      "sha256": "dcf8d3406822b76d3180e8760051b22b7db3fe5490515bfb090f602a74e47241"
+    },
+    {
+      "path": "custom_components/eufy_sdk/device_trigger.py",
+      "sha256": "9b4a149ca8f2611dcd6d84dd0070fc7be17ee43e706683542cd83403f1d9c9b9"
+    },
+    {
+      "path": "custom_components/eufy_sdk/diagnostics.py",
+      "sha256": "cbc1c12d45481000a865cbd836fb67b22d024056d1b5517c34c3c1dce2387feb"
+    },
+    {
+      "path": "custom_components/eufy_sdk/entity.py",
+      "sha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88"
+    },
+    {
+      "path": "custom_components/eufy_sdk/event.py",
+      "sha256": "43be0efc00be4fbd4b98ee1da093f0bc9164e2ff954f93dcae3fa8826288b977"
+    },
+    {
+      "path": "custom_components/eufy_sdk/event_image.py",
+      "sha256": "d13e87d314c4e3e4eb956de7d68c94aeca3402631af52cedf02e23240866d627"
+    },
+    {
+      "path": "custom_components/eufy_sdk/image.py",
+      "sha256": "b9555b3af15d1c16d01f51e2e89fafdba0f8dc6d0e704dd36b0c7a8ab20ce505"
+    },
+    {
+      "path": "custom_components/eufy_sdk/light.py",
+      "sha256": "002a62c652ecb9cc45ebe516de3446d8ffa4b0d295fa3c0cb8f7c66f84e88f81"
+    },
+    {
+      "path": "custom_components/eufy_sdk/lock.py",
+      "sha256": "171be5106a535d8097ba098c39f98e58508045ab351efb019777778f3b8c692a"
+    },
+    {
+      "path": "custom_components/eufy_sdk/manifest.json",
+      "sha256": "28b5b8cb942a6f77b646336d73cbb3fd97789403dc3f7a16f56fae6f93957c9c"
+    },
+    {
+      "path": "custom_components/eufy_sdk/manifest_reads.py",
+      "sha256": "2ba5310c52188931bbc0bfb52657312a00f798ce4fc8e22113fd09c6deabfb8d"
+    },
+    {
+      "path": "custom_components/eufy_sdk/number.py",
+      "sha256": "422ad59e16d4910566f1a1ad537aff4c0b5d147c9a66dbfd9ca87d79bcc64946"
+    },
+    {
+      "path": "custom_components/eufy_sdk/presets.py",
+      "sha256": "5fa96bed348b611e3b56ff0caa6c184c3a2a7d3c1802eb089323ab347efc2d14"
+    },
+    {
+      "path": "custom_components/eufy_sdk/property_entities.py",
+      "sha256": "64bf121963b045b8d6b503a4087645ee13498e916b23378e2127b02a6c63695e"
+    },
+    {
+      "path": "custom_components/eufy_sdk/property_sync.py",
+      "sha256": "dcb6225195e5c8364a1ecc0caef2d07741b3f7471a193bf4bdfeac594fcefc36"
+    },
+    {
+      "path": "custom_components/eufy_sdk/pushmap.py",
+      "sha256": "f1d3ed5887ec5aa21557880263b4d230a016847a03e09565659b025d8339c7b3"
+    },
+    {
+      "path": "custom_components/eufy_sdk/schedule_logic.py",
+      "sha256": "cc5480fc972b9576038b6eabf6cb47415d745f74a460df4edbd74906fd66a929"
+    },
+    {
+      "path": "custom_components/eufy_sdk/select.py",
+      "sha256": "2fac06e88ecfe242dbb3d620b074784aac4ef78198391add7692c5ea7c52825e"
+    },
+    {
+      "path": "custom_components/eufy_sdk/sensor.py",
+      "sha256": "fbb40aaaa0d2a003da26bca0ecd7aa7e265624d9b20ff376c2ebcaae74789d7d"
+    },
+    {
+      "path": "custom_components/eufy_sdk/siren.py",
+      "sha256": "e4f346dd78709d5d6d3e6e1a502033c342ebc329a3a493e3dc97870e644b5643"
+    },
+    {
+      "path": "custom_components/eufy_sdk/snapshot_policy.py",
+      "sha256": "1271ca790b639a980640474d79cf7eb74d71c4edb2abb1d60c4ae7da43dda6dd"
+    },
+    {
+      "path": "custom_components/eufy_sdk/storage_telemetry.py",
+      "sha256": "d94e05611fc3e6b01a9df3e304df5f7c4d4380f43d60928d1857f245afe304dd"
+    },
+    {
+      "path": "custom_components/eufy_sdk/switch.py",
+      "sha256": "16b1208e7c126c9895353296404481d5e80cbef9876c5cbf255e55929231688b"
+    },
+    {
+      "path": "custom_components/eufy_sdk/translations/en.json",
+      "sha256": "522de2461289eaef19050ddeac95434dcc64df350da725e00133a6e7bcce2d2c"
+    },
+    {
+      "path": "custom_components/eufy_sdk/translations/it.json",
+      "sha256": "77683637b87b5e87fb7ab694569780768297cbbdba44606b806348857fa89dbb"
+    },
+    {
+      "path": "custom_components/eufy_sdk/translations/nl.json",
+      "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
+    }
+  ]
+}

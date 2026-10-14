@@ -1,8 +1,8 @@
-# Experimental source preview
+# Experimental installer release
 
-This branch is for source review and development. It is not a supported installation or a published binary release. No npm package, container image, HACS release or add-on-store release accompanies it.
+This experimental installer release is `0.3.1.dev1`, available through its matching [GitHub prerelease](https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1.dev1) source and manual integration ZIP. It is not a supported general installation. Publication does not establish HACS UI replacement, live Supervisor migration, stock-Core media playback, camera switching or physical-device acceptance. See [INSTALL.md](INSTALL.md).
 
-The source is a composite S1/T9000 baseline, not a byte-equivalent copy of an official upstream version. Inherited version fields identify its preparation inputs; they do not identify a downloadable fork release. Existing contribution branches and upstream history remain separate.
+The source is a composite S1/T9000 baseline, not a byte-equivalent official upstream version. The integration version identifies this experimental release; historical component version labels do not identify official release inclusion. Existing contribution branches and upstream history remain separate. Candidate runtime changes are limited to an explicit bridge-endpoint reconfigure flow and its translations/tests; prior entry/registry identifiers and config schema remain unchanged.
 
 ## Scope and evidence
 
@@ -16,11 +16,11 @@ The tested streaming environment used six separate, version-specific Home Assist
 
 ## Installation boundary
 
-Do not replace a working installation with this source preview. The integration retains the upstream `eufy_sdk` domain and cannot be installed alongside another copy under that domain. Add-on repository identity affects data directories and discovery; migration has not been validated for other installations. There is no public binary rollback target in this preview.
+Do not replace a working installation with the earlier source preview. Installation of this experimental release requires the backup/identity checkpoint in [INSTALL.md](INSTALL.md). The integration retains `eufy_sdk` and cannot coexist with another owner of that domain. The endpoint reconfigure flow checks connection/authentication, not account/device identity. Add-on repository identity affects data directories and discovery; migration has not been validated for other installations. There is no promised public binary rollback target: preserve exact prior component, coherent configuration/registry snapshot, sole HACS/manual owner and paired bridge/add-on recovery material.
 
-The bridge's historical registry SDK dependency is not the customized SDK used during qualification. Running `npm ci` in the bridge alone does not produce the qualified component pair. The add-on recipe requires exact paired build inputs which are not a public install bundle. A coherent public dependency lock, distributable images, migration instructions and rollback procedure will accompany a later installable release.
+The bridge's historical registry SDK dependency is not the customized SDK used during qualification. Running `npm ci` in the source-preview bridge alone does not produce the qualified pair. Use only the separately reviewed exact paired experimental bridge/add-on image and corresponding-source/notices assets; this integration ZIP bundles neither. Verify that paired release's registry digest and source receipts. Add-on migration/rollback and live acceptance remain separate installation work.
 
-No workflow in this branch publishes packages, images or releases. Native dependency provenance and binary corresponding-source/notices requirements remain separate release work. Existing licenses and upstream credit are preserved.
+No workflow in this branch publishes packages, images or releases. Native dependency provenance and binary corresponding-source/notices are supplied with the separate paired container release, not this integration artifact. Existing licenses and upstream credit are preserved.
 
 ## Contributing useful findings
 

@@ -46,6 +46,101 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self._client: EufySdkApiClient | None = None
         self._host: str = ""
         self._port: int = DEFAULT_PORT
+        self._reconfigure_removed = False
+
+    @callback
+    def async_remove(self) -> None:
+        """Retire a reconfigure connection when HA removes its flow."""
+        if self.source != config_entries.SOURCE_RECONFIGURE:
+            return
+        self._reconfigure_removed = True
+        if self._client is not None:
+            client, self._client = self._client, None
+            self.hass.async_create_task(client.close())
+
+    async def _close_reconfigure_client(self) -> None:
+        """Close a failed or cancelled reconfigure connection."""
+        if self.source == config_entries.SOURCE_RECONFIGURE and self._client:
+            client, self._client = self._client, None
+            await client.close()
+
+    def _reconfigure_endpoint_in_use(self) -> bool:
+        """Reject another entry's endpoint without changing either entry."""
+        current = self._get_reconfigure_entry()
+        endpoint = f"{self._host}:{self._port}"
+        return any(
+            entry.entry_id != current.entry_id
+            and (
+                entry.unique_id == endpoint
+                or (
+                    entry.data.get(CONF_HOST) == self._host
+                    and entry.data.get(CONF_PORT) == self._port
+                )
+            )
+            for entry in self._async_current_entries()
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Validate a replacement bridge endpoint before updating the entry."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._host = str(user_input[CONF_HOST]).strip()
+            self._port = int(user_input[CONF_PORT])
+            if not self._host:
+                errors[CONF_HOST] = "invalid_host"
+            elif self._reconfigure_endpoint_in_use():
+                return self.async_abort(reason="already_configured")
+            else:
+                client = self._client = EufySdkApiClient(
+                    self._host, self._port, async_get_clientsession(self.hass)
+                )
+                try:
+                    await client.connect()
+                except EufySdkApiClientCommunicationError:
+                    await client.close()
+                    self._client = None
+                    LOGGER.warning("bridge reconfigure failed [bridge_unreachable]")
+                    errors["base"] = "cannot_connect"
+                except BaseException:
+                    await client.close()
+                    self._client = None
+                    raise
+                else:
+                    # Removal can close the client before connect assigns its
+                    # socket. Close again after connect to retire that late socket.
+                    if self._reconfigure_removed:
+                        await client.close()
+                        self._client = None
+                        return self.async_abort(reason="cannot_connect")
+                    try:
+                        return await self._continue_auth()
+                    except BaseException:
+                        await self._close_reconfigure_client()
+                        raise
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOST,
+                        default=(user_input or entry.data)[CONF_HOST],
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_PORT,
+                        default=(user_input or entry.data)[CONF_PORT],
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_reauth(
         self,
@@ -126,22 +221,58 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _continue_auth(self) -> config_entries.ConfigFlowResult:
+    async def _continue_auth(  # noqa: PLR0911 - explicit auth/ownership outcomes
+        self,
+    ) -> config_entries.ConfigFlowResult:
         """Route to the right step for the bridge's current auth state."""
         if self._client is None:
             return self.async_abort(reason="cannot_connect")
+        client = self._client
         try:
-            auth = await self._client.auth_status()
+            auth = await client.auth_status()
         except EufySdkApiClientError:
             LOGGER.error("auth.status failed [auth_status_unavailable]")
-            await self._client.close()
+            await client.close()
             self._client = None
+            return self.async_abort(reason="cannot_connect")
+
+        except BaseException:
+            await self._close_reconfigure_client()
+            raise
+
+        if (
+            self.source == config_entries.SOURCE_RECONFIGURE
+            and self._reconfigure_removed
+        ):
+            await client.close()
             return self.async_abort(reason="cannot_connect")
 
         state = auth.get("state")
         if state == "ok":
-            await self._client.close()  # the coordinator opens its own connection
+            await client.close()  # the coordinator opens its own connection
             self._client = None
+            if self.source == config_entries.SOURCE_RECONFIGURE:
+                if self._reconfigure_removed:
+                    return self.async_abort(reason="cannot_connect")
+                # A different entry may have claimed this endpoint while the
+                # user completed a challenge. Recheck after the last await.
+                if self._reconfigure_endpoint_in_use():
+                    return self.async_abort(reason="already_configured")
+                update = {
+                    "data_updates": {CONF_HOST: self._host, CONF_PORT: self._port},
+                    "unique_id": f"{self._host}:{self._port}",
+                    "title": f"eufy bridge ({self._host})",
+                }
+                entry = self._get_reconfigure_entry()
+                # The integration's registered update listener already reloads
+                # a loaded entry. Let that listener own the reload exactly once.
+                if entry.update_listeners:
+                    return self.async_update_and_abort(entry, **update)
+                return self.async_update_reload_and_abort(
+                    entry,
+                    **update,
+                    reload_even_if_entry_is_unchanged=False,
+                )
             # Reauth → the entry exists, so reload it; first setup → create it.
             return (
                 self.async_update_reload_and_abort(
@@ -159,7 +290,7 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_captcha()
         # The bridge owns login. Observing an incomplete or failed attempt must
         # not start additional cloud logins, including during a reauth flow.
-        await self._client.close()
+        await client.close()
         self._client = None
         return self.async_abort(
             reason={
@@ -179,9 +310,17 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             if user_input.get("resend"):
-                await self._client.retrigger_auth()
+                try:
+                    await self._client.retrigger_auth()
+                except BaseException:
+                    await self._close_reconfigure_client()
+                    raise
                 return await self._continue_auth()
-            auth = await self._client.submit_2fa(str(user_input["code"]))
+            try:
+                auth = await self._client.submit_2fa(str(user_input["code"]))
+            except BaseException:
+                await self._close_reconfigure_client()
+                raise
             if auth.get("state") == "ok":
                 return await self._continue_auth()
             errors["base"] = "invalid_2fa"
@@ -207,15 +346,27 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             if user_input.get("refresh"):
-                await self._client.retrigger_auth()
+                try:
+                    await self._client.retrigger_auth()
+                except BaseException:
+                    await self._close_reconfigure_client()
+                    raise
                 return await self._continue_auth()
-            auth = await self._client.submit_captcha(str(user_input["answer"]))
+            try:
+                auth = await self._client.submit_captcha(str(user_input["answer"]))
+            except BaseException:
+                await self._close_reconfigure_client()
+                raise
             # An accepted answer may lead to email 2FA before login completes.
             if auth.get("state") in ("ok", "require_2fa"):
                 return await self._continue_auth()
             errors["base"] = "invalid_captcha"
 
-        auth = await self._client.auth_status()
+        try:
+            auth = await self._client.auth_status()
+        except BaseException:
+            await self._close_reconfigure_client()
+            raise
         image = auth.get("image", "")
         return self.async_show_form(
             step_id="captcha",
