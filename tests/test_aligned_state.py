@@ -61,7 +61,10 @@ class TypedSensorTests(unittest.TestCase):
         self.assertEqual(
             self.value({"type": "number", "enumValues": {"0": "off"}}, 0), "off"
         )
-        self.assertIsNone(self.value({"type": "number", "enumValues": {"0": "off"}}, 9))
+        # Unlabelled codes stay visible as their raw value.
+        self.assertEqual(
+            self.value({"type": "number", "enumValues": {"0": "off"}}, 9), 9
+        )
         self.assertIsNone(self.value({"type": "string", "raw": True}, "synthetic-wire"))
 
     def test_geofence_without_report_is_unknown(self):

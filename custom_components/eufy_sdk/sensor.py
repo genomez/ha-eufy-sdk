@@ -527,7 +527,7 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
-        """Current value; enums render as their label, structured values are dropped."""
+        """Current value; enums use labels or raw codes, structured values are dropped."""
         v = self.prop_value
         if v is None or self._spec.get("raw") is True:
             return None
@@ -542,7 +542,7 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
             return None
         enum = self._spec.get("enumValues")
         if enum:
-            return enum.get(str(v))
+            return enum.get(str(v), v)
         return v
 
 
