@@ -22,6 +22,14 @@ FRESHNESS_MS = 2 * 60 * 60 * 1000
 UNIT_PROFILE = "T9000/4.4.0.4 app-compared MiB"
 _MAX_INTEGER = (1 << 53) - 1
 _PERCENT_MAX = 100
+_FAILURE_CATEGORIES = (
+    "busy",
+    "consumed_session",
+    "timeout",
+    "invalid_quantity",
+    "ownership_changed",
+    "other",
+)
 _BYTE_FIELDS = (
     "total_bytes",
     "used_bytes",
@@ -42,6 +50,30 @@ _SENSORS = (
 
 def _now_ms() -> float:
     return time.time() * 1000
+
+
+def _attempt_diagnostics(telemetry: dict) -> dict[str, Any]:
+    """Keep optional attempt evidence bounded, including from older bridges."""
+    result = {}
+    for source, target in (
+        ("lastAttemptAtMs", "last_attempt_at_ms"),
+        ("nextEligibleAtMs", "next_eligible_at_ms"),
+    ):
+        value = telemetry.get(source)
+        result[target] = (
+            value if type(value) is int and 0 <= value <= _MAX_INTEGER else None
+        )
+    failures = telemetry.get("consecutiveFailures")
+    result["consecutive_failures"] = (
+        failures if type(failures) is int and 0 <= failures <= _MAX_INTEGER else 0
+    )
+    category = telemetry.get("lastFailureCategory")
+    result["last_failure_category"] = (
+        (category if category in _FAILURE_CATEGORIES else "other")
+        if result["consecutive_failures"]
+        else None
+    )
+    return result
 
 
 def supports_storage(device: dict[str, Any]) -> bool:
@@ -204,15 +236,32 @@ class EufySdkStorageSensor(EufySdkDeviceEntity, SensorEntity):
         now_ms = _now_ms()
         status = storage_reading(self.device, now_ms)[0]
         observed = storage_observed_at(self.device, now_ms)
+        attempts = _attempt_diagnostics(
+            self.device["storageTelemetry"] if supports_storage(self.device) else {}
+        )
         if not super().available:
             status, observed = "unavailable", None
+            attempts = _attempt_diagnostics({})
         elif observed is not None and (
             self.device["storageTelemetry"]["status"] == "stale"
             or now_ms - observed >= FRESHNESS_MS
         ):
             status = "stale"
+        if status == "unknown":
+            status = (
+                "off"
+                if self.device["storageTelemetry"]["enabled"] is False
+                else "waiting_for_first_reading"
+            )
+        if (
+            status in ("waiting_for_first_reading", "current", "stale")
+            and attempts["last_attempt_at_ms"] is not None
+            and attempts["consecutive_failures"] > 0
+        ):
+            status = "last_attempt_failed"
         return {
             "storage_status": status,
+            **attempts,
             "unit_profile": UNIT_PROFILE if observed is not None else None,
             "correlation": "time-associated" if observed is not None else None,
             "exactly_correlated": False,
