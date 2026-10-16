@@ -99,6 +99,18 @@ class StorageAttemptStatusTests(unittest.TestCase):
         self.assertFalse(available)
         self.assertIsNone(value)
 
+    def test_fractional_next_attempt_time_is_truncated(self):
+        row = device()
+        row["storageTelemetry"].update(
+            lastAttemptAtMs=NOW, consecutiveFailures=0, nextEligibleAtMs=NOW + 0.48
+        )
+        attributes, _, _ = self.attributes(row)
+        self.assertEqual(attributes["next_eligible_at_ms"], NOW)
+        self.assertIs(type(attributes["next_eligible_at_ms"]), int)
+        for bad in (float("nan"), float("inf"), -1.5):
+            row["storageTelemetry"]["nextEligibleAtMs"] = bad
+            self.assertIsNone(self.attributes(row)[0]["next_eligible_at_ms"])
+
     def test_malformed_diagnostics_cannot_expose_raw_details_or_change_values(self):
         row = device()
         row["storageTelemetry"].update(

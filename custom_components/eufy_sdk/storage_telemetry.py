@@ -60,6 +60,9 @@ def _attempt_diagnostics(telemetry: dict) -> dict[str, Any]:
         ("nextEligibleAtMs", "next_eligible_at_ms"),
     ):
         value = telemetry.get(source)
+        # Older bridge builds send a fractional next-attempt time.
+        if type(value) is float and math.isfinite(value):
+            value = int(value)
         result[target] = (
             value if type(value) is int and 0 <= value <= _MAX_INTEGER else None
         )
