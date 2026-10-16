@@ -138,4 +138,10 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             self.solix_devices = {d["sn"]: d for d in solix if d.get("sn")}
         except EufySdkApiClientError:
             self.solix_devices = getattr(self, "solix_devices", {})
+        # Retain multiplicity before the coordinator dictionary collapses duplicates.
+        self.device_serial_counts = {}
+        for device in devices:
+            serial = device.get("sn")
+            if isinstance(serial, str):
+                self.device_serial_counts[serial] = self.device_serial_counts.get(serial, 0) + 1
         return {d["sn"]: d for d in devices if d.get("sn")}

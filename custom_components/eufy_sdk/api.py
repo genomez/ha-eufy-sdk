@@ -39,6 +39,11 @@ COMMAND_ERROR_CODES = frozenset(
     }
 )
 
+WEBRTC_ERROR_CODES = frozenset({
+    "webrtc_busy", "webrtc_releasing", "webrtc_unsupported",
+    "webrtc_closed", "webrtc_failed",
+})
+
 
 class EufySdkApiClientCommunicationError(EufySdkApiClientError):
     """The bridge could not be reached / spoke unexpectedly."""
@@ -76,6 +81,23 @@ class EufySdkApiClient:
         self._closing = False
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self._webrtc_callbacks: dict[str, Callable[[dict[str, Any]], None]] = {}
+
+    def register_webrtc_session(self, session_id, callback):
+        """Bind pushes to one session on the current transport, without connecting."""
+        self._webrtc_callbacks[session_id] = callback
+        return self._ws
+
+    def remove_webrtc_session(self, session_id):
+        """Retire pushes before scheduling close."""
+        self._webrtc_callbacks.pop(session_id, None)
+
+    def _invalidate_webrtc_sessions(self):
+        """A replacement transport never inherits sessions from its predecessor."""
+        callbacks = tuple(self._webrtc_callbacks.values())
+        self._webrtc_callbacks.clear()
+        for callback in callbacks:
+            callback({"event": "webrtc.closed", "code": "webrtc_closed"})
 
     @property
     def connected(self) -> bool:
@@ -85,6 +107,7 @@ class EufySdkApiClient:
     async def reset_connection(self) -> None:
         """Retire a wedged bridge socket while preserving reconnect behavior."""
         async with self._connect_lock:
+            self._invalidate_webrtc_sessions()
             ws, task = self._ws, self._recv_task
             self._ws = None
             self._recv_task = None
@@ -122,6 +145,7 @@ class EufySdkApiClient:
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
         self._closing = True
+        self._invalidate_webrtc_sessions()
         if self._reconnect_task:
             self._reconnect_task.cancel()
             self._reconnect_task = None
@@ -152,6 +176,11 @@ class EufySdkApiClient:
                     fut = self._pending.pop(mid)
                     if not fut.done():
                         fut.set_result(data)
+                elif data.get("event") in ("webrtc.candidate", "webrtc.closed"):
+                    # SDP and ICE content must never enter the general HA event bus.
+                    handler = self._webrtc_callbacks.get(data.get("sessionId"))
+                    if handler is not None:
+                        handler(data)
                 elif data.get("event") and self._on_event:
                     self._on_event(data)
         except (aiohttp.ClientError, asyncio.CancelledError):
@@ -161,6 +190,7 @@ class EufySdkApiClient:
             # and (unless deliberately closing) reconnect so events resume promptly, not
             # only on the next poll.
             self._ws = None
+            self._invalidate_webrtc_sessions()
             for fut in self._pending.values():
                 if not fut.done():
                     fut.set_exception(
@@ -196,10 +226,11 @@ class EufySdkApiClient:
         self,
         cmd: str,
         timeout: float = 15,  # noqa: ASYNC109 — deliberate per-call timeout API
+        _transport: aiohttp.ClientWebSocketResponse | None = None,
         **args: Any,
     ) -> dict[str, Any]:
         """Send a command and await its reply. Raises on `ok: false`."""
-        if not self.connected:
+        if not self.connected or (_transport is not None and self._ws is not _transport):
             msg = "not connected"
             raise EufySdkApiClientCommunicationError(msg)
         self._next_id += 1
@@ -224,7 +255,9 @@ class EufySdkApiClient:
             code = reply.get("code")
             msg = (
                 code
-                if isinstance(code, str) and code in COMMAND_ERROR_CODES
+                if isinstance(code, str) and code in (
+                    WEBRTC_ERROR_CODES if cmd.startswith("webrtc.") else COMMAND_ERROR_CODES
+                )
                 else "bridge_request_rejected"
             )
             raise EufySdkApiClientError(msg)

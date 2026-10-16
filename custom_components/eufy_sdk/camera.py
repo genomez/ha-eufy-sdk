@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, CONF_HOST, CONF_PORT, DOMAIN
 from .snapshot_policy import snapshot_url
+from .native_webrtc import NativeWebRTCMixin, is_s1_camera
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -34,7 +35,9 @@ async def async_setup_entry(
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     async_add_entities(
-        EufySdkCamera(coordinator, sn, host, port)
+        (EufySdkS1Camera if is_s1_camera(coordinator, sn) else EufySdkCamera)(
+            coordinator, sn, host, port
+        )
         for sn, dev in coordinator.data.items()
         if dev.get("stream")
     )
@@ -98,3 +101,7 @@ class EufySdkCamera(CoordinatorEntity["EufySdkDataUpdateCoordinator"], Camera):
         except (TimeoutError, OSError):
             return None
         return None
+
+
+class EufySdkS1Camera(NativeWebRTCMixin, EufySdkCamera):
+    """Native WebRTC only for a camera uniquely bound to a T9000 station."""
