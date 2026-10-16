@@ -26,6 +26,11 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
     """Exercise real entity/cache methods with synthetic RPC and timer boundaries."""
 
     def _entity(self, *, initial=False, prop="light"):
+        offline_timer = patch(
+            "custom_components.eufy_sdk.entity.async_call_later", return_value=Mock()
+        )
+        self.offline_timer = offline_timer.start()
+        self.addCleanup(offline_timer.stop)
         client = SimpleNamespace(set_property=AsyncMock())
         coordinator = SimpleNamespace(
             data={"fixture-device": {"state": {prop: initial}}},
@@ -102,11 +107,14 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         )
         self._report(entity, target)
         self.assertEqual(seen, [target])
-        self.assertEqual(entity._optimistic_owner, owner)
+        self.assertIsNone(entity._optimistic_owner)
+        self.assertEqual(entity._light_guard_owner, owner)
         self.assertIs(entity._post_write_unsub, cancel)
         self.assertEqual(entity._post_write_owner, owner)
         self.assertEqual(entity._report_generation, 2)
-        timer.assert_called_once_with(entity.hass, POST_WRITE_REFRESH_SECS, ANY)
+        self.assertEqual(timer.call_count, 2)
+        timer.assert_any_call(entity.hass, POST_WRITE_REFRESH_SECS, ANY)
+        timer.assert_any_call(entity.hass, 30, ANY)
         cancel.assert_not_called()
 
     async def test_on_matching_report_then_stale_receipt_has_no_reversal(self):
@@ -141,7 +149,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(seen, [target])
                 cancel.assert_not_called()
 
-    async def test_ineffective_write_releases_after_timer_and_new_snapshot(self):
+    async def test_ineffective_write_debounces_contradictory_new_snapshot(self):
         entity, coordinator, _client, seen = self._entity()
         tasks = []
         entity.hass.async_create_task.side_effect = lambda coro: tasks.append(
@@ -160,8 +168,15 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             await entity.write(True)
             self._report(entity, False)
             self.assertEqual(seen, [True])
-            timer.call_args.args[2](None)
+            next(
+                call.args[2]
+                for call in timer.call_args_list
+                if call.args[1] == POST_WRITE_REFRESH_SECS
+            )(None)
             await asyncio.gather(*tasks)
+            self.assertEqual(seen, [True])
+            self.assertEqual(timer.call_args.args[1], 8)
+            timer.call_args.args[2](None)
         self.assertEqual(seen, [True, False])
         self.assertIsNone(entity._optimistic_owner)
         self.assertIsNone(entity._post_write_unsub)
@@ -186,6 +201,9 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, [True])
         coordinator.snapshot_generation = coordinator.completed_snapshot_generation = 6
         entity._handle_coordinator_update()
+        self.assertEqual(seen, [True])
+        self.assertEqual(self.offline_timer.call_args.args[1], 8)
+        self.offline_timer.call_args.args[2](None)
         self.assertEqual(seen, [True, False])
         self.assertIsNone(entity._optimistic_owner)
 
@@ -273,7 +291,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(entity._post_write_unsub)
         self.assertFalse(entity.is_on)
         self.assertEqual(seen, [True])
-        cancel.assert_called_once()
+        self.assertEqual(cancel.call_count, 2)
         entity.hass.async_create_task.assert_not_called()
         coordinator.async_request_refresh.assert_not_awaited()
 
@@ -299,7 +317,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entity._optimistic_owner, 2)
         self.assertEqual(entity._post_write_owner, 2)
         self.assertEqual(seen, [False])
-        timer.assert_called_once()
+        self.assertEqual(timer.call_count, 3)
         cancel.assert_not_called()
 
     async def test_repeated_writes_replace_timer_and_ignore_old_callback(self):
@@ -307,7 +325,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         first_cancel, second_cancel = Mock(), Mock()
         with patch(
             "custom_components.eufy_sdk.entity.async_call_later",
-            side_effect=[first_cancel, second_cancel],
+            side_effect=[Mock(), first_cancel, Mock(), second_cancel, Mock()],
         ) as timer:
             await entity.write(True)
             first_callback = timer.call_args.args[2]
@@ -334,7 +352,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             self._report(entity, False)
         self.assertEqual(seen, [True])
         self.assertEqual(entity._optimistic_owner, 1)
-        timer.assert_called_once()
+        self.assertEqual(timer.call_count, 3)
         cancel.assert_not_called()
 
     async def test_refresh_failure_still_has_no_hard_hold_expiry(self):

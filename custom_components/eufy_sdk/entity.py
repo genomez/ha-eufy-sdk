@@ -182,6 +182,8 @@ class EufySolixEntity(Entity):
 # pull (not on a timeout), so the entity always re-renders to the true state — if
 # the write didn't take, it reverts to the real value then.
 POST_WRITE_REFRESH_SECS = 20
+LIGHT_SETTLE_MAX_SECS = 30
+LIGHT_CONTRADICTION_SECS = 8
 
 
 class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
@@ -314,6 +316,13 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         if not self._named_by_translation:
             self._attr_name = label_for(self._prop)
         self._post_write_unsub: Callable[[], None] | None = None
+        self._light_guard_owner: int | None = None
+        self._light_guard_value: Any = None
+        self._light_candidate_generation = 0
+        self._light_deadline_unsub: Callable[[], None] | None = None
+        self._light_candidate_unsub: Callable[[], None] | None = None
+        self._light_state_seen: tuple[Any, int, Any] | None = None
+        self._light_finish: Callable[[Any], None] | None = None
         self._post_write_owner: int | None = None
         self._refresh_owner_watermark = 0
         self._assumed_value: Any = None
@@ -370,15 +379,16 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
     @callback
     def _handle_property_changed(self, event: Event) -> None:
-        """Keep light holds until reconciliation; release other holds on reports."""
+        """Keep bounded light settling; release other holds on reports."""
         if not self._property_event_filter(event.data):
             return
         # A report during RPC has unknown ordering relative to the command. The
         # pending RPC must not later obscure it with the intended value.
         self._report_generation += 1
         # Uncorrelated light reports may arrive after a matching report. Keep
-        # the hold until reconciliation; cache and receipts still update.
-        if self._prop == "light" and self._optimistic_owner is not None:
+        # the recent-command guard; cache and receipts still update.
+        if self._prop == "light" and self._light_guard_owner is not None:
+            self._update_light_candidate(force=True)
             return
         if self._post_write_unsub is not None:
             self._post_write_unsub()
@@ -391,7 +401,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
     @property
     def prop_value(self) -> Any:
-        """The held optimistic value if set, else the device's live state."""
+        """The settling/optimistic value if set, else the device's live state."""
+        if self._prop == "light" and self._light_guard_owner is not None:
+            return self._light_guard_value
         if self._assumed_value is not None:
             return self._assumed_value
         return self.device.get("state", {}).get(self._prop)
@@ -420,9 +432,112 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             self._pending_reconcile = None
             self._assumed_value = value
             self._optimistic_owner = owner
+            if self._prop == "light":
+                self._start_light_settle(owner, lifecycle, value)
+            self.async_write_ha_state()
+        elif self._prop == "light" and owner == self._write_generation:
+            # A report during this RPC must also retire an older command's guard.
+            self._clear_light_settle()
+            self._pending_reconcile = None
+            self._optimistic_owner = None
+            self._assumed_value = None
+            if self.device.get("state", {}).get(self._prop) == value:
+                self._start_light_settle(owner, lifecycle, value)
             self.async_write_ha_state()
         if not self.write_only:
             self._schedule_post_write_refresh(owner)
+
+    @callback
+    def _clear_light_settle(self) -> None:
+        """Cancel both presentation timers without changing the shared cache."""
+        for name in ("_light_deadline_unsub", "_light_candidate_unsub"):
+            cancel = getattr(self, name, None)
+            if cancel is not None:
+                cancel()
+                setattr(self, name, None)
+        self._light_guard_owner = None
+        self._light_guard_value = None
+        self._light_candidate_generation = (
+            getattr(self, "_light_candidate_generation", 0) + 1
+        )
+
+    def _start_light_settle(self, owner: int, lifecycle: int, value: Any) -> None:
+        """Bound uncertainty; a persistent contrary value can end it sooner."""
+        self._clear_light_settle()
+        self._light_guard_owner = owner
+        self._light_guard_value = value
+        self._light_state_seen = self._light_state_marker()
+
+        @callback
+        def finish(_now: Any) -> None:
+            if (
+                self._removed
+                or lifecycle != self._lifecycle_generation
+                or owner != self._light_guard_owner
+            ):
+                return
+            self._clear_light_settle()
+            if self._optimistic_owner == owner:
+                self._optimistic_owner = None
+                self._assumed_value = None
+                self._pending_reconcile = None
+            self.async_write_ha_state()
+
+        self._light_finish = finish
+        self._light_deadline_unsub = async_call_later(
+            self.hass, LIGHT_SETTLE_MAX_SECS, finish
+        )
+
+    @callback
+    def _light_state_marker(self) -> tuple[Any, int, Any]:
+        """Separate light/snapshot evidence from unrelated listener updates."""
+        receipt = (
+            (self.coordinator.property_observations or {})
+            .get(self._sn, {})
+            .get(self._prop, {})
+        )
+        return (
+            self.device.get("state", {}).get(self._prop),
+            self.coordinator.completed_snapshot_generation,
+            receipt.get("observed_at"),
+        )
+
+    @callback
+    def _update_light_candidate(self, *, force: bool = False) -> None:
+        """Accept agreement immediately; debounce only a contrary presentation."""
+        if self._light_guard_owner is None:
+            return
+        marker = self._light_state_marker()
+        if not force and marker == self._light_state_seen:
+            return
+        self._light_state_seen = marker
+        value = self.device.get("state", {}).get(self._prop)
+        if value == self._light_guard_value:
+            if self._optimistic_owner == self._light_guard_owner:
+                self._optimistic_owner = None
+                self._assumed_value = None
+                self._pending_reconcile = None
+            if self._light_candidate_unsub is not None:
+                self._light_candidate_unsub()
+                self._light_candidate_unsub = None
+                self._light_candidate_generation += 1
+        elif type(value) is not bool:
+            if self._light_candidate_unsub is not None:
+                self._light_candidate_unsub()
+                self._light_candidate_unsub = None
+                self._light_candidate_generation += 1
+        elif self._light_candidate_unsub is None:
+            generation = self._light_candidate_generation
+            finish = self._light_finish
+
+            @callback
+            def settle(now: Any) -> None:
+                if generation == self._light_candidate_generation:
+                    finish(now)
+
+            self._light_candidate_unsub = async_call_later(
+                self.hass, LIGHT_CONTRADICTION_SECS, settle
+            )
 
     def _schedule_post_write_refresh(self, owner: int) -> None:
         """Catch up successful writes without superseding a newer read owner."""
@@ -470,10 +585,14 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             return
         if self._optimistic_owner == owner:
             self._pending_reconcile = (
-                owner, lifecycle, self.coordinator.snapshot_generation
+                owner,
+                lifecycle,
+                self.coordinator.snapshot_generation,
             )
         await self.coordinator.async_request_refresh()
         if self._release_reconciled_hold():
+            if self._prop == "light":
+                self._update_light_candidate()
             self.async_write_ha_state()
 
     @callback
@@ -501,6 +620,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         if self._removed:
             return
         self._release_reconciled_hold()
+        if self._prop == "light":
+            self._update_light_candidate()
         super()._handle_coordinator_update()
 
     async def async_will_remove_from_hass(self) -> None:
@@ -510,6 +631,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._write_generation += 1
         self._report_generation += 1
         self._remove_property_listener()
+        self._clear_light_settle()
         if self._post_write_unsub is not None:
             self._post_write_unsub()
             self._post_write_unsub = None
