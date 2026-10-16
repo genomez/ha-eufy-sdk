@@ -24,7 +24,7 @@ def apply_alarm_event(coordinator: Any, event: dict[str, Any]) -> str | None:
     if phase is None:
         return None
     serial = alarm_event_serial(event)
-    if not serial or serial not in coordinator.data:
+    if not serial or serial not in (coordinator.data or {}):
         return None
     state = coordinator.data[serial].setdefault("state", {})
     state["alarmTriggered"] = phase == "triggered"
@@ -46,7 +46,7 @@ def apply_alarm_event(coordinator: Any, event: dict[str, Any]) -> str | None:
 
 def clear_alarm(coordinator: Any, serial: str) -> bool:
     """Drop a station's alarm flags (the fallback when no stop push ever arrives)."""
-    device = coordinator.data.get(serial)
+    device = (coordinator.data or {}).get(serial)
     if not device:
         return False
     state = device.setdefault("state", {})

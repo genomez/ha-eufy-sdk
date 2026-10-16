@@ -19,7 +19,7 @@ def apply_arming_mode_event(coordinator: Any, event: dict[str, Any]) -> bool:
     if event.get("event") != "armingModeChanged" or "mode" not in event:
         return False
     serial = event.get("deviceSn") or event.get("sn")
-    if not serial or serial not in coordinator.data:
+    if not serial or serial not in (coordinator.data or {}):
         return False
     state = coordinator.data[serial].setdefault("state", {})
     state["armingMode"] = event["arming"] if "arming" in event else event["mode"]

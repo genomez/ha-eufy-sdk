@@ -11,10 +11,12 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, CONF_HOST, CONF_PORT, DOMAIN
+from .preload import async_check_preload, on_battery_power
 from .snapshot_policy import snapshot_url
 from .native_webrtc import NativeWebRTCMixin, is_s1_camera
 
 if TYPE_CHECKING:
+    from homeassistant.components.stream import Stream
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -90,6 +92,14 @@ class EufySdkCamera(CoordinatorEntity["EufySdkDataUpdateCoordinator"], Camera):
             serial_number=sn,
         )
 
+    async def async_added_to_hass(self) -> None:
+        """Flag battery stream preloading after the entity is registered."""
+        await super().async_added_to_hass()
+        await async_check_preload(
+            self.hass, self.entity_id, self._sn,
+            (self.coordinator.data or {}).get(self._sn),
+        )
+
     @property
     def available(self) -> bool:
         """Available while the bridge still reports this camera."""
@@ -98,6 +108,17 @@ class EufySdkCamera(CoordinatorEntity["EufySdkDataUpdateCoordinator"], Camera):
     async def stream_source(self) -> str:
         """Return the go2rtc RTSP URL — HA's stream component + go2rtc do the work."""
         return f"rtsp://{self._host}:{GO2RTC_RTSP_PORT}/{self._sn}"
+
+    async def async_create_stream(self) -> Stream | None:
+        """Keep HA's indefinitely retrying stream worker off battery cameras.
+
+        Each retry can wake a sleeping camera (ha-eufy-sdk#83). Battery
+        cameras retain the RTSP source and native WebRTC selection, but lose
+        HA HLS fallback and camera.record.
+        """
+        if on_battery_power((self.coordinator.data or {}).get(self._sn)):
+            return None
+        return await super().async_create_stream()
 
     async def async_camera_image(
         self,
