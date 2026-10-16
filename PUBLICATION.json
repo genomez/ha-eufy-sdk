@@ -27,8 +27,8 @@
     "npmPublication": false
   },
   "verification": {
-    "unittestDiscovered": 314,
-    "unittestPassed": 312,
+    "unittestDiscovered": 339,
+    "unittestPassed": 337,
     "unittestFailures": 1,
     "unittestErrors": 1,
     "physicalDeviceAcceptance": false,
@@ -36,7 +36,13 @@
     "installationAcceptance": false,
     "newUnittestFailures": 0,
     "unittestSkipped": 0,
-    "implementationCommit": "3c535036eacb054bc6a0f9f0b2ab2d9789deebfb",
-    "overnightSoakAcceptance": false
+    "implementationCommit": "d7628098965182a1ad50adab639b78af8fb11023",
+    "overnightSoakAcceptance": false,
+    "pytestPassedItems": 419,
+    "pytestFailedItems": 2,
+    "pytestPassedSubtests": 235,
+    "pytestCoroutineAdapter": "external asyncio.run hook for unmarked plain coroutine functions; no dependency installation",
+    "offlineHomeAssistantVersion": "2026.7.0",
+    "core2026_10ApiQualified": false
   }
 }

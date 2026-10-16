@@ -13,7 +13,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "251ee2dfdac109f7dfbe7c61b3dfcb0e85ca01374b193efa6834fdbf5f34df63"
+      "sha256": "84fe297cb3056bc7cf295afd04720399334968469401418d3071cb45f08ec0a6"
     },
     {
       "path": "INSTALL.md",
@@ -21,7 +21,7 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "fa6f591c4a990011cc4eea2e8ee1df9f8881ea7bb66e3b2c4d6151bddd78ef98"
+      "sha256": "13e31b249edd7a0e152a29fd333791992bee8952fb094e2384568ec751e74e4a"
     },
     {
       "path": "LICENSE",
@@ -49,7 +49,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/alarm_sync.py",
-      "sha256": "d8846e144fc31b800c1275c035f1f1fc47748ebeba360f8c5577d240e1cd94d5"
+      "sha256": "6ce511b28d0777fb3f9e71550d887c5fd48976bd5c3c31a6532b03fb3d38d400"
     },
     {
       "path": "custom_components/eufy_sdk/api.py",
@@ -57,7 +57,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
-      "sha256": "57ff180f70c118fe28163cd1bdf510e835fa764baee7c00c5047035467bd6f29"
+      "sha256": "b1e16f40ed978e58ac170cfc9ea1aaf4304e421ea0e2c5d32b1b24f2e64afb76"
     },
     {
       "path": "custom_components/eufy_sdk/bespoke.py",
@@ -105,7 +105,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
-      "sha256": "edf45361a84fe2b3966dddcbbd422f3fb0df6a70b4fefa7cf167674e10e0fdd2"
+      "sha256": "cc11629da6e02c9b290e2a34ded6734490eff2852ef5d42763f74ea00c637d10"
     },
     {
       "path": "custom_components/eufy_sdk/config_flow.py",
@@ -172,6 +172,10 @@
       "sha256": "422ad59e16d4910566f1a1ad537aff4c0b5d147c9a66dbfd9ca87d79bcc64946"
     },
     {
+      "path": "custom_components/eufy_sdk/preload.py",
+      "sha256": "08fff508ea16337ea4dede7760a3acde6e61c067fbff580854a634758d461f22"
+    },
+    {
       "path": "custom_components/eufy_sdk/presets.py",
       "sha256": "5fa96bed348b611e3b56ff0caa6c184c3a2a7d3c1802eb089323ab347efc2d14"
     },
@@ -186,6 +190,10 @@
     {
       "path": "custom_components/eufy_sdk/pushmap.py",
       "sha256": "f1d3ed5887ec5aa21557880263b4d230a016847a03e09565659b025d8339c7b3"
+    },
+    {
+      "path": "custom_components/eufy_sdk/repairs.py",
+      "sha256": "a4907eb6551f00fb4d3c92e5c1bf5b92d9c7243c0674b030c9c9e52d9c946475"
     },
     {
       "path": "custom_components/eufy_sdk/schedule_logic.py",
@@ -217,7 +225,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/translations/en.json",
-      "sha256": "522de2461289eaef19050ddeac95434dcc64df350da725e00133a6e7bcce2d2c"
+      "sha256": "0750597005bf356a4bea5b2b4bd92391e9dbbc983eda043442e5ca7a481bf5e5"
     },
     {
       "path": "custom_components/eufy_sdk/translations/it.json",
@@ -228,5 +236,5 @@
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
   ],
-  "qualificationScope": "local candidate with deterministic ZIP built and allowlist verified; unittest 312 passed of 314 with one inherited failure and one inherited error; no release availability or installation verified"
+  "qualificationScope": "local candidate; unittest 337 passed of 339 with one inherited failure and one inherited error; offline adapted pytest 419 passed, 2 inherited failures, 235 passed subtests; deterministic ZIP verified; interpreter HA 2026.7.0, HA 2026.10 API and runtime/media acceptance unverified"
 }

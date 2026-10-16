@@ -17,12 +17,31 @@
     "gitMetadataIncluded": false,
     "priorPublishedVersion": "0.3.1.dev2",
     "priorPublishedCommit": "6d4402dca70c24560cc48860dd6affbae632f00d",
-    "developmentCommit": "3c535036eacb054bc6a0f9f0b2ab2d9789deebfb",
+    "developmentCommit": "d7628098965182a1ad50adab639b78af8fb11023",
     "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised",
-    "packagingRefreshBaseCommit": "1c5e2943b7225c373753b4739b2c6de88869e927",
-    "originRefsRecheckedForLocalRc": false
+    "packagingRefreshBaseCommit": "9cfdb88aca20f4fdcaf298bc1144282fca0fcc5e",
+    "originRefsRecheckedForLocalRc": false,
+    "upstreamIntegrationPorts": {
+      "repository": "https://github.com/mega-yfue/ha-eufy-sdk",
+      "adaptedOn": "2026-10-16",
+      "implementationCommit": "d7628098965182a1ad50adab639b78af8fb11023",
+      "commits": [
+        {
+          "commit": "bde4a566ea8549543b2c3346a077f91fdc106069",
+          "scope": "Shared battery predicate and base camera stream-worker suppression; retain STREAM, RTSP source and native T9000 class selection."
+        },
+        {
+          "commit": "2ee7e77752340a87d54064ecc4b923165e15ddf0",
+          "scope": "Preload checker, confirmation-only Repair flow, English issue strings and adapted synthetic tests."
+        },
+        {
+          "commit": "3d4dd6b2e42a7150f1a7f1a4541cd7c6ca9c5702",
+          "scope": "Narrow missing-data alarm/arming guards; retain existing setup/property guards, reported modes and observation receipts."
+        }
+      ]
+    }
   },
-  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata",
+  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata; battery HA stream-worker suppression with explicit power precedence and legacy fallback; confirmation-only battery preload Repair; early-event alarm/arming missing-data guards",
   "coreOverlaysBundled": false,
   "stockCoreMediaQualified": false,
   "cameraSwitchingQualified": false,
@@ -55,7 +74,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "251ee2dfdac109f7dfbe7c61b3dfcb0e85ca01374b193efa6834fdbf5f34df63",
+      "sha256": "84fe297cb3056bc7cf295afd04720399334968469401418d3071cb45f08ec0a6",
       "publicBaselineSha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373",
       "status": "modified"
     },
@@ -67,13 +86,13 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "fa6f591c4a990011cc4eea2e8ee1df9f8881ea7bb66e3b2c4d6151bddd78ef98",
+      "sha256": "13e31b249edd7a0e152a29fd333791992bee8952fb094e2384568ec751e74e4a",
       "publicBaselineSha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "4a5f6eecaddbc58607680ade95aa0b04d299532c126085128f3ebc2d3adb90c6",
+      "sha256": "8ea380742d137e21cad67ad919c291cc23ba05e7f367ea9d97c1b584fb682e8f",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -91,7 +110,7 @@
     },
     {
       "path": "PUBLICATION.json",
-      "sha256": "4b83fac2cd57b0fd08090dd4437302c30d5182dca6111d44edbe5af81063e398",
+      "sha256": "6da4d19a59c9a97e35ac4d5fee7cd0f5e0ed24813836828d35869af612df59cc",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -127,9 +146,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/alarm_sync.py",
-      "sha256": "d8846e144fc31b800c1275c035f1f1fc47748ebeba360f8c5577d240e1cd94d5",
+      "sha256": "6ce511b28d0777fb3f9e71550d887c5fd48976bd5c3c31a6532b03fb3d38d400",
       "publicBaselineSha256": "d8846e144fc31b800c1275c035f1f1fc47748ebeba360f8c5577d240e1cd94d5",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/api.py",
@@ -139,9 +158,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
-      "sha256": "57ff180f70c118fe28163cd1bdf510e835fa764baee7c00c5047035467bd6f29",
+      "sha256": "b1e16f40ed978e58ac170cfc9ea1aaf4304e421ea0e2c5d32b1b24f2e64afb76",
       "publicBaselineSha256": "57ff180f70c118fe28163cd1bdf510e835fa764baee7c00c5047035467bd6f29",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/bespoke.py",
@@ -211,7 +230,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
-      "sha256": "edf45361a84fe2b3966dddcbbd422f3fb0df6a70b4fefa7cf167674e10e0fdd2",
+      "sha256": "cc11629da6e02c9b290e2a34ded6734490eff2852ef5d42763f74ea00c637d10",
       "publicBaselineSha256": "4b2dacd1aafa3e5c044f9afb7f3d169b7459968111dd9bd232dd5c92115baaa5",
       "status": "modified"
     },
@@ -312,6 +331,12 @@
       "status": "unchanged"
     },
     {
+      "path": "custom_components/eufy_sdk/preload.py",
+      "sha256": "08fff508ea16337ea4dede7760a3acde6e61c067fbff580854a634758d461f22",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "custom_components/eufy_sdk/presets.py",
       "sha256": "5fa96bed348b611e3b56ff0caa6c184c3a2a7d3c1802eb089323ab347efc2d14",
       "publicBaselineSha256": "5fa96bed348b611e3b56ff0caa6c184c3a2a7d3c1802eb089323ab347efc2d14",
@@ -334,6 +359,12 @@
       "sha256": "f1d3ed5887ec5aa21557880263b4d230a016847a03e09565659b025d8339c7b3",
       "publicBaselineSha256": "f1d3ed5887ec5aa21557880263b4d230a016847a03e09565659b025d8339c7b3",
       "status": "unchanged"
+    },
+    {
+      "path": "custom_components/eufy_sdk/repairs.py",
+      "sha256": "a4907eb6551f00fb4d3c92e5c1bf5b92d9c7243c0674b030c9c9e52d9c946475",
+      "publicBaselineSha256": null,
+      "status": "new"
     },
     {
       "path": "custom_components/eufy_sdk/schedule_logic.py",
@@ -379,9 +410,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/translations/en.json",
-      "sha256": "522de2461289eaef19050ddeac95434dcc64df350da725e00133a6e7bcce2d2c",
+      "sha256": "0750597005bf356a4bea5b2b4bd92391e9dbbc983eda043442e5ca7a481bf5e5",
       "publicBaselineSha256": "522de2461289eaef19050ddeac95434dcc64df350da725e00133a6e7bcce2d2c",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/translations/it.json",
@@ -492,6 +523,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_camera_battery_stream.py",
+      "sha256": "8598fcb951c046a6e61eb61d0ab47f9c0efd5160414083e234d800f3df3b77ad",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_captcha_flow.py",
       "sha256": "ee534ec741446a0678e63321cd6ed88ea319817a5ddc3967e450c0bcb9f2af63",
       "publicBaselineSha256": "ee534ec741446a0678e63321cd6ed88ea319817a5ddc3967e450c0bcb9f2af63",
@@ -582,6 +619,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_preload_repair.py",
+      "sha256": "633ad50ee05e60260b367d6a1db0c7a07c5701c35f7cae8020ea22f83692f6b9",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_preset_availability.py",
       "sha256": "93bbf084da04feea3559d5364558ae9cda849821de43a8d05026a4df035955d5",
       "publicBaselineSha256": "93bbf084da04feea3559d5364558ae9cda849821de43a8d05026a4df035955d5",
@@ -626,6 +669,12 @@
     {
       "path": "tests/test_sensor_enum_values.py",
       "sha256": "8f9dfeedcf2f526e1e0201c6de37bc41b1e04881940c92e7507c8c4a3d7e55e5",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
+      "path": "tests/test_setup_event_guards.py",
+      "sha256": "f96f2341ff781e745aef718f6f150b0f0e436d59ed1ec373c73a15e521109d4e",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -692,6 +741,6 @@
   ],
   "selfHashLocation": "external preparation receipt; source manifest excludes itself",
   "distribution": "experimental artifact; use exact matching published prerelease and checksums or separately approved verified local candidate",
-  "qualificationScope": "local release candidate; unittest 312 passed of 314 with one inherited failure and one inherited error; deterministic manual ZIP built and allowlist verified; no release availability, installation acceptance or completed overnight soak asserted",
+  "qualificationScope": "local candidate; unittest 337 passed of 339 with one inherited failure and one inherited error; offline adapted pytest 419 passed, 2 inherited failures, 235 passed subtests; deterministic ZIP verified; interpreter HA 2026.7.0, HA 2026.10 API and runtime/media acceptance unverified",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6"
 }
