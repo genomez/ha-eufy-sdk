@@ -7,6 +7,8 @@ Native WebRTC live view requires a matching bridge started with
 bridge's WebSocket hello enables the native camera class, and only for streaming
 cameras uniquely bound to a T9000 station. Relay-off, older bridges without this
 advertisement, and other cameras retain the existing RTSP/HA stream path.
+Native signaling forwards offers and ICE candidates through the bridge and closes sessions on removal or transport loss. Admission refusals retain `webrtc_busy` or `webrtc_releasing`, including when a close event arrives before the open reply. These labels report bridge ownership; they do not trigger an automatic retry.
+
 There is no separate integration switch. If the advertisement changes after a
 bridge reconnect, the integration schedules one config-entry reload to recreate
 camera classes; unchanged reconnects do not reload. A fresh setup consumes the
@@ -14,9 +16,13 @@ bridge hello before its auth/list replies and establishes a new baseline, so the
 reload does not repeat. Capability listeners are removed when the entry unloads
 or its client closes. No Home Assistant private capability attributes are changed.
 
-**Experimental integration `0.3.1.dev2`.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Its narrow detection-mask safety change and synthetic regression results are documented in [EXPERIMENTAL.md](EXPERIMENTAL.md). Packaging does not establish installation, authentication, physical-device or media acceptance. Read [INSTALL.md](INSTALL.md), [CORE_COMPATIBILITY.md](CORE_COMPATIBILITY.md), and [EXPERIMENTAL.md](EXPERIMENTAL.md) before a separate installation decision.
+**Experimental integration `0.3.1.dev3`.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Its native WebRTC signaling, floodlight state reconciliation, storage diagnostics and synthetic regression results are documented in [EXPERIMENTAL.md](EXPERIMENTAL.md). Packaging does not establish installation, authentication, physical-device or media acceptance. Read [INSTALL.md](INSTALL.md), [CORE_COMPATIBILITY.md](CORE_COMPATIBILITY.md), and [EXPERIMENTAL.md](EXPERIMENTAL.md) before a separate installation decision.
 
 This is an independently maintained experimental branch derived from the [upstream project](https://github.com/mega-yfue/ha-eufy-sdk) and [danymexi's S1 work](https://github.com/danymexi/eufy-sdk). It is not an official upstream release. Upstream copyright and license notices are preserved.
+
+After a successful floodlight `light` property write, the displayed intended value remains held through uncorrelated push reports until a successful new post-write snapshot completes. The normal delayed reconciliation is 20 seconds; a failed refresh retains the hold, so the display alone does not prove physical state.
+
+This candidate is the integration companion prepared for runtime `0.4.1-s1.experimental.6`. The matching runtime artifact and relay configuration require separate verification; this repository does not bundle them.
 
 ## Component sources
 
@@ -35,6 +41,6 @@ This fork is owned by `@genomez` and retains the upstream `eufy_sdk` domain. Use
 
 The manual ZIP contains the integration plus MIT license and install documentation. It excludes the bridge, SDK, add-on, tests, frontend assets, private configuration and all six local Core overlays. Stock-Core media/playback and camera switching remain unqualified. Optional `frontend/scoped-webrtc-camera` files remain source-only and are not registered or added to dashboards by HACS or this ZIP.
 
-Run `python -B tools/build_integration_zip.py --output-dir <empty-output-directory>` with Python 3.13 or later to reproduce the manual archive. It uses only the standard library, verifies a pinned file allowlist, and writes `eufy-sdk-s1-0.3.1.dev2.zip` plus hashes/content receipt. Fixed timestamps, permissions, order and stored compression make byte identity independent of checkout timestamps and zlib versions. No deployment, dependency downloads, registry edits or camera starts occur.
+Run `python -B tools/build_integration_zip.py --output-dir <empty-output-directory>` with Python 3.13 or later to reproduce the manual archive. It uses only the standard library, verifies a pinned file allowlist, and writes `eufy-sdk-s1-0.3.1.dev3.zip` plus hashes/content receipt. Fixed timestamps, permissions, order and stored compression make byte identity independent of checkout timestamps and zlib versions. No deployment, dependency downloads, registry edits or camera starts occur.
 
 `SOURCE_MANIFEST.json` identifies this local candidate and its exact public baseline by file hashes; `PREVIEW_SOURCE_MANIFEST.json` is the unchanged historical source-preview manifest, not this candidate's current inventory. The narrow endpoint reconfigure flow preserves the existing entry and identifiers after successful bridge connection/authentication validation. It does not verify account identity or device equivalence; the migration checkpoint in INSTALL.md requires that review before changing endpoints.

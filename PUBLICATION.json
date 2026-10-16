@@ -1,19 +1,38 @@
 {
-  "schemaVersion": 1,
-  "releaseDate": "2026-10-14",
-  "runtimeSourceRelease": "https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.2",
+  "schemaVersion": 2,
+  "state": "local candidate; not published",
+  "candidateVersion": "0.3.1.dev3",
+  "preparedRuntimeVersion": "0.4.1-s1.experimental.6",
+  "matchingRuntimeAvailabilityVerified": false,
+  "releaseAvailabilityVerified": false,
+  "hacsAvailabilityVerified": false,
   "candidateSourceManifest": "SOURCE_MANIFEST.json",
-  "candidatePreparationReceiptsAreHistorical": true,
-  "repositoryPreservedFiles": [],
-  "knownLimitations": [
-    "Dashboard configuration refresh can replace a player card and interrupt playback; initiating trigger remains unknown.",
-    "Stock-Core media, camera switching, ARM and non-S1 behavior remain unqualified."
-  ],
-  "verification": {
-    "integrationStockCore2026_9_4SyntheticChecks": 25,
-    "realAuthenticationInThatTest": false,
-    "runtimeSyntheticMediaRoutes": 3,
-    "runtimeSyntheticLifecycleCases": 4
+  "historicalPublication": {
+    "schemaVersion": 1,
+    "releaseDate": "2026-10-14",
+    "runtimeSourceRelease": "https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.2",
+    "candidateSourceManifest": "SOURCE_MANIFEST.json",
+    "candidatePreparationReceiptsAreHistorical": true,
+    "repositoryPreservedFiles": [],
+    "knownLimitations": [
+      "Dashboard configuration refresh can replace a player card and interrupt playback; initiating trigger remains unknown.",
+      "Stock-Core media, camera switching, ARM and non-S1 behavior remain unqualified."
+    ],
+    "verification": {
+      "integrationStockCore2026_9_4SyntheticChecks": 25,
+      "realAuthenticationInThatTest": false,
+      "runtimeSyntheticMediaRoutes": 3,
+      "runtimeSyntheticLifecycleCases": 4
+    },
+    "npmPublication": false
   },
-  "npmPublication": false
+  "verification": {
+    "unittestDiscovered": 295,
+    "unittestPassed": 293,
+    "unittestFailures": 1,
+    "unittestErrors": 1,
+    "physicalDeviceAcceptance": false,
+    "stockCoreMediaAcceptance": false,
+    "installationAcceptance": false
+  }
 }

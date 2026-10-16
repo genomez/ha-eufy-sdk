@@ -2,21 +2,25 @@
   "schemaVersion": 3,
   "component": "integration",
   "runtimeDomain": "eufy_sdk",
-  "candidateVersion": "0.3.1.dev2",
+  "candidateVersion": "0.3.1.dev3",
   "zipIncludedInSourceTree": false,
   "provenance": {
     "publicRepository": "https://github.com/genomez/ha-eufy-sdk",
     "publicBranch": "s1-experimental",
     "publicBaselineCommit": "8bfeaae54aae1f393fa4da4cb616440c22086a76",
-    "exportMethod": "pinned public file allowlist plus exactly reviewed three-file detection safety patch",
+    "exportMethod": "tracked local candidate source with per-file hashes and comparison to the retained public dev1 baseline",
     "upstreamSafetyCommit": "c59b3d93cde9f5e889cf10950b129ce1c389bba5",
     "reviewedImplementationSha256": "0e7964aad4cb14c65620b1118b7e569765e289115832dc6bf8d7243f44b7c71f",
     "historicalPreviewManifestPath": "PREVIEW_SOURCE_MANIFEST.json",
     "historicalPreviewManifestSha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360",
     "historicalPreviewManifestIsCurrentInventory": false,
-    "gitMetadataIncluded": false
+    "gitMetadataIncluded": false,
+    "priorPublishedVersion": "0.3.1.dev2",
+    "priorPublishedCommit": "6d4402dca70c24560cc48860dd6affbae632f00d",
+    "developmentCommit": "a64624eddad09803f5f5aa53f651fdd3d94c246e",
+    "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised"
   },
-  "runtimeModificationScope": "reviewed detection-mask safety plus version metadata; no other runtime changes",
+  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; floodlight light property hold; storage attempt and enum presentation; version metadata",
   "coreOverlaysBundled": false,
   "stockCoreMediaQualified": false,
   "cameraSwitchingQualified": false,
@@ -49,25 +53,25 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "c86717b3ac6cb7e5dd7bafc522f874ae3cc8a1da7d1532a72a619ae95fe56b13",
+      "sha256": "c8cd3cc23d5122e3ddff4cecf606ff1897d3d524b2bfbf198564bceeace8af5c",
       "publicBaselineSha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373",
       "status": "modified"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "fa9bad80c6b94cecb031b1ca9475db1386056974c3b099f22d70b35d3f2d6bdc",
+      "sha256": "ee8a3ff07836f7c51d834763333d7d35e33f091cf10638135cf877844bcb503a",
       "publicBaselineSha256": "2163168ffe6666ebedaa264c29aac2ccea8f0e5981943456ad5f89d2e8a78af6",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "337c2e253b4c9737018cd2bb29c195a5fa8f58acd874077ae3685eeef7bbec2e",
+      "sha256": "8d0ac145237869e360c6987bfa5bde7f20ef2cfc06db0dcd3512f7712c68146f",
       "publicBaselineSha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "40e827da87719cecf53395b56a00519bb61bc00f9abe98681a333f3c3d01eaf9",
+      "sha256": "5307daf5f0c81748d104ab852d633587b02a22e4e770da96c729c1792f1c9d5b",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -84,8 +88,14 @@
       "status": "unchanged"
     },
     {
+      "path": "PUBLICATION.json",
+      "sha256": "9f02f43b30369c1e972fe175e1e37f15eba3df6a1811fbfd2a4cb399cdcb2aa8",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "README.md",
-      "sha256": "a39ede1cade5c773ecad2d5e7baa3b8841eeaaed135ef2a1248b4687eb90e116",
+      "sha256": "0ca8f77aa8cbc06108fcd9d94bd24ba2e583e1ae159753809d3678045af2c54b",
       "publicBaselineSha256": "73a5191e1d64400cac1071259e41c06e973227dcdabf0e0b870343fe76f259f0",
       "status": "modified"
     },
@@ -121,9 +131,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/api.py",
-      "sha256": "044c47b6f9440fae61f4cb7d73bb4e194f9b14e2c565ce2f3eb00f7750b5356f",
+      "sha256": "154255dd811b26c75a60ca4a3d40a1bff976468f89d9ffd8c843a8f1b2c94080",
       "publicBaselineSha256": "044c47b6f9440fae61f4cb7d73bb4e194f9b14e2c565ce2f3eb00f7750b5356f",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
@@ -199,9 +209,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
-      "sha256": "4b2dacd1aafa3e5c044f9afb7f3d169b7459968111dd9bd232dd5c92115baaa5",
+      "sha256": "edf45361a84fe2b3966dddcbbd422f3fb0df6a70b4fefa7cf167674e10e0fdd2",
       "publicBaselineSha256": "4b2dacd1aafa3e5c044f9afb7f3d169b7459968111dd9bd232dd5c92115baaa5",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/config_flow.py",
@@ -217,9 +227,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/coordinator.py",
-      "sha256": "18f3745f991ab2723e61a696c649ea1458f3be2c05f3c6abc970aa59f4b88d4c",
+      "sha256": "40f830f6c4964d15b04482ecbaefd63d55cd5fe290e895cb01287a2d8329308a",
       "publicBaselineSha256": "18f3745f991ab2723e61a696c649ea1458f3be2c05f3c6abc970aa59f4b88d4c",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/data.py",
@@ -241,9 +251,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88",
+      "sha256": "7650d44ad3efe5ad94e808c673fc033007511cd632b04ddc43a21ce333a558eb",
       "publicBaselineSha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -277,7 +287,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "4e00e2afa86c460ed3704f431900530562160b0a2f8d4ac36719250c62abd7c0",
+      "sha256": "6ed9808f13b107cbbe780f81c8c8bd45c12fa5c26f9a0e72b5d0e1eadc7ee3de",
       "publicBaselineSha256": "28b5b8cb942a6f77b646336d73cbb3fd97789403dc3f7a16f56fae6f93957c9c",
       "status": "modified"
     },
@@ -286,6 +296,12 @@
       "sha256": "2ba5310c52188931bbc0bfb52657312a00f798ce4fc8e22113fd09c6deabfb8d",
       "publicBaselineSha256": "2ba5310c52188931bbc0bfb52657312a00f798ce4fc8e22113fd09c6deabfb8d",
       "status": "unchanged"
+    },
+    {
+      "path": "custom_components/eufy_sdk/native_webrtc.py",
+      "sha256": "8339818ebbf510f0683eab4adeb9b54f681c1c1455df2df991349d25a5e08e36",
+      "publicBaselineSha256": null,
+      "status": "new"
     },
     {
       "path": "custom_components/eufy_sdk/number.py",
@@ -331,9 +347,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "fbb40aaaa0d2a003da26bca0ecd7aa7e265624d9b20ff376c2ebcaae74789d7d",
+      "sha256": "7b679bffb00f6dab9fb22c3d889a44281424396983bd6813f9757c2546c15c46",
       "publicBaselineSha256": "fbb40aaaa0d2a003da26bca0ecd7aa7e265624d9b20ff376c2ebcaae74789d7d",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
@@ -349,9 +365,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/storage_telemetry.py",
-      "sha256": "d94e05611fc3e6b01a9df3e304df5f7c4d4380f43d60928d1857f245afe304dd",
+      "sha256": "3b62fc497ee4ff4ac41b92eb032824bc8eb53aeb7b56deba74e291d734de1191",
       "publicBaselineSha256": "d94e05611fc3e6b01a9df3e304df5f7c4d4380f43d60928d1857f245afe304dd",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
@@ -463,9 +479,9 @@
     },
     {
       "path": "tests/test_aligned_state.py",
-      "sha256": "953d34e3eecbe7ff2fb0b4dc23deb066c667f7fde0d25720f01072e4e733b94e",
+      "sha256": "42d2559d65d2d266814ad73d330d88f64c4f1326ffc56993d9d9c3c09d9d0673",
       "publicBaselineSha256": "953d34e3eecbe7ff2fb0b4dc23deb066c667f7fde0d25720f01072e4e733b94e",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "tests/test_arming_mode_realtime.py",
@@ -510,6 +526,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_floodlight_state_hold.py",
+      "sha256": "f577e87cdd9ec361d287250c771a57b77fe25d5e118aadcec95e5494a0017266",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_known_mask.py",
       "sha256": "746e63cc1d5fb5602961d98913160cb8c54f09dcef75ccde49470b46dc1c7a51",
       "publicBaselineSha256": "e2fedb74f0a995fe9a8efa264121c07d7747cf489b4cc785eb62445dfe14ff0b",
@@ -520,6 +542,12 @@
       "sha256": "188ba3a9bdd56793fd2446da1785979a999147af41f84e3b59131a2cfb153df7",
       "publicBaselineSha256": "188ba3a9bdd56793fd2446da1785979a999147af41f84e3b59131a2cfb153df7",
       "status": "unchanged"
+    },
+    {
+      "path": "tests/test_native_webrtc.py",
+      "sha256": "ce3689d6afe77c88af58a2ff131cfb79e2446553fada58ecaee405823267a02c",
+      "publicBaselineSha256": null,
+      "status": "new"
     },
     {
       "path": "tests/test_observation_receipts.py",
@@ -588,6 +616,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_sensor_enum_values.py",
+      "sha256": "8f9dfeedcf2f526e1e0201c6de37bc41b1e04881940c92e7507c8c4a3d7e55e5",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_setup_events.py",
       "sha256": "4ee6936d49f34a6d323fecda510bc415d6f3b0c46f246aef5a4e87671d19d5d6",
       "publicBaselineSha256": "4ee6936d49f34a6d323fecda510bc415d6f3b0c46f246aef5a4e87671d19d5d6",
@@ -618,6 +652,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_storage_attempt_status.py",
+      "sha256": "1f562196746528130e2e33c9a253132fe1c8bff35ae80625f29c04a74680b84b",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_storage_breakdown.py",
       "sha256": "10c689b96f9a6e1da563643a88f7404cb38a0344160a66bf177bf6eb6856e879",
       "publicBaselineSha256": "10c689b96f9a6e1da563643a88f7404cb38a0344160a66bf177bf6eb6856e879",
@@ -630,13 +670,20 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_webrtc_capability.py",
+      "sha256": "57cad97e429ed3fbfb0a204a592a8669078954ebb66db5f3ae3d1bf1672a1a4c",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tools/build_integration_zip.py",
-      "sha256": "9bb0cb0e5bd82ebb22ef3654e46c858d557797c7f2a2bb09eb64f7f389f09fee",
+      "sha256": "66beb704efb045db2d9b605ff26fbaaada038837532387c4a75e9cb630e492b3",
       "publicBaselineSha256": "dc06c794fdd8f2b789aaee81c2272f328cde3efd65f3f5abff9cc9e4ae37b8f4",
       "status": "modified"
     }
   ],
-  "selfHashLocation": "external candidate packaging receipt",
+  "selfHashLocation": "external preparation receipt; source manifest excludes itself",
   "distribution": "experimental artifact; use exact matching published prerelease and checksums or separately approved verified local candidate",
-  "qualificationScope": "offline preparation only; no release availability or installation acceptance asserted"
+  "qualificationScope": "local candidate preparation; unittest 293 passed of 295 with one inherited failure and one inherited error; no release availability or installation acceptance asserted",
+  "preparedRuntimeVersion": "0.4.1-s1.experimental.6"
 }

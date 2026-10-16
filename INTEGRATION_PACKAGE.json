@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1.dev2",
+  "version": "0.3.1.dev3",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1.dev2.zip",
+  "filename": "eufy-sdk-s1-0.3.1.dev3.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "c86717b3ac6cb7e5dd7bafc522f874ae3cc8a1da7d1532a72a619ae95fe56b13"
+      "sha256": "c8cd3cc23d5122e3ddff4cecf606ff1897d3d524b2bfbf198564bceeace8af5c"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "fa9bad80c6b94cecb031b1ca9475db1386056974c3b099f22d70b35d3f2d6bdc"
+      "sha256": "ee8a3ff07836f7c51d834763333d7d35e33f091cf10638135cf877844bcb503a"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "337c2e253b4c9737018cd2bb29c195a5fa8f58acd874077ae3685eeef7bbec2e"
+      "sha256": "8d0ac145237869e360c6987bfa5bde7f20ef2cfc06db0dcd3512f7712c68146f"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "a39ede1cade5c773ecad2d5e7baa3b8841eeaaed135ef2a1248b4687eb90e116"
+      "sha256": "0ca8f77aa8cbc06108fcd9d94bd24ba2e583e1ae159753809d3678045af2c54b"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -53,7 +53,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/api.py",
-      "sha256": "044c47b6f9440fae61f4cb7d73bb4e194f9b14e2c565ce2f3eb00f7750b5356f"
+      "sha256": "154255dd811b26c75a60ca4a3d40a1bff976468f89d9ffd8c843a8f1b2c94080"
     },
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
@@ -105,7 +105,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
-      "sha256": "4b2dacd1aafa3e5c044f9afb7f3d169b7459968111dd9bd232dd5c92115baaa5"
+      "sha256": "edf45361a84fe2b3966dddcbbd422f3fb0df6a70b4fefa7cf167674e10e0fdd2"
     },
     {
       "path": "custom_components/eufy_sdk/config_flow.py",
@@ -117,7 +117,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/coordinator.py",
-      "sha256": "18f3745f991ab2723e61a696c649ea1458f3be2c05f3c6abc970aa59f4b88d4c"
+      "sha256": "40f830f6c4964d15b04482ecbaefd63d55cd5fe290e895cb01287a2d8329308a"
     },
     {
       "path": "custom_components/eufy_sdk/data.py",
@@ -133,7 +133,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88"
+      "sha256": "7650d44ad3efe5ad94e808c673fc033007511cd632b04ddc43a21ce333a558eb"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -157,11 +157,15 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "4e00e2afa86c460ed3704f431900530562160b0a2f8d4ac36719250c62abd7c0"
+      "sha256": "6ed9808f13b107cbbe780f81c8c8bd45c12fa5c26f9a0e72b5d0e1eadc7ee3de"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
       "sha256": "2ba5310c52188931bbc0bfb52657312a00f798ce4fc8e22113fd09c6deabfb8d"
+    },
+    {
+      "path": "custom_components/eufy_sdk/native_webrtc.py",
+      "sha256": "8339818ebbf510f0683eab4adeb9b54f681c1c1455df2df991349d25a5e08e36"
     },
     {
       "path": "custom_components/eufy_sdk/number.py",
@@ -193,7 +197,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "fbb40aaaa0d2a003da26bca0ecd7aa7e265624d9b20ff376c2ebcaae74789d7d"
+      "sha256": "7b679bffb00f6dab9fb22c3d889a44281424396983bd6813f9757c2546c15c46"
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
@@ -205,7 +209,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/storage_telemetry.py",
-      "sha256": "d94e05611fc3e6b01a9df3e304df5f7c4d4380f43d60928d1857f245afe304dd"
+      "sha256": "3b62fc497ee4ff4ac41b92eb032824bc8eb53aeb7b56deba74e291d734de1191"
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
@@ -224,5 +228,5 @@
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
   ],
-  "qualificationScope": "offline packaging only; release availability and installation require separate verification"
+  "qualificationScope": "local candidate metadata only; no ZIP built, release availability or installation verified"
 }

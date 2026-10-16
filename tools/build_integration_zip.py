@@ -14,10 +14,10 @@ DOCUMENTS = {'README.md', 'INSTALL.md', 'CORE_COMPATIBILITY.md', 'EXPERIMENTAL.m
 def build(output_dir):
     """Verify the allowlist and write deterministic ZIP/hash/content receipts."""
     metadata = json.loads((ROOT / 'INTEGRATION_PACKAGE.json').read_text(encoding='utf-8'))
-    assert metadata['version'] == '0.3.1.dev2'
+    assert metadata['version'] == '0.3.1.dev3'
     assert metadata['domain'] == 'eufy_sdk'
     assert metadata['owner'] == 'genomez'
-    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1.dev2.zip'
+    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1.dev3.zip'
     expected = {item['path']: item['sha256'] for item in metadata['files']}
     assert len(expected) == len(metadata['files']), 'Duplicate allowlist member'
     for rel in expected:

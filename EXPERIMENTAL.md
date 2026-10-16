@@ -1,16 +1,22 @@
 # Experimental integration artifact
 
-Experimental integration `0.3.1.dev2` was prepared offline. Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. It is not a supported general installation. Packaging establishes neither HACS UI replacement, live Supervisor migration, stock-Core media playback, camera switching, authentication nor physical-device acceptance. See [INSTALL.md](INSTALL.md).
+Experimental integration `0.3.1.dev3` is a local companion candidate for runtime `0.4.1-s1.experimental.6`. Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Packaging establishes neither installation, authentication, stock-Core playback, camera switching nor physical-device acceptance. See [INSTALL.md](INSTALL.md).
 
-The source is a composite S1/T9000 baseline, not a byte-equivalent official upstream version. The integration version identifies this experimental release; historical component version labels do not identify official release inclusion. Existing contribution branches and upstream history remain separate. Relative to the exact public `0.3.1.dev1` baseline commit `8bfeaae54aae1f393fa4da4cb616440c22086a76`, the candidate runtime changes only detection-mask safety and version metadata. The existing endpoint reconfigure flow, entry/registry identifiers, write/report reconciliation and config schema remain unchanged.
+The source is a composite S1/T9000 baseline, not a byte-equivalent official upstream version. The integration version identifies this experimental candidate; historical component labels do not identify official release inclusion. Existing contribution branches and upstream history remain separate. This candidate incorporates local integration development through `a64624e` on top of published `0.3.1.dev2` commit `6d4402dca70c24560cc48860dd6affbae632f00d`. The config schema and existing entry/registry identifiers are retained.
 
-## Candidate release notes: 0.3.1.dev2
+## Candidate release notes: 0.3.1.dev3
 
-- Non-bitmask detection reports now display unknown and both toggle directions refuse scalar writes over structured or unrecognized values.
-- Numeric-string masks preserve all unrelated bits just like numeric masks. An absent value retains the existing fallback; bool, finite-float truncation and negative conversion behavior remain compatible.
-- Malformed/nonfinite mask values use a controlled error without raw device report content. No automatic repair, hidden device query or authentication action was added.
-- The identical new synthetic regression produced 55 failures and 27 passes against the unchanged baseline; the focused candidate suite passed 159 tests plus 55 subtests. Focused lint and formatting passed. Tests used HA 2026.10.1 in an isolated network-disabled container, with fake bridge I/O. These results qualify the narrow implementation; they do not establish a supported Core range, physical-device behavior, installation, new-account authentication or media acceptance.
-- All six local Core overlays remain excluded. Stock-Core playback, camera switching, ARM and non-S1 operation remain unqualified. The paired SDK/bridge/add-on is separate and requires its own exact artifact/provenance review.
+- Native Home Assistant WebRTC live view forwards offers and ICE candidates to the bridge for streaming cameras uniquely bound to a T9000 station. Only the explicit boolean `webrtcRelay: true` in the bridge WebSocket hello selects the native camera class. Relay-off, missing advertisements and other cameras retain the RTSP/HA stream path. The matching bridge requires `BRIDGE_WEBRTC_RELAY=1`; there is no separate integration switch.
+- A relay advertisement change after reconnect schedules one config-entry reload to recreate camera classes. Unchanged advertisements do not reload; a fresh setup establishes a new hello baseline. Listeners and signaling sessions are cleaned up on unload/removal or transport loss.
+- Bridge admission errors retain `webrtc_busy` and `webrtc_releasing`, even when an early close event precedes the open reply. No automatic retry or hidden stream start is added.
+- The floodlight `light` property holds a successful intended write through uncorrelated push reports until a successful new post-write reconciliation snapshot completes. The normal delay is 20 seconds; failed refreshes retain the hold. Reports still update the cache and observation receipts. The displayed hold is not physical-device confirmation.
+- Storage diagnostics distinguish off, waiting and failed attempts, retain bounded failure categories and tolerate a finite fractional next-attempt timestamp from older bridges. Unlabelled enum codes display their raw value.
+- Offline discovery with the existing local Home Assistant environment ran 295 unittest cases: 293 passed, with the same firmware-registry assertion failure and reconfigure-registry API error documented for the inherited baseline. A missing optional turbojpeg library also produced a startup warning. The full suite is not green; these checks do not establish runtime, installation or media acceptance. Pytest-only functions are not executed by unittest discovery.
+- All six local Core overlays remain excluded. Stock-Core playback, camera switching, ARM and non-S1 operation remain unqualified. This integration contains neither the paired runtime nor optional frontend installation.
+
+## Historical 0.3.1.dev2 change
+
+The earlier candidate adapted detection-mask safety from upstream commit `c59b3d93cde9f5e889cf10950b129ce1c389bba5`, retaining unrelated bits while refusing unsafe structured or unrecognized values. Its retained qualification reported 159 focused tests plus 55 subtests with fake bridge I/O in an isolated network-disabled HA 2026.10.1 container. Those historical results are not a fresh validation of this candidate.
 
 ## Historical baseline evidence
 
