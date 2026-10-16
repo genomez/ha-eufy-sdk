@@ -370,12 +370,16 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
     @callback
     def _handle_property_changed(self, event: Event) -> None:
-        """Release the hold on accepted reports, never on observation receipts."""
+        """Keep light holds until reconciliation; release other holds on reports."""
         if not self._property_event_filter(event.data):
             return
         # A report during RPC has unknown ordering relative to the command. The
         # pending RPC must not later obscure it with the intended value.
         self._report_generation += 1
+        # Uncorrelated light reports may arrive after a matching report. Keep
+        # the hold until reconciliation; cache and receipts still update.
+        if self._prop == "light" and self._optimistic_owner is not None:
+            return
         if self._post_write_unsub is not None:
             self._post_write_unsub()
             self._post_write_unsub = None
