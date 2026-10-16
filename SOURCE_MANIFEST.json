@@ -17,10 +17,12 @@
     "gitMetadataIncluded": false,
     "priorPublishedVersion": "0.3.1.dev2",
     "priorPublishedCommit": "6d4402dca70c24560cc48860dd6affbae632f00d",
-    "developmentCommit": "a64624eddad09803f5f5aa53f651fdd3d94c246e",
-    "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised"
+    "developmentCommit": "3c535036eacb054bc6a0f9f0b2ab2d9789deebfb",
+    "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised",
+    "packagingRefreshBaseCommit": "1c5e2943b7225c373753b4739b2c6de88869e927",
+    "originRefsRecheckedForLocalRc": false
   },
-  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; floodlight light property hold; storage attempt and enum presentation; version metadata",
+  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata",
   "coreOverlaysBundled": false,
   "stockCoreMediaQualified": false,
   "cameraSwitchingQualified": false,
@@ -53,7 +55,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "c8cd3cc23d5122e3ddff4cecf606ff1897d3d524b2bfbf198564bceeace8af5c",
+      "sha256": "251ee2dfdac109f7dfbe7c61b3dfcb0e85ca01374b193efa6834fdbf5f34df63",
       "publicBaselineSha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373",
       "status": "modified"
     },
@@ -65,13 +67,13 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "8d0ac145237869e360c6987bfa5bde7f20ef2cfc06db0dcd3512f7712c68146f",
+      "sha256": "fa6f591c4a990011cc4eea2e8ee1df9f8881ea7bb66e3b2c4d6151bddd78ef98",
       "publicBaselineSha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "5307daf5f0c81748d104ab852d633587b02a22e4e770da96c729c1792f1c9d5b",
+      "sha256": "4a5f6eecaddbc58607680ade95aa0b04d299532c126085128f3ebc2d3adb90c6",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -89,13 +91,13 @@
     },
     {
       "path": "PUBLICATION.json",
-      "sha256": "9f02f43b30369c1e972fe175e1e37f15eba3df6a1811fbfd2a4cb399cdcb2aa8",
+      "sha256": "4b83fac2cd57b0fd08090dd4437302c30d5182dca6111d44edbe5af81063e398",
       "publicBaselineSha256": null,
       "status": "new"
     },
     {
       "path": "README.md",
-      "sha256": "0ca8f77aa8cbc06108fcd9d94bd24ba2e583e1ae159753809d3678045af2c54b",
+      "sha256": "312be896b7523b9a4ae023ddd8ccedcd6ee49542ce9e739f157020a7eeefc03c",
       "publicBaselineSha256": "73a5191e1d64400cac1071259e41c06e973227dcdabf0e0b870343fe76f259f0",
       "status": "modified"
     },
@@ -251,7 +253,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "7650d44ad3efe5ad94e808c673fc033007511cd632b04ddc43a21ce333a558eb",
+      "sha256": "1bf83cdea196235167ff2f45c04541adc1fb6f9b863d295b3ce484dd2b7cca49",
       "publicBaselineSha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88",
       "status": "modified"
     },
@@ -527,7 +529,7 @@
     },
     {
       "path": "tests/test_floodlight_state_hold.py",
-      "sha256": "f577e87cdd9ec361d287250c771a57b77fe25d5e118aadcec95e5494a0017266",
+      "sha256": "519022feb3dab8218b3b5156e6da6ebf2e1e221e16070e7a056ec1574e54b245",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -536,6 +538,12 @@
       "sha256": "746e63cc1d5fb5602961d98913160cb8c54f09dcef75ccde49470b46dc1c7a51",
       "publicBaselineSha256": "e2fedb74f0a995fe9a8efa264121c07d7747cf489b4cc785eb62445dfe14ff0b",
       "status": "modified"
+    },
+    {
+      "path": "tests/test_late_light_settle.py",
+      "sha256": "3316fa56fcd707c87e0a22b6e29c1da43905c5238591e7c06fc39e16c0dd222c",
+      "publicBaselineSha256": null,
+      "status": "new"
     },
     {
       "path": "tests/test_manifest_reads.py",
@@ -684,6 +692,6 @@
   ],
   "selfHashLocation": "external preparation receipt; source manifest excludes itself",
   "distribution": "experimental artifact; use exact matching published prerelease and checksums or separately approved verified local candidate",
-  "qualificationScope": "local candidate preparation; unittest 293 passed of 295 with one inherited failure and one inherited error; no release availability or installation acceptance asserted",
+  "qualificationScope": "local release candidate; unittest 312 passed of 314 with one inherited failure and one inherited error; deterministic manual ZIP built and allowlist verified; no release availability, installation acceptance or completed overnight soak asserted",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6"
 }

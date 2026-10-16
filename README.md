@@ -20,7 +20,7 @@ or its client closes. No Home Assistant private capability attributes are change
 
 This is an independently maintained experimental branch derived from the [upstream project](https://github.com/mega-yfue/ha-eufy-sdk) and [danymexi's S1 work](https://github.com/danymexi/eufy-sdk). It is not an official upstream release. Upstream copyright and license notices are preserved.
 
-After a successful floodlight `light` property write, the displayed intended value remains held through uncorrelated push reports until a successful new post-write snapshot completes. The normal delayed reconciliation is 20 seconds; a failed refresh retains the hold, so the display alone does not prove physical state.
+After a successful floodlight command, brief contrary reports are debounced to reduce displayed state flicker. Contrary boolean reports use an 8-second debounce within a settling window that ends at most 30 seconds after the command, even if a refresh fails. The normal post-write refresh remains 20 seconds. The display alone does not prove physical state; see [EXPERIMENTAL.md](EXPERIMENTAL.md).
 
 This candidate is the integration companion prepared for runtime `0.4.1-s1.experimental.6`. The matching runtime artifact and relay configuration require separate verification; this repository does not bundle them.
 

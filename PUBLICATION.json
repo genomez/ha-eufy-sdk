@@ -27,12 +27,16 @@
     "npmPublication": false
   },
   "verification": {
-    "unittestDiscovered": 295,
-    "unittestPassed": 293,
+    "unittestDiscovered": 314,
+    "unittestPassed": 312,
     "unittestFailures": 1,
     "unittestErrors": 1,
     "physicalDeviceAcceptance": false,
     "stockCoreMediaAcceptance": false,
-    "installationAcceptance": false
+    "installationAcceptance": false,
+    "newUnittestFailures": 0,
+    "unittestSkipped": 0,
+    "implementationCommit": "3c535036eacb054bc6a0f9f0b2ab2d9789deebfb",
+    "overnightSoakAcceptance": false
   }
 }
