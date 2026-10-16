@@ -227,6 +227,91 @@ class NativeWebRTCTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.messages[0], WebRTCError("webrtc_busy", "webrtc_busy"))
         self.assertFalse(self.camera._signaling_sessions)
 
+    async def test_open_refusal_wins_over_earlier_closed_event(self):
+        for code in ("webrtc_busy", "webrtc_releasing"):
+            with self.subTest(code=code):
+                self.client.started.clear()
+                self.client.release.clear()
+                self.client.error = code
+                messages = []
+                task = await self.offer(code, messages)
+                self.client.push(code, "webrtc.closed")
+                for _ in range(MAX_PENDING_CANDIDATES + 1):
+                    await self.camera.async_on_webrtc_candidate(
+                        code, RTCIceCandidateInit(candidate="synthetic-late-local")
+                    )
+                self.assertEqual(messages, [])
+                self.assertEqual(self.camera._signaling_sessions[code].candidates, [])
+                self.assertEqual(self.commands("webrtc.candidate"), [])
+                self.assertFalse(task.done())
+                self.client.release.set()
+                await task
+                await self.drain_closes()
+                self.assertEqual(messages, [WebRTCError(code, code)])
+                self.assertNotIn(code, self.camera._signaling_sessions)
+                self.assertNotIn(code, self.client.callbacks)
+        self.assertEqual(len(self.commands("webrtc.close")), 2)
+
+    async def test_open_refusal_wins_over_later_closed_event(self):
+        for code in ("webrtc_busy", "webrtc_releasing"):
+            with self.subTest(code=code):
+                self.client.started.clear()
+                self.client.release.clear()
+                self.client.error = code
+                messages = []
+                task = await self.offer(code, messages)
+                callback = self.client.callbacks[code]
+                self.client.release.set()
+                await task
+                callback({"event": "webrtc.closed", "code": "webrtc_closed"})
+                await self.drain_closes()
+                self.assertEqual(messages, [WebRTCError(code, code)])
+                self.assertNotIn(code, self.camera._signaling_sessions)
+                self.assertNotIn(code, self.client.callbacks)
+        self.assertEqual(len(self.commands("webrtc.close")), 2)
+
+    async def test_closed_before_answer_discards_late_success_and_candidates(self):
+        self.client.release.clear()
+        task = await self.offer()
+        self.client.push("synthetic-session", "webrtc.closed")
+        self.client.push("synthetic-session")
+        self.client.release.set()
+        await task
+        await self.drain_closes()
+        self.assertEqual(self.messages, [WebRTCError("webrtc_closed", "webrtc_closed")])
+        self.assertFalse(self.camera._signaling_sessions)
+        self.assertFalse(self.client.callbacks)
+        self.assertEqual(len(self.commands("webrtc.close")), 1)
+        self.assertEqual(self.commands("webrtc.candidate"), [])
+
+    async def test_closed_before_non_admission_error_keeps_closed_label(self):
+        for code in ("webrtc_failed", "webrtc_timeout", "synthetic-other-error"):
+            with self.subTest(code=code):
+                self.client.started.clear()
+                self.client.release.clear()
+                self.client.error = code
+                messages = []
+                task = await self.offer(code, messages)
+                self.client.push(code, "webrtc.closed")
+                self.client.release.set()
+                await task
+                await self.drain_closes()
+                self.assertEqual(messages, [WebRTCError("webrtc_closed", "webrtc_closed")])
+                self.assertNotIn(code, self.camera._signaling_sessions)
+        self.assertFalse(self.client.callbacks)
+
+    async def test_local_close_after_early_closed_event_cancels_open(self):
+        self.client.release.clear()
+        task = await self.offer()
+        self.client.push("synthetic-session", "webrtc.closed")
+        self.camera.close_webrtc_session("synthetic-session")
+        await task
+        await self.drain_closes()
+        self.assertEqual(self.messages, [])
+        self.assertFalse(self.camera._signaling_sessions)
+        self.assertFalse(self.client.callbacks)
+        self.assertEqual(len(self.commands("webrtc.close")), 1)
+
     async def test_ha_ice_configuration_is_forwarded_unchanged(self):
         await (await self.offer())
         self.assertEqual(self.commands("webrtc.open")[0]["iceServers"], self.camera.ice_servers)

@@ -42,6 +42,7 @@ class SignalingSession:
     transport: object = None
     forwarded: bool = False
     answered: bool = False
+    closed_before_answer: bool = False
     closed: bool = False
     candidates: list[str] = field(default_factory=list)
     remote_candidates: list[str] = field(default_factory=list)
@@ -100,7 +101,13 @@ class NativeWebRTCMixin:
         if not self._live(session):
             return
         if event.get("event") == "webrtc.closed":
-            self._close_signaling(session, "webrtc_closed")
+            if session.answered:
+                self._close_signaling(session, "webrtc_closed")
+            else:
+                # The pending open RPC may carry a more specific admission error.
+                session.closed_before_answer = True
+        elif session.closed_before_answer:
+            return
         elif isinstance(candidate := event.get("candidate"), str):
             if session.answered:
                 session.send_message(WebRTCCandidate(
@@ -133,6 +140,9 @@ class NativeWebRTCMixin:
                                      _transport=session.transport)
             if not self._live(session):
                 return
+            if session.closed_before_answer:
+                self._close_signaling(session, "webrtc_closed")
+                return
             if not isinstance(reply.get("sdp"), str):
                 self._close_signaling(session, "webrtc_failed")
                 return
@@ -154,11 +164,13 @@ class NativeWebRTCMixin:
             # Core owns the wrapper task: cancellation is fully handled here.
         except EufySdkApiClientError as error:
             code = str(error) if str(error) in WEBRTC_ERROR_CODES else "webrtc_failed"
+            if session.closed_before_answer and code not in {"webrtc_busy", "webrtc_releasing"}:
+                code = "webrtc_closed"
             self._close_signaling(session, code)
 
     async def async_on_webrtc_candidate(self, session_id, candidate):
         session = self._signaling_sessions.get(session_id)
-        if session is None or not self._live(session):
+        if session is None or not self._live(session) or session.closed_before_answer:
             return
         if not session.answered:
             if len(session.candidates) >= MAX_PENDING_CANDIDATES:
