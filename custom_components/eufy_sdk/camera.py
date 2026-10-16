@@ -26,16 +26,32 @@ GO2RTC_RTSP_PORT = 8554
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001
+    hass: HomeAssistant,
     entry: EufySdkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create a camera for every device the bridge marked with a `stream` path."""
     coordinator = entry.runtime_data.coordinator
+    client = entry.runtime_data.client
+    # First refresh awaits auth/list replies on the same ordered WebSocket as
+    # hello, so its advertisement is available before HA initializes cameras.
+    relay_enabled = client.webrtc_relay_enabled is True
+    reload_scheduled = False
+
+    def relay_changed(enabled: bool) -> None:
+        nonlocal reload_scheduled
+        if enabled == relay_enabled or reload_scheduled:
+            return
+        # HA fixes native WebRTC support per class at entity initialization.
+        # A fresh entry creates the right classes and a new capability baseline.
+        reload_scheduled = True
+        hass.config_entries.async_schedule_reload(entry.entry_id)
+
+    entry.async_on_unload(client.listen_webrtc_relay(relay_changed))
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     async_add_entities(
-        (EufySdkS1Camera if is_s1_camera(coordinator, sn) else EufySdkCamera)(
+        (EufySdkS1Camera if relay_enabled and is_s1_camera(coordinator, sn) else EufySdkCamera)(
             coordinator, sn, host, port
         )
         for sn, dev in coordinator.data.items()

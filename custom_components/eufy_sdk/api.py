@@ -82,6 +82,23 @@ class EufySdkApiClient:
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self._webrtc_callbacks: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._webrtc_relay_enabled = False
+        self._webrtc_relay_listener: Callable[[bool], None] | None = None
+
+    @property
+    def webrtc_relay_enabled(self) -> bool:
+        """Whether the latest bridge hello explicitly enabled the relay."""
+        return self._webrtc_relay_enabled
+
+    def listen_webrtc_relay(self, listener: Callable[[bool], None]) -> Callable[[], None]:
+        """Watch capability changes after camera classes have been selected."""
+        self._webrtc_relay_listener = listener
+
+        def unsubscribe() -> None:
+            if self._webrtc_relay_listener is listener:
+                self._webrtc_relay_listener = None
+
+        return unsubscribe
 
     def register_webrtc_session(self, session_id, callback):
         """Bind pushes to one session on the current transport, without connecting."""
@@ -145,6 +162,7 @@ class EufySdkApiClient:
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
         self._closing = True
+        self._webrtc_relay_listener = None
         self._invalidate_webrtc_sessions()
         if self._reconnect_task:
             self._reconnect_task.cancel()
@@ -171,6 +189,14 @@ class EufySdkApiClient:
                 if msg.type is not aiohttp.WSMsgType.TEXT:
                     continue
                 data = msg.json()
+                if data.get("event") == "hello":
+                    # Keep the last advertisement through a disconnect. The next
+                    # hello (including an old bridge's absent field) replaces it.
+                    enabled = data.get("webrtcRelay") is True
+                    changed = enabled != self._webrtc_relay_enabled
+                    self._webrtc_relay_enabled = enabled
+                    if changed and self._webrtc_relay_listener is not None:
+                        self._webrtc_relay_listener(enabled)
                 mid = data.get("id")
                 if mid is not None and mid in self._pending:
                     fut = self._pending.pop(mid)

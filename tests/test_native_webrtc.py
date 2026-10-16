@@ -271,8 +271,14 @@ class NativeWebRTCSelectionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_p1_09_10_actual_camera_classes_preserve_native_and_legacy_capabilities(self):
         coordinator = roster()
-        coordinator.config_entry = SimpleNamespace(runtime_data=SimpleNamespace(client=FakeClient()))
-        entry = SimpleNamespace(data={"host": "synthetic-host", "port": 3000}, runtime_data=SimpleNamespace(coordinator=coordinator))
+        client = EufySdkApiClient("synthetic-host", 3000, Mock())
+        client._webrtc_relay_enabled = True
+        entry = SimpleNamespace(
+            data={"host": "synthetic-host", "port": 3000},
+            runtime_data=SimpleNamespace(coordinator=coordinator, client=client),
+            async_on_unload=Mock(),
+        )
+        coordinator.config_entry = entry
         entities = []
         await async_setup_entry(Mock(), entry, lambda items: entities.extend(items))
         native, legacy = entities

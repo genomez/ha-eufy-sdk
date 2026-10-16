@@ -2,6 +2,18 @@
 
 Experimental S1/T9000 Home Assistant integration and optional player source.
 
+Native WebRTC live view requires a matching bridge started with
+`BRIDGE_WEBRTC_RELAY=1`. Only an explicit boolean `webrtcRelay: true` in the
+bridge's WebSocket hello enables the native camera class, and only for streaming
+cameras uniquely bound to a T9000 station. Relay-off, older bridges without this
+advertisement, and other cameras retain the existing RTSP/HA stream path.
+There is no separate integration switch. If the advertisement changes after a
+bridge reconnect, the integration schedules one config-entry reload to recreate
+camera classes; unchanged reconnects do not reload. A fresh setup consumes the
+bridge hello before its auth/list replies and establishes a new baseline, so the
+reload does not repeat. Capability listeners are removed when the entry unloads
+or its client closes. No Home Assistant private capability attributes are changed.
+
 **Experimental integration `0.3.1.dev2`.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Its narrow detection-mask safety change and synthetic regression results are documented in [EXPERIMENTAL.md](EXPERIMENTAL.md). Packaging does not establish installation, authentication, physical-device or media acceptance. Read [INSTALL.md](INSTALL.md), [CORE_COMPATIBILITY.md](CORE_COMPATIBILITY.md), and [EXPERIMENTAL.md](EXPERIMENTAL.md) before a separate installation decision.
 
 This is an independently maintained experimental branch derived from the [upstream project](https://github.com/mega-yfue/ha-eufy-sdk) and [danymexi's S1 work](https://github.com/danymexi/eufy-sdk). It is not an official upstream release. Upstream copyright and license notices are preserved.
