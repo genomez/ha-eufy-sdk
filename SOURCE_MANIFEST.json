@@ -131,7 +131,7 @@
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "1a66b73c49e1edfe0660c836977db57f1a96a099790791568407917142893920",
+      "sha256": "e80ca3a5eff14a1e3cc48a3af33cc7ecd602e1f122ce83d0e70e11437a1b0883",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -347,7 +347,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "1ccb8c6c4e83a14a460041926c1ee17f28765d5b5f3fac258cc56583e3f51693",
+      "sha256": "5d99002ae64a7032ef0ad5ea80ae767c3c2fed1cedb97e5918049e38a93c7158",
       "publicBaselineSha256": "28b5b8cb942a6f77b646336d73cbb3fd97789403dc3f7a16f56fae6f93957c9c",
       "status": "modified"
     },

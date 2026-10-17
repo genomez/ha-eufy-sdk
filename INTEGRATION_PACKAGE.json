@@ -157,7 +157,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "1ccb8c6c4e83a14a460041926c1ee17f28765d5b5f3fac258cc56583e3f51693"
+      "sha256": "5d99002ae64a7032ef0ad5ea80ae767c3c2fed1cedb97e5918049e38a93c7158"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
