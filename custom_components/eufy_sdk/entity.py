@@ -1,5 +1,8 @@
 """Base entity for eufy_sdk — one HA device per eufy device (keyed by serial)."""
 
+# Modified for genomez S1 experimental source preview, 2026-10-17.
+# Successful floodlight writes show the requested state within bounded settling.
+
 from __future__ import annotations
 
 import math
@@ -382,8 +385,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         """Keep bounded light settling; release other holds on reports."""
         if not self._property_event_filter(event.data):
             return
-        # A report during RPC has unknown ordering relative to the command. The
-        # pending RPC must not later obscure it with the intended value.
+        # A report during RPC has unknown ordering relative to the command.
+        # Non-light properties keep it authoritative; successful light writes
+        # present the request while fresh contrary evidence bounds correction.
         self._report_generation += 1
         # Uncorrelated light reports may arrive after a matching report. Keep
         # the recent-command guard; cache and receipts still update.
@@ -421,28 +425,24 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         owner = self._write_generation
         report_generation = self._report_generation
         lifecycle = self._lifecycle_generation
+        light_marker = self._light_state_marker() if self._prop == "light" else None
         await self.client.set_property(self._sn, self._prop, value)
 
         if self._removed or lifecycle != self._lifecycle_generation:
             return
-        if (
-            owner == self._write_generation
-            and report_generation == self._report_generation
+        if owner == self._write_generation and (
+            self._prop == "light" or report_generation == self._report_generation
         ):
             self._pending_reconcile = None
             self._assumed_value = value
             self._optimistic_owner = owner
             if self._prop == "light":
                 self._start_light_settle(owner, lifecycle, value)
-            self.async_write_ha_state()
-        elif self._prop == "light" and owner == self._write_generation:
-            # A report during this RPC must also retire an older command's guard.
-            self._clear_light_settle()
-            self._pending_reconcile = None
-            self._optimistic_owner = None
-            self._assumed_value = None
-            if self.device.get("state", {}).get(self._prop) == value:
-                self._start_light_settle(owner, lifecycle, value)
+                if (
+                    light_marker != self._light_state_marker()
+                    or report_generation != self._report_generation
+                ):
+                    self._update_light_candidate(force=True)
             self.async_write_ha_state()
         if not self.write_only:
             self._schedule_post_write_refresh(owner)

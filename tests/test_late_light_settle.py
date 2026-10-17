@@ -1,5 +1,7 @@
 """Offline timing regressions for bounded, contrary-value light settling."""
 
+# Modified for genomez S1 experimental source preview, 2026-10-17.
+# Pending-success presentation reconciles even unchanged device observations.
 # ruff: noqa: ANN001, ANN002, ANN201, ANN202, D102, FBT002, FBT003, INP001, PLR2004, PT009, PT027, SLF001
 
 import asyncio
@@ -8,12 +10,103 @@ from unittest.mock import patch
 
 import test_floodlight_state_hold as fixtures
 
+from custom_components.eufy_sdk.property_sync import apply_observation_event
+
 
 class LateLightSettleTests(unittest.IsolatedAsyncioTestCase):
     """Exercise real light entities/cache with a manual offline clock."""
 
     _entity = fixtures.FloodlightStateHoldTests._entity
     _report = fixtures.FloodlightStateHoldTests._report
+
+    def receipt(self, entity, value):
+        stamp = 100 + self.now
+        with patch("custom_components.eufy_sdk.property_sync.time", return_value=stamp):
+            self.assertTrue(
+                apply_observation_event(
+                    entity.coordinator,
+                    {
+                        "event": "propertiesObserved",
+                        "deviceSn": "fixture-device",
+                        "source": "rtc",
+                        "observedAtMs": stamp * 1000,
+                        "properties": {"light": value},
+                    },
+                )
+            )
+
+    async def test_success_presents_request_then_matching_late_read_confirms(self):
+        entity, coordinator, _client, seen = self.clock(initial=True)
+        await entity.write(False)
+        self.assertEqual(seen, [False])
+        self.assertTrue(coordinator.data["fixture-device"]["state"]["light"])
+        await self.advance(5)
+        self.receipt(entity, False)
+        self.assertIsNone(entity._optimistic_owner)
+        await self.advance(40)
+        self.assertEqual(seen, [False])
+
+    async def test_unchanged_opposite_late_read_corrects_requested_state(self):
+        for initial in (False, True):
+            with self.subTest(initial=initial):
+                entity, coordinator, _client, seen = self.clock(initial=initial)
+                await entity.write(not initial)
+                await self.advance(5)
+                self.receipt(entity, initial)
+                self.assertIs(
+                    coordinator.data["fixture-device"]["state"]["light"], initial
+                )
+                await self.advance(12)
+                self.assertEqual(seen, [not initial])
+                await self.advance(13)
+                self.assertEqual(seen, [not initial, initial])
+                self.assertIsNone(entity._optimistic_owner)
+
+    async def test_unchanged_opposite_receipt_during_rpc_starts_correction(self):
+        entity, _coordinator, client, seen = self.clock(initial=True)
+
+        async def pending(*_args):
+            self.receipt(entity, True)
+
+        client.set_property.side_effect = pending
+        await entity.write(False)
+        self.assertEqual(seen, [True, False])
+        await self.advance(7)
+        self.assertFalse(entity.is_on)
+        await self.advance(8)
+        self.assertEqual(seen, [True, False, True])
+
+    async def test_opposite_report_during_rpc_starts_correction(self):
+        entity, _coordinator, client, seen = self.clock(initial=True)
+
+        async def pending(*_args):
+            self._report(entity, True)
+
+        client.set_property.side_effect = pending
+        await entity.write(False)
+        self.assertEqual(seen, [True, False])
+        await self.advance(8)
+        self.assertEqual(seen, [True, False, True])
+
+    async def test_missing_late_reads_restore_last_real_state_at_deadline(self):
+        entity, coordinator, _client, seen = self.clock(initial=True)
+        coordinator.last_update_success = False
+        await entity.write(False)
+        await self.advance(29)
+        self.assertEqual(seen, [False])
+        await self.advance(30)
+        self.assertEqual(seen, [False, True])
+        self.assertIsNone(entity._assumed_value)
+
+    async def test_matching_late_receipt_cancels_opposite_candidate(self):
+        entity, _coordinator, _client, seen = self.clock(initial=True)
+        await entity.write(False)
+        await self.advance(5)
+        self.receipt(entity, True)
+        await self.advance(10)
+        self.receipt(entity, False)
+        await self.advance(40)
+        self.assertEqual(seen, [False])
 
     def clock(self, initial=True, prop="light"):
         entity, coordinator, client, seen = self._entity(initial=initial, prop=prop)

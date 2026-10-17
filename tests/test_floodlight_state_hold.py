@@ -1,5 +1,7 @@
 """Keep floodlight command presentation stable while uncorrelated reports settle."""
 
+# Modified for genomez S1 experimental source preview, 2026-10-17.
+# Light RPC success presents the request while contrary reports remain bounded.
 # ruff: noqa: ANN001, ANN201, ANN202, D102, FBT003, INP001, PT009, PT027, SLF001
 
 import asyncio
@@ -12,7 +14,10 @@ from homeassistant.core import HomeAssistant
 
 import custom_components.eufy_sdk as integration
 from custom_components.eufy_sdk.const import CONF_HOST, CONF_PORT
-from custom_components.eufy_sdk.entity import POST_WRITE_REFRESH_SECS
+from custom_components.eufy_sdk.entity import (
+    LIGHT_CONTRADICTION_SECS,
+    POST_WRITE_REFRESH_SECS,
+)
 from custom_components.eufy_sdk.property_sync import (
     apply_observation_event,
     apply_property_event,
@@ -240,7 +245,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, [])
         timer.assert_not_called()
 
-    async def test_report_during_rpc_still_prevents_new_optimism(self):
+    async def test_light_report_during_rpc_starts_bounded_contrary_candidate(self):
         entity, _coordinator, client, seen = self._entity()
         gate = asyncio.Event()
 
@@ -256,9 +261,16 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             self._report(entity, False)
             gate.set()
             await task
+        self.assertEqual(entity._optimistic_owner, 1)
+        self.assertEqual(seen, [False, True])
+        contrary = next(
+            call.args[2]
+            for call in timer.call_args_list
+            if call.args[1] == LIGHT_CONTRADICTION_SECS
+        )
+        contrary(None)
+        self.assertEqual(seen, [False, True, False])
         self.assertIsNone(entity._optimistic_owner)
-        self.assertEqual(seen, [False])
-        timer.assert_called_once()
 
     async def test_non_light_reports_still_release_immediately(self):
         for prop in ("enabled", "lightPower"):
