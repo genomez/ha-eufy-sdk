@@ -2,7 +2,7 @@
 
 ## Local source changes, 2026-10-17
 
-This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1.dev3` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is prepared locally; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
+This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1-s1.experimental.6` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is prepared locally; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
 
 - Sirens require a bound `siren` descriptor with both `trigger` and `stop`, or standalone sensor-family `test` and `stop`. Missing, incomplete or malformed manifests create no new siren entities; withdrawn actions make existing entities unavailable and direct calls fail before RPC. HomeBase/camera duration commands retain the 30-second default. Command acknowledgements and elapsed durations never establish sounding state: without a reported boolean it remains unknown.
 - Doorbell presses publish legacy `pressed`, then standard `ring`, with a separate write for each. Existing event types and entity identities remain. Automations filtered to either type each receive one matching event; an unfiltered state automation can run twice. Detection event types remain unchanged.
@@ -12,11 +12,11 @@ This local release candidate packages the reviewed source at `0f4ff70`, includin
 
 The earlier candidate notes below describe retained history. See INTEGRATION_NOTICES.md for this review's modification record and SOURCE_MANIFEST.json for current local inventory.
 
-Experimental integration `0.3.1.dev3` is a local companion candidate for runtime `0.4.1-s1.experimental.6`. Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Packaging establishes neither installation, authentication, stock-Core playback, camera switching nor physical-device acceptance. See [INSTALL.md](INSTALL.md).
+Experimental integration `0.3.1-s1.experimental.6` is a local companion candidate for runtime `0.4.1-s1.experimental.6`. Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Packaging establishes neither installation, authentication, stock-Core playback, camera switching nor physical-device acceptance. See [INSTALL.md](INSTALL.md).
 
 The source is a composite S1/T9000 baseline, not a byte-equivalent official upstream version. The integration version identifies this experimental candidate; historical component labels do not identify official release inclusion. Existing contribution branches and upstream history remain separate. This candidate incorporates local integration development through `c50fe57` (including `cad908c`, `d762809` and `3c53503`) on top of published `0.3.1.dev2` commit `6d4402dca70c24560cc48860dd6affbae632f00d`. The config schema and existing entry/registry identifiers are retained.
 
-## Candidate release notes: 0.3.1.dev3
+## Candidate release notes: 0.3.1-s1.experimental.6
 
 - Successful latest floodlight writes present the requested state while confirmation is pending. Fresh contrary reports or unchanged real reads during the request retain the bounded automatic correction path. The 30-second settling deadline and 8-second correction debounce remain; requested presentation does not prove physical state.
 - Camera siren controls require complete supported actions, and doorbells publish the standard `ring` event alongside legacy `pressed`.

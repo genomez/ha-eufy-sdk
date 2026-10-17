@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1.dev3",
+  "version": "0.3.1-s1.experimental.6",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1.dev3.zip",
+  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.6.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "7abbaf529b99bfd5764c758ebb72dcaa8929f281405007bd671eccd2f3a5453f"
+      "sha256": "ea07fc91c5b83b4f05809076a25918ef6d52eb061ec39200df19021b44326e62"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "ee8a3ff07836f7c51d834763333d7d35e33f091cf10638135cf877844bcb503a"
+      "sha256": "b6089ac216c787a9e6f9cb04223e2adf55656482efac82cd97398b3583f8346e"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "f18ebd21ad1148d340b309c64d7369e9705d655c7edbc980d3e1479a148dcfe7"
+      "sha256": "6fbb872f9bb7e273b3c006b775ed3511aa280043ea1cdf33c7459c99b01c40b9"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "312be896b7523b9a4ae023ddd8ccedcd6ee49542ce9e739f157020a7eeefc03c"
+      "sha256": "2ffc864980f847b4584c62fb0b8ccd8ed8440c476774c58a0910cfef9c49a3ea"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -157,7 +157,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "6ed9808f13b107cbbe780f81c8c8bd45c12fa5c26f9a0e72b5d0e1eadc7ee3de"
+      "sha256": "1ccb8c6c4e83a14a460041926c1ee17f28765d5b5f3fac258cc56583e3f51693"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
