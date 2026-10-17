@@ -21,7 +21,7 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "42a6f5fc9f6407d3ba88b44ea8992042ecfb010234c8f79739025629c89f9eb8"
+      "sha256": "6fc78adba16465e3ed339c22a6c1a3375d983d7bf98d271fa15b112ddf031b50"
     },
     {
       "path": "LICENSE",
@@ -133,7 +133,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "1bf83cdea196235167ff2f45c04541adc1fb6f9b863d295b3ce484dd2b7cca49"
+      "sha256": "e2055948769821c6518503dc18a13c727f557d216f4ba0e7aaca7858cba792b5"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -236,5 +236,5 @@
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
   ],
-  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 444 passed, 2 inherited registry-test failures, 278 passed subtests; all 25 new items and 43 new subtests passed. Untouched base: 419 passed, same 2 failures, 235 passed subtests. HA 2026.10 and live acceptance unqualified."
+  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 450 passed, 2 inherited registry-test failures, 280 passed subtests. All 6 new items and 2 new subtests passed. Untouched 74ad50a baseline: 444 passed, same 2 failures, 278 passed subtests. Focused floodlight/property suites: 71 passed, 29 passed subtests, no failures. HA 2026.10 and live acceptance unqualified."
 }

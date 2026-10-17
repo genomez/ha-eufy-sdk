@@ -17,9 +17,9 @@
     "gitMetadataIncluded": false,
     "priorPublishedVersion": "0.3.1.dev2",
     "priorPublishedCommit": "6d4402dca70c24560cc48860dd6affbae632f00d",
-    "developmentCommit": "cad908c9a9018599143dc2539d32917d77528400",
+    "developmentCommit": "c50fe577b7a069fa663a1e149c72caf7a9e24fff",
     "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised",
-    "packagingRefreshBaseCommit": "cad908c9a9018599143dc2539d32917d77528400",
+    "packagingRefreshBaseCommit": "c50fe577b7a069fa663a1e149c72caf7a9e24fff",
     "originRefsRecheckedForLocalRc": false,
     "upstreamIntegrationPorts": {
       "repository": "https://github.com/mega-yfue/ha-eufy-sdk",
@@ -53,9 +53,21 @@
       "versionNamingPending": true,
       "networkAccess": false,
       "archiveBuilt": false
+    },
+    "floodlightPendingReview": {
+      "date": "2026-10-17",
+      "baseCommit": "74ad50a99f6b2e1fbf4d858eee25c278771834c7",
+      "implementationCommit": "c50fe577b7a069fa663a1e149c72caf7a9e24fff",
+      "scope": [
+        "Successful latest light writes present requested state within existing bounded settling",
+        "Fresh contrary reports and unchanged observation receipts during RPC start correction on completion",
+        "No API metadata or runtime dependency change; non-light ordering and latest-write ownership retained"
+      ],
+      "networkAccess": false,
+      "archiveBuilt": false
     }
   },
-  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata; battery HA stream-worker suppression with explicit power precedence and legacy fallback; confirmation-only battery preload Repair; early-event alarm/arming missing-data guards; bound siren action gates without inferred sounding state; standard ring plus legacy pressed events; storage UTC timestamp reuse and disconnected diagnostics short circuit",
+  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata; battery HA stream-worker suppression with explicit power precedence and legacy fallback; confirmation-only battery preload Repair; early-event alarm/arming missing-data guards; bound siren action gates without inferred sounding state; standard ring plus legacy pressed events; storage UTC timestamp reuse and disconnected diagnostics short circuit; successful latest floodlight requests present bounded requested state while fresh in-flight real observations retain correction",
   "coreOverlaysBundled": false,
   "stockCoreMediaQualified": false,
   "cameraSwitchingQualified": false,
@@ -100,13 +112,13 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "42a6f5fc9f6407d3ba88b44ea8992042ecfb010234c8f79739025629c89f9eb8",
+      "sha256": "6fc78adba16465e3ed339c22a6c1a3375d983d7bf98d271fa15b112ddf031b50",
       "publicBaselineSha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "4c047b26df338e59ed8e58ddd684da4126c92cafa45422d03ca5cd117930afd0",
+      "sha256": "dba6fae4c40aedaa97c0a4fed4aa685b0a92747a9e4d419dcab0281ae3c1c537",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -124,7 +136,7 @@
     },
     {
       "path": "PUBLICATION.json",
-      "sha256": "6e4f61cadfb1a3d16453e069d524c528c025364964144df669dc5229a91fec1d",
+      "sha256": "aefc1fe25e40e2ef87325192756a8fb3f5fd48851c96d6f7f07f036a19ba7cfa",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -286,7 +298,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "1bf83cdea196235167ff2f45c04541adc1fb6f9b863d295b3ce484dd2b7cca49",
+      "sha256": "e2055948769821c6518503dc18a13c727f557d216f4ba0e7aaca7858cba792b5",
       "publicBaselineSha256": "1a52afe4141bb475d41cbbc2532bde153a7c4a97c23dc262d340354bd62efe88",
       "status": "modified"
     },
@@ -586,7 +598,7 @@
     },
     {
       "path": "tests/test_floodlight_state_hold.py",
-      "sha256": "519022feb3dab8218b3b5156e6da6ebf2e1e221e16070e7a056ec1574e54b245",
+      "sha256": "5aabe3120d46d93ae52316444f2a89dda1764c14dc2f1ab23de2bbefdd3fa7a6",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -598,7 +610,7 @@
     },
     {
       "path": "tests/test_late_light_settle.py",
-      "sha256": "3316fa56fcd707c87e0a22b6e29c1da43905c5238591e7c06fc39e16c0dd222c",
+      "sha256": "7ab7769b13af1b715903212f6e4e059b08b3e5bb8535af5aaedf505bcc679595",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -779,6 +791,6 @@
   ],
   "selfHashLocation": "external preparation receipt; source manifest excludes itself",
   "distribution": "experimental artifact; use exact matching published prerelease and checksums or separately approved verified local candidate",
-  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 444 passed, 2 inherited registry-test failures, 278 passed subtests; all 25 new items and 43 new subtests passed. Untouched base: 419 passed, same 2 failures, 235 passed subtests. HA 2026.10 and live acceptance unqualified.",
+  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 450 passed, 2 inherited registry-test failures, 280 passed subtests. All 6 new items and 2 new subtests passed. Untouched 74ad50a baseline: 444 passed, same 2 failures, 278 passed subtests. Focused floodlight/property suites: 71 passed, 29 passed subtests, no failures. HA 2026.10 and live acceptance unqualified.",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6"
 }
