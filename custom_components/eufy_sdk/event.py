@@ -1,10 +1,16 @@
 """Event platform — discrete push events (doorbell, package, sound, …) in real time."""
 
+# Modified 2026-10-17: publish standard doorbell ring events alongside legacy presses.
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from homeassistant.components.event import EventDeviceClass, EventEntity
+from homeassistant.components.event import (
+    DoorbellEventType,
+    EventDeviceClass,
+    EventEntity,
+)
 from homeassistant.core import callback
 
 from .const import EVENT_TYPE
@@ -55,12 +61,15 @@ class _EufySdkBusEvent(EufySdkDeviceEntity, EventEntity):
         data = event.data
         if data.get("deviceSn") != self._sn:
             return
-        event_type = self._match(data.get("event"))
-        if event_type is None:
-            return
         attrs = {k: v for k, v in data.items() if k == "thumbnailUrl" and v}
-        self._trigger_event(event_type, attrs)
-        self.async_write_ha_state()
+        for event_type in self._event_types_for(data.get("event")):
+            self._trigger_event(event_type, attrs)
+            self.async_write_ha_state()
+
+    def _event_types_for(self, bus_event: str | None) -> tuple[str, ...]:
+        """Return the entity events to publish for one bridge event."""
+        event_type = self._match(bus_event)
+        return (event_type,) if event_type is not None else ()
 
     def _match(self, bus_event: str | None) -> str | None:
         """Return the HA event_type for a bridge event name, or None to ignore it."""
@@ -77,7 +86,15 @@ class EufySdkDoorbellEvent(_EufySdkBusEvent):
         """Bind to a doorbell device."""
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_doorbell_event"
-        self._attr_event_types = [DOORBELL_EVENT_TYPE]
+        self._attr_event_types = [DOORBELL_EVENT_TYPE, DoorbellEventType.RING]
+
+    def _event_types_for(self, bus_event: str | None) -> tuple[str, ...]:
+        """Retain legacy triggers, then leave the standard ring as the last event."""
+        if self._match(bus_event) is None:
+            return ()
+        # Each event needs its own state write so existing pressed automations
+        # observe it before ring becomes the current event_type.
+        return (DOORBELL_EVENT_TYPE, DoorbellEventType.RING)
 
     def _match(self, bus_event: str | None) -> str | None:
         """Fire on a doorbell press."""

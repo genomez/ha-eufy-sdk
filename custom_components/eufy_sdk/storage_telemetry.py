@@ -1,5 +1,8 @@
 """Optional S1 storage diagnostics from cached, timestamped bridge snapshots."""
 
+# Modified for genomez S1 experimental source preview, 2026-10-17.
+# Reuse validated UTC timestamps and skip storage work while disconnected.
+
 from __future__ import annotations
 
 import math
@@ -199,6 +202,8 @@ class EufySdkStorageSensor(EufySdkDeviceEntity, SensorEntity):
         self._attr_unique_id = f"{serial}_storage_{field}"
         self._attr_name = name
         self._expiry_cancel = None
+        self._observed_datetime_ms: int | None = None
+        self._observed_datetime: datetime | None = None
         if field == "observed_at":
             self._attr_device_class = SensorDeviceClass.TIMESTAMP
             self._attr_icon = "mdi:clock-outline"
@@ -227,7 +232,12 @@ class EufySdkStorageSensor(EufySdkDeviceEntity, SensorEntity):
         now_ms = _now_ms()
         if self._field == "observed_at":
             observed = storage_observed_at(self.device, now_ms)
-            return datetime.fromtimestamp(observed / 1000, UTC) if observed else None
+            if observed is None:
+                return None
+            if observed != self._observed_datetime_ms:
+                self._observed_datetime = datetime.fromtimestamp(observed / 1000, UTC)
+                self._observed_datetime_ms = observed
+            return self._observed_datetime
         status, reading = storage_reading(self.device, now_ms)
         if status != "current" or reading is None:
             return None
@@ -236,24 +246,26 @@ class EufySdkStorageSensor(EufySdkDeviceEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Retain timestamp provenance after values expire, without reviving values."""
-        now_ms = _now_ms()
-        status = storage_reading(self.device, now_ms)[0]
-        observed = storage_observed_at(self.device, now_ms)
-        attempts = _attempt_diagnostics(
-            self.device["storageTelemetry"] if supports_storage(self.device) else {}
-        )
         if not super().available:
             status, observed = "unavailable", None
             attempts = _attempt_diagnostics({})
-        elif observed is not None and (
-            self.device["storageTelemetry"]["status"] == "stale"
-            or now_ms - observed >= FRESHNESS_MS
-        ):
-            status = "stale"
+        else:
+            now_ms = _now_ms()
+            device = self.device
+            status = storage_reading(device, now_ms)[0]
+            observed = storage_observed_at(device, now_ms)
+            attempts = _attempt_diagnostics(
+                device["storageTelemetry"] if supports_storage(device) else {}
+            )
+            if observed is not None and (
+                device["storageTelemetry"]["status"] == "stale"
+                or now_ms - observed >= FRESHNESS_MS
+            ):
+                status = "stale"
         if status == "unknown":
             status = (
                 "off"
-                if self.device["storageTelemetry"]["enabled"] is False
+                if device["storageTelemetry"]["enabled"] is False
                 else "waiting_for_first_reading"
             )
         if (

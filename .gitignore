@@ -11,6 +11,8 @@ __pycache__
 .vscode
 coverage.xml
 .ruff_cache
+# Local offline test outputs, 2026-10-17.
+.offline/
 
 
 # Home Assistant configuration

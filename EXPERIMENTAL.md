@@ -1,5 +1,17 @@
 # Experimental integration artifact
 
+## Local source changes, 2026-10-17
+
+This local review starts at `5833e03`; the retained version metadata is not a newly named release. No archive, installation or publication is performed.
+
+- Sirens require a bound `siren` descriptor with both `trigger` and `stop`, or standalone sensor-family `test` and `stop`. Missing, incomplete or malformed manifests create no new siren entities; withdrawn actions make existing entities unavailable and direct calls fail before RPC. HomeBase/camera duration commands retain the 30-second default. Command acknowledgements and elapsed durations never establish sounding state: without a reported boolean it remains unknown.
+- Doorbell presses publish legacy `pressed`, then standard `ring`, with a separate write for each. Existing event types and entity identities remain. Automations filtered to either type each receive one matching event; an unfiltered state automation can run twice. Detection event types remain unchanged.
+- Storage getters reuse validated UTC observation datetimes and skip diagnostics validation while disconnected. Existing freshness, provenance, in-place update validation and expiry semantics remain. Other warned push/binary/select getters already read cached scalars or fixed dictionary keys. Offline timings are microseconds; the reported 0.6-second warning is not reproduced or attributed by these checks.
+- The existing HA 2026.7.0 / Python 3.14.4 environment runs all 446 pytest items through `tools/run_offline_tests.py`: 444 passed, two inherited registry-test failures, and 278 passed subtests. All 25 new items and 43 new subtests pass. The same runner against untouched `5833e03` yields 419 passed, the same two failures, and 235 passed subtests. No packages are installed. HA 2026.10 runtime behavior remains unqualified.
+- Add-on compatibility is action-surface based: review.7 or published .5 bridges lacking siren descriptors/actions simply offer no new siren entities or leave existing ones unavailable. No hello/protocol version requirement is introduced. Four owner cameras (two T8214 and two T8134) are expected to gain controls only when the paired SDK advertises their evidenced routes; audible acceptance is separate. Existing registry records are retained, and newly gained methods require an entry reload to create entities.
+
+The earlier candidate notes below describe retained history. See INTEGRATION_NOTICES.md for this review's modification record and SOURCE_MANIFEST.json for current local inventory.
+
 Experimental integration `0.3.1.dev3` is a local companion candidate for runtime `0.4.1-s1.experimental.6`. Use the exact matching published prerelease and checksums, or a separately approved verified local candidate. Candidate preparation does not establish release or HACS availability. Packaging establishes neither installation, authentication, stock-Core playback, camera switching nor physical-device acceptance. See [INSTALL.md](INSTALL.md).
 
 The source is a composite S1/T9000 baseline, not a byte-equivalent official upstream version. The integration version identifies this experimental candidate; historical component labels do not identify official release inclusion. Existing contribution branches and upstream history remain separate. This candidate incorporates local integration development through `d762809` (including `3c53503`) on top of published `0.3.1.dev2` commit `6d4402dca70c24560cc48860dd6affbae632f00d`. The config schema and existing entry/registry identifiers are retained.
