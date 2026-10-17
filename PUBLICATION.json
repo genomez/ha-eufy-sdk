@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "state": "local candidate; not published",
+  "state": "local reviewed source; not packaged or published",
   "candidateVersion": "0.3.1.dev3",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6",
   "matchingRuntimeAvailabilityVerified": false,
@@ -27,6 +27,29 @@
     "npmPublication": false
   },
   "verification": {
+    "implementationCommit": "cad908c9a9018599143dc2539d32917d77528400",
+    "localBaseCommit": "5833e03bca08ef98b8f749ba5ef38c0bb4bc0c8f",
+    "offlineHomeAssistantVersion": "2026.7.0",
+    "offlinePythonVersion": "3.14.4",
+    "pytestPassedItems": 444,
+    "pytestFailedItems": 2,
+    "pytestPassedSubtests": 278,
+    "pytestSkippedItems": 0,
+    "pytestCollectionErrors": 0,
+    "newTestItemsPassed": 25,
+    "newTestSubtestsPassed": 43,
+    "baselinePytestPassedItems": 419,
+    "baselinePytestFailedItems": 2,
+    "baselinePytestPassedSubtests": 235,
+    "pytestCoroutineAdapter": "tools/run_offline_tests.py; no-I/O loop and plain coroutine hook",
+    "physicalDeviceAcceptance": false,
+    "stockCoreMediaAcceptance": false,
+    "installationAcceptance": false,
+    "core2026_10ApiQualified": false,
+    "packagesInstalled": false,
+    "archiveBuilt": false
+  },
+  "priorCandidateVerification": {
     "unittestDiscovered": 339,
     "unittestPassed": 337,
     "unittestFailures": 1,
@@ -44,5 +67,10 @@
     "pytestCoroutineAdapter": "external asyncio.run hook for unmarked plain coroutine functions; no dependency installation",
     "offlineHomeAssistantVersion": "2026.7.0",
     "core2026_10ApiQualified": false
+  },
+  "localReview": {
+    "date": "2026-10-17",
+    "versionNamingPending": true,
+    "compatibility": "Siren action surface required, no bridge version gate; review.7 / published .5 without actions omit sirens or leave them unavailable"
   }
 }

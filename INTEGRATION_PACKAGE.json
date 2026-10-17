@@ -13,7 +13,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "84fe297cb3056bc7cf295afd04720399334968469401418d3071cb45f08ec0a6"
+      "sha256": "e20ca32f67cb528dd347e661b4181aa60497e96c8108da8292b15946c7fc64f9"
     },
     {
       "path": "INSTALL.md",
@@ -21,7 +21,7 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "13e31b249edd7a0e152a29fd333791992bee8952fb094e2384568ec751e74e4a"
+      "sha256": "42a6f5fc9f6407d3ba88b44ea8992042ecfb010234c8f79739025629c89f9eb8"
     },
     {
       "path": "LICENSE",
@@ -137,7 +137,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
-      "sha256": "43be0efc00be4fbd4b98ee1da093f0bc9164e2ff954f93dcae3fa8826288b977"
+      "sha256": "962b2206fc29c7e0f9a66d50ed0776f18b9ff5a68c472fe5bed89bf4fb1692fe"
     },
     {
       "path": "custom_components/eufy_sdk/event_image.py",
@@ -209,7 +209,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
-      "sha256": "e4f346dd78709d5d6d3e6e1a502033c342ebc329a3a493e3dc97870e644b5643"
+      "sha256": "4c773f7b95c600165f75656a7ed68784d40f30af532b7c5d3fec67cb43fbab5b"
     },
     {
       "path": "custom_components/eufy_sdk/snapshot_policy.py",
@@ -217,7 +217,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/storage_telemetry.py",
-      "sha256": "3b62fc497ee4ff4ac41b92eb032824bc8eb53aeb7b56deba74e291d734de1191"
+      "sha256": "6f9099b305ef5d61972d5957e76c7c2d9dc3da8679c7ac74ab20841cbcc6d206"
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
@@ -236,5 +236,5 @@
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
   ],
-  "qualificationScope": "local candidate; unittest 337 passed of 339 with one inherited failure and one inherited error; offline adapted pytest 419 passed, 2 inherited failures, 235 passed subtests; deterministic ZIP verified; interpreter HA 2026.7.0, HA 2026.10 API and runtime/media acceptance unverified"
+  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 444 passed, 2 inherited registry-test failures, 278 passed subtests; all 25 new items and 43 new subtests passed. Untouched base: 419 passed, same 2 failures, 235 passed subtests. HA 2026.10 and live acceptance unqualified."
 }

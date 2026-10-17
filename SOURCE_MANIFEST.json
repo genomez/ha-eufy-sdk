@@ -17,9 +17,9 @@
     "gitMetadataIncluded": false,
     "priorPublishedVersion": "0.3.1.dev2",
     "priorPublishedCommit": "6d4402dca70c24560cc48860dd6affbae632f00d",
-    "developmentCommit": "d7628098965182a1ad50adab639b78af8fb11023",
+    "developmentCommit": "cad908c9a9018599143dc2539d32917d77528400",
     "readOnlyOriginRefComparison": "2026-10-16 git ls-remote: s1-experimental and 0.3.1.dev2 match priorPublishedCommit; no 0.3.1.dev3 tag advertised",
-    "packagingRefreshBaseCommit": "9cfdb88aca20f4fdcaf298bc1144282fca0fcc5e",
+    "packagingRefreshBaseCommit": "cad908c9a9018599143dc2539d32917d77528400",
     "originRefsRecheckedForLocalRc": false,
     "upstreamIntegrationPorts": {
       "repository": "https://github.com/mega-yfue/ha-eufy-sdk",
@@ -39,9 +39,23 @@
           "scope": "Narrow missing-data alarm/arming guards; retain existing setup/property guards, reported modes and observation receipts."
         }
       ]
+    },
+    "localIntegrationReview": {
+      "date": "2026-10-17",
+      "baseCommit": "5833e03bca08ef98b8f749ba5ef38c0bb4bc0c8f",
+      "implementationCommit": "cad908c9a9018599143dc2539d32917d77528400",
+      "sirenInput": "2026-10-16 integration-siren-actions.patch and INTEGRATION_REVIEW.md; tightened malformed-manifest validation",
+      "scope": [
+        "bound siren action gates and reported boolean state only",
+        "legacy pressed plus standard ring doorbell events",
+        "validated UTC datetime reuse, disconnected storage short circuit, state-cost regression checks"
+      ],
+      "versionNamingPending": true,
+      "networkAccess": false,
+      "archiveBuilt": false
     }
   },
-  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata; battery HA stream-worker suppression with explicit power precedence and legacy fallback; confirmation-only battery preload Repair; early-event alarm/arming missing-data guards",
+  "runtimeModificationScope": "inherited detection-mask safety; native T9000 WebRTC gated on explicit relay hello; admission error preservation; bounded floodlight contrary-state debounce and post-write reconciliation; storage attempt and enum presentation; version metadata; battery HA stream-worker suppression with explicit power precedence and legacy fallback; confirmation-only battery preload Repair; early-event alarm/arming missing-data guards; bound siren action gates without inferred sounding state; standard ring plus legacy pressed events; storage UTC timestamp reuse and disconnected diagnostics short circuit",
   "coreOverlaysBundled": false,
   "stockCoreMediaQualified": false,
   "cameraSwitchingQualified": false,
@@ -56,9 +70,9 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "7636a1436961cb5d135c79c70f2584ddb24baaab14e6abcfec9375b6d8959206",
+      "sha256": "73bd568e4d73f92118934213eb74c2bab1299829476645afb93e4c27603e3561",
       "publicBaselineSha256": "7636a1436961cb5d135c79c70f2584ddb24baaab14e6abcfec9375b6d8959206",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": ".ruff.toml",
@@ -74,7 +88,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "84fe297cb3056bc7cf295afd04720399334968469401418d3071cb45f08ec0a6",
+      "sha256": "e20ca32f67cb528dd347e661b4181aa60497e96c8108da8292b15946c7fc64f9",
       "publicBaselineSha256": "6e12ac9c74123fe85d2adb7ab0d612676a523e904a09b427c2977dceea2be373",
       "status": "modified"
     },
@@ -86,13 +100,13 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "13e31b249edd7a0e152a29fd333791992bee8952fb094e2384568ec751e74e4a",
+      "sha256": "42a6f5fc9f6407d3ba88b44ea8992042ecfb010234c8f79739025629c89f9eb8",
       "publicBaselineSha256": "b7c31b689e9ff157578e4f9a539dbf74be55bcde74d2f72d504840154341b6a1",
       "status": "modified"
     },
     {
       "path": "INTEGRATION_PACKAGE.json",
-      "sha256": "8ea380742d137e21cad67ad919c291cc23ba05e7f367ea9d97c1b584fb682e8f",
+      "sha256": "4c047b26df338e59ed8e58ddd684da4126c92cafa45422d03ca5cd117930afd0",
       "publicBaselineSha256": "80c5bcd46201e115a26f997fc841c830ca51a3a7eeac756026887c0b926b0276",
       "status": "modified"
     },
@@ -110,7 +124,7 @@
     },
     {
       "path": "PUBLICATION.json",
-      "sha256": "6da4d19a59c9a97e35ac4d5fee7cd0f5e0ed24813836828d35869af612df59cc",
+      "sha256": "6e4f61cadfb1a3d16453e069d524c528c025364964144df669dc5229a91fec1d",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -278,9 +292,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
-      "sha256": "43be0efc00be4fbd4b98ee1da093f0bc9164e2ff954f93dcae3fa8826288b977",
+      "sha256": "962b2206fc29c7e0f9a66d50ed0776f18b9ff5a68c472fe5bed89bf4fb1692fe",
       "publicBaselineSha256": "43be0efc00be4fbd4b98ee1da093f0bc9164e2ff954f93dcae3fa8826288b977",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/event_image.py",
@@ -386,9 +400,9 @@
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
-      "sha256": "e4f346dd78709d5d6d3e6e1a502033c342ebc329a3a493e3dc97870e644b5643",
+      "sha256": "4c773f7b95c600165f75656a7ed68784d40f30af532b7c5d3fec67cb43fbab5b",
       "publicBaselineSha256": "e4f346dd78709d5d6d3e6e1a502033c342ebc329a3a493e3dc97870e644b5643",
-      "status": "unchanged"
+      "status": "modified"
     },
     {
       "path": "custom_components/eufy_sdk/snapshot_policy.py",
@@ -398,7 +412,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/storage_telemetry.py",
-      "sha256": "3b62fc497ee4ff4ac41b92eb032824bc8eb53aeb7b56deba74e291d734de1191",
+      "sha256": "6f9099b305ef5d61972d5957e76c7c2d9dc3da8679c7ac74ab20841cbcc6d206",
       "publicBaselineSha256": "d94e05611fc3e6b01a9df3e304df5f7c4d4380f43d60928d1857f245afe304dd",
       "status": "modified"
     },
@@ -537,6 +551,12 @@
     {
       "path": "tests/test_detection_mask_safety.py",
       "sha256": "de783984ee0b49850923d84588919212f0700682782a6a032a8129d90f084d4e",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
+      "path": "tests/test_doorbell_events.py",
+      "sha256": "ecdc367c07fc7e7154aa04a26ffd42e0b0a39a2336592688b611241de6706bdd",
       "publicBaselineSha256": null,
       "status": "new"
     },
@@ -685,6 +705,12 @@
       "status": "unchanged"
     },
     {
+      "path": "tests/test_siren_actions.py",
+      "sha256": "c2fee1a602f21c4cd8002eed83ea7b61eefc0ebe72e9219d9dce71ba81ae1e5a",
+      "publicBaselineSha256": null,
+      "status": "new"
+    },
+    {
       "path": "tests/test_snapshot_generation.py",
       "sha256": "873459de58b84805420c065ffb577709e97449ed8eedd6a6790478b745b6631a",
       "publicBaselineSha256": "873459de58b84805420c065ffb577709e97449ed8eedd6a6790478b745b6631a",
@@ -707,6 +733,12 @@
       "sha256": "308400ff68b4fcca340974be69b8c9622219dfd164ef218d00de83276bc845eb",
       "publicBaselineSha256": "308400ff68b4fcca340974be69b8c9622219dfd164ef218d00de83276bc845eb",
       "status": "unchanged"
+    },
+    {
+      "path": "tests/test_state_write_cost.py",
+      "sha256": "0f435c94a5f22374bac6ffe3e024514dfa207cecb1b74acb2a3f01442d7c5009",
+      "publicBaselineSha256": null,
+      "status": "new"
     },
     {
       "path": "tests/test_storage_attempt_status.py",
@@ -737,10 +769,16 @@
       "sha256": "66beb704efb045db2d9b605ff26fbaaada038837532387c4a75e9cb630e492b3",
       "publicBaselineSha256": "dc06c794fdd8f2b789aaee81c2272f328cde3efd65f3f5abff9cc9e4ae37b8f4",
       "status": "modified"
+    },
+    {
+      "path": "tools/run_offline_tests.py",
+      "sha256": "24a70a03bf667254199d2eb182e287f26f64e6f0fac641b41cdf932c8ef5d04c",
+      "publicBaselineSha256": null,
+      "status": "new"
     }
   ],
   "selfHashLocation": "external preparation receipt; source manifest excludes itself",
   "distribution": "experimental artifact; use exact matching published prerelease and checksums or separately approved verified local candidate",
-  "qualificationScope": "local candidate; unittest 337 passed of 339 with one inherited failure and one inherited error; offline adapted pytest 419 passed, 2 inherited failures, 235 passed subtests; deterministic ZIP verified; interpreter HA 2026.7.0, HA 2026.10 API and runtime/media acceptance unverified",
+  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 444 passed, 2 inherited registry-test failures, 278 passed subtests; all 25 new items and 43 new subtests passed. Untouched base: 419 passed, same 2 failures, 235 passed subtests. HA 2026.10 and live acceptance unqualified.",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6"
 }
