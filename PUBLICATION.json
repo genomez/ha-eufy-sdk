@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "state": "local reviewed source; not packaged or published",
+  "state": "locally prepared release candidate; not installed or published",
   "candidateVersion": "0.3.1.dev3",
   "preparedRuntimeVersion": "0.4.1-s1.experimental.6",
   "matchingRuntimeAvailabilityVerified": false,
@@ -73,7 +73,7 @@
   },
   "localReview": {
     "date": "2026-10-17",
-    "versionNamingPending": true,
+    "versionNamingPending": false,
     "compatibility": "Siren action surface required, no bridge version gate; review.7 / published .5 without actions omit sirens or leave them unavailable",
     "floodlightPendingSuccess": "Successful latest light writes use bounded requested-state presentation and preserve in-flight real observation correction."
   },
@@ -99,5 +99,17 @@
     "core2026_10ApiQualified": false,
     "packagesInstalled": false,
     "archiveBuilt": false
+  },
+  "releasePreparation": {
+    "date": "2026-10-17",
+    "sourceCommit": "0f4ff708b106985940a6b95d214f3591f33ba8d4",
+    "implementationCommit": "c50fe577b7a069fa663a1e149c72caf7a9e24fff",
+    "version": "0.3.1.dev3",
+    "matchingRuntimeVersion": "0.4.1-s1.experimental.6",
+    "implementationAndTestsUnchanged": true,
+    "archiveFormat": "deterministic stored ZIP; tools/build_integration_zip.py",
+    "published": false,
+    "installed": false,
+    "packagesInstalled": false
   }
 }

@@ -22,10 +22,14 @@ Changes above local base `5833e03bca08ef98b8f749ba5ef38c0bb4bc0c8f` finish the 2
 
 Doorbell events retain the legacy `pressed` type and also publish Home Assistant's standard `ring` type, with one state write per type. Storage presentation reuses a validated observation's UTC datetime and skips validation/attempt-diagnostic work while disconnected. Other warned binary/push/select getters retain their existing bounded scalar reads. Synthetic regression and timing checks cover these paths. The offline runner adapts the retained local no-I/O test-loop approach; no runtime dependency is added.
 
-Changed Python source/test/helper files carry dated modification notices. Original copyright, MIT license and upstream attribution remain intact. Version strings are retained pending owner naming. This is local source work only; refreshed source/package input inventories are not a built archive, publication, Home Assistant 2026.10 qualification or physical-device acceptance.
+Changed Python source/test/helper files carry dated modification notices. Original copyright, MIT license and upstream attribution remain intact. The reviewed runtime source remains unchanged in the local release candidate. Its deterministic packaging and current version are recorded below; source review does not establish Home Assistant 2026.10 qualification or physical-device acceptance.
 
 ## Floodlight pending-success presentation, 2026-10-17
 
 Changes above local base `74ad50a` make a successful latest `light` property write present its requested state within the existing 30-second settling window, including a successful bridge response that is awaiting late device confirmation. Fresh contrary reports or observation receipts received during the RPC start the existing 8-second correction timer when the call succeeds. Unchanged real reads still update the shared cache and receipt timestamp; later observations or the settling deadline restore the last real state. Generic property report-ordering and latest-write ownership safeguards remain in place. No new wire metadata or runtime dependency is added.
 
 Six added offline test items and two added subtests cover pending-equivalent success, unchanged contrary readings before and after RPC completion, matching observations and the no-read deadline. Existing overlap, lifecycle and non-light ordering tests remain applicable. These local checks do not qualify Home Assistant 2026.10 or physical-device behavior.
+
+## Release package refresh, 2026-10-17
+
+Integration `0.3.1.dev3`, paired with runtime `0.4.1-s1.experimental.6`, is prepared from reviewed source commit `0f4ff70` (implementation `c50fe57`). Implementation files, translations and tests are unchanged. This refresh updates candidate documentation, publication provenance and pinned package/source inventories, then builds a deterministic manual ZIP. No installation, authentication, dependency installation, publication or newly supported Core range is claimed.

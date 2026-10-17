@@ -13,7 +13,7 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "e20ca32f67cb528dd347e661b4181aa60497e96c8108da8292b15946c7fc64f9"
+      "sha256": "7abbaf529b99bfd5764c758ebb72dcaa8929f281405007bd671eccd2f3a5453f"
     },
     {
       "path": "INSTALL.md",
@@ -21,7 +21,7 @@
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "6fc78adba16465e3ed339c22a6c1a3375d983d7bf98d271fa15b112ddf031b50"
+      "sha256": "f18ebd21ad1148d340b309c64d7369e9705d655c7edbc980d3e1479a148dcfe7"
     },
     {
       "path": "LICENSE",
@@ -236,5 +236,5 @@
       "sha256": "60dc9de0a64de6b9938293822b5b417743790f1be791b5308402ff3d3798092a"
     }
   ],
-  "qualificationScope": "Local source only, no archive built; HA 2026.7.0 / Python 3.14.4 offline pytest: 450 passed, 2 inherited registry-test failures, 280 passed subtests. All 6 new items and 2 new subtests passed. Untouched 74ad50a baseline: 444 passed, same 2 failures, 278 passed subtests. Focused floodlight/property suites: 71 passed, 29 passed subtests, no failures. HA 2026.10 and live acceptance unqualified."
+  "qualificationScope": "Locally packaged reviewed source at 0f4ff70; implementation and tests unchanged. Review evidence: HA 2026.7.0 / Python 3.14.4 offline pytest 450 passed, 2 inherited registry-test failures, 280 passed subtests. Fresh preparation verification is external; packaging does not qualify HA 2026.10, installation or physical-device behavior."
 }
