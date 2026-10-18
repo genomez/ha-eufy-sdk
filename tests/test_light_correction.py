@@ -583,6 +583,118 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.commands), 4)
         self.notification.assert_called_once()
 
+    async def test_three_predispatch_errors_report_attempts_and_notify_once(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        client.set_property.side_effect = EufySdkApiClientCommunicationError(
+            "command_clock_unavailable"
+        )
+        self.emit()
+        await self.advance(319.999)
+        self.assertEqual(entity._light_correction.attempts, 3)
+        self.assertEqual(len(self.commands), 1)
+        self.notification.assert_not_called()
+        await self.advance(320)
+        self.assertEqual(client.confirm_light.await_count, 5)
+        self.notification.assert_called_once()
+        self.assertIn(
+            "after 3 correction attempts", self.notification.call_args.args[1]
+        )
+        self.emit()
+        await self.advance(599)
+        self.notification.assert_called_once()
+        failure_events = [
+            call
+            for call in entity.hass.bus.async_fire.call_args_list
+            if call.args[0] == FAILURE_EVENT
+        ]
+        self.assertEqual(len(failure_events), 1)
+        self.assertEqual(failure_events[0].args[1]["correction_attempts"], 3)
+        self.assertEqual(client.set_property.await_count, 4)
+        self.assertEqual(len(self.commands), 1)
+
+    async def test_between_command_wall_steps_keep_monotonic_correction_authority(self):
+        for step in (900, -900):
+            with self.subTest(wall_step=step):
+                entity, _, client, _ = self.setup_light()
+                protocol = bounded.BoundedProtocolTests.client(self)
+                protocol._set_late_contrary_capability(CAPABILITY)
+                loop = asyncio.get_running_loop()
+                origin = loop.time()
+                wall_step = [0]
+                fake_datetime = Mock(wraps=datetime)
+                fake_datetime.now.side_effect = lambda tz, wall_step=wall_step: (
+                    datetime.fromtimestamp(2000 + self.now + wall_step[0], tz)
+                )
+                with (
+                    patch.object(
+                        loop,
+                        "time",
+                        side_effect=lambda origin=origin: origin + self.now,
+                    ),
+                    patch(
+                        "custom_components.eufy_sdk.light_correction.monotonic",
+                        side_effect=lambda origin=origin: origin + self.now,
+                    ),
+                    patch(
+                        "custom_components.eufy_sdk.light_correction.datetime",
+                        fake_datetime,
+                    ),
+                    patch(
+                        "custom_components.eufy_sdk.api.time.time",
+                        side_effect=lambda wall_step=wall_step: (
+                            2000 + self.now + wall_step[0]
+                        ),
+                    ),
+                ):
+                    await entity.write(False)
+                    display = entity._light_correction.window_until
+                    original_reply = protocol._ws.send_json.side_effect
+
+                    async def reply(
+                        payload, protocol=protocol, original_reply=original_reply
+                    ):
+                        await original_reply(payload)
+                        if payload["cmd"] == "device.set":
+                            protocol._pending[payload["id"]].result()["receipt"] = {
+                                **bounded.ACCEPTED,
+                                "intent": 2,
+                            }
+
+                    protocol._ws.send_json.side_effect = reply
+                    client.set_property.side_effect = protocol.set_property
+                    self.now = 45
+                    self.emit()
+                    wall_step[0] = step
+                    await self.advance(60)
+                    writes = [f for f in self.frames if f["cmd"] == "device.set"]
+                    self.assertEqual(len(writes), 1)
+                    self.assertEqual(entity._light_correction.intent, 2)
+                    self.assertEqual(
+                        writes[0]["execution"]["correctionExpiresAtMs"],
+                        (2600 + step) * 1000,
+                    )
+                    self.assertEqual(entity._light_correction.window_until, display)
+                    before_expiry = len(self.frames)
+                    self.now = 600
+                    await entity._light_correction._run(
+                        entity._light_correction.generation
+                    )
+                    with self.assertRaisesRegex(
+                        EufySdkApiClientCommunicationError, "expired_before_send"
+                    ):
+                        await protocol.set_property(
+                            "fixture",
+                            "light",
+                            False,
+                            bounded=True,
+                            correction=True,
+                            correction_expires_at=origin + 600,
+                            correction_expires_at_ms=(2600 + step) * 1000,
+                        )
+                    self.assertEqual(len(self.frames), before_expiry)
+                    entity._light_correction.stop("expired")
+
     async def test_third_correction_matching_final_read_suppresses_failure(self):
         entity, _, client, _ = self.setup_light()
         await entity.write(False)

@@ -94,9 +94,6 @@ class LightCorrection:
         self.window_until = (
             datetime.now(UTC) + timedelta(seconds=WINDOW_SECONDS)
         ).isoformat()
-        self.expires_wall_ms = (
-            datetime.fromisoformat(self.window_until).timestamp() * 1000
-        )
         self.first_contrary = None
         self.attempts = 0
         self.last_correction = None
@@ -409,6 +406,9 @@ class LightCorrection:
             self.state = "correcting"
             self.transition = True
             self.pause_requested = False
+            self.expires_wall_ms = (
+                datetime.now(UTC).timestamp() + self.born + WINDOW_SECONDS - monotonic()
+            ) * 1000
             receipt = await self.entity.client.set_property(
                 self.entity._sn,
                 "light",
@@ -501,7 +501,7 @@ class LightCorrection:
         persistent_notification.async_create(
             self.entity.hass,
             f"{entity_id} still reports the opposite light state "
-            "after three corrections.",
+            f"after {self.attempts} correction attempts.",
             title="Eufy light correction failed",
             notification_id=f"eufy_light_correction_{self.entity.unique_id}",
         )
