@@ -422,7 +422,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         """Whether this property accepts writes without reporting its value."""
         return bool(self._spec.get("writeOnly"))
 
-    async def write(self, value: Any) -> None:  # noqa: PLR0912
+    async def write(self, value: Any) -> None:  # noqa: PLR0912, PLR0915
         """Keep successful optimistic state owned by the latest write/lifecycle."""
         if self._removed:
             return
@@ -477,6 +477,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         elif bounded:
             self._command_receipt = None
             self._command_profile = "legacy"
+        if isinstance(receipt, CommandReceipt) and receipt.status == "pending_accepted":
+            self._present_pending_acceptance(owner)
+            return
         if owner == self._write_generation and (
             self._prop == "light" or report_generation == self._report_generation
         ):
@@ -493,6 +496,17 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             self.async_write_ha_state()
         if not self.write_only:
             self._schedule_post_write_refresh(owner)
+
+    def _present_pending_acceptance(self, owner: int) -> None:
+        """Keep the reported state until a report shows the slow light acted."""
+        # The station has not reached the light yet, so any older hold is
+        # retired rather than presenting a value the light has not taken.
+        self._clear_light_settle()
+        self._pending_reconcile = None
+        self._assumed_value = None
+        self._optimistic_owner = None
+        self.async_write_ha_state()
+        self._schedule_post_write_refresh(owner)
 
     @callback
     def _clear_light_settle(self) -> None:

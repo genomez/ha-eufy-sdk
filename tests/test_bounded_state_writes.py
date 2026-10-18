@@ -426,12 +426,34 @@ class BoundedEntityTests(unittest.IsolatedAsyncioTestCase):
         client.set_property.assert_awaited_once_with(
             "fixture-device", "light", True, bounded=True
         )
-        self.assertTrue(entity.is_on)
+        self.assertFalse(entity.is_on)
         self.assertFalse(coordinator.data["fixture-device"]["state"]["light"])
+        self.assertIsNone(entity._optimistic_owner)
+        self.assertIsNone(entity._light_guard_owner)
         self.assertEqual(
             entity.extra_state_attributes["command_status"], "pending_accepted"
         )
         self.assertEqual(entity.extra_state_attributes["command_effect"], "unconfirmed")
+        self._report(entity, True)
+        self.assertTrue(entity.is_on)
+
+    async def test_pending_acceptance_retires_an_older_hold(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        client.set_property.return_value = CommandReceipt(
+            "acknowledged", True, "unconfirmed"
+        )
+        await entity.write(True)
+        self.assertTrue(entity.is_on)
+        client.set_property.return_value = CommandReceipt(
+            "pending_accepted", True, "unconfirmed"
+        )
+        await entity.write(False)
+        self.assertIsNone(entity._optimistic_owner)
+        self.assertIsNone(entity._light_guard_owner)
+        self.assertFalse(entity.is_on)
+        self.assertEqual(
+            entity.extra_state_attributes["command_status"], "pending_accepted"
+        )
 
     async def test_external_newer_intent_prevents_current_invocation_optimism(self):
         for status in ("acknowledged", "pending_accepted"):
