@@ -33,6 +33,8 @@ DEFAULT_SOC_REFRESH_SEC = 60
 
 # Emit the legacy doorbell event instead of the standard ring, never both.
 CONF_LEGACY_DOORBELL_PRESSED = "legacy_doorbell_pressed"
+CONF_LIGHT_CORRECTION = "light_correction_enabled"
+CONF_LIGHT_CORRECTION_PAUSE = "light_correction_pause_entity"
 MAX_DOORBELL_EVENT_IDS = 256
 
 # Schema version this integration targets (the bridge sends its own in `hello`/`ready`).

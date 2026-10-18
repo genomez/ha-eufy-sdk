@@ -152,6 +152,8 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
             )
             if self._command_receipt.superseded:
                 attributes["command_superseded"] = True
+        if self._light_correction is not None:
+            attributes.update(self._light_correction.attributes)
         return attributes
 
     @property

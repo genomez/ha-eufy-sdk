@@ -18,6 +18,8 @@ from .api import (
 from .const import (
     CONF_HOST,
     CONF_LEGACY_DOORBELL_PRESSED,
+    CONF_LIGHT_CORRECTION,
+    CONF_LIGHT_CORRECTION_PAUSE,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_SOC_REFRESH,
@@ -435,6 +437,24 @@ class EufySdkOptionsFlow(config_entries.OptionsFlow):
                             CONF_LEGACY_DOORBELL_PRESSED, False
                         ),
                     ): selector.BooleanSelector(),
+                    vol.Required(
+                        CONF_LIGHT_CORRECTION,
+                        default=self.config_entry.options.get(
+                            CONF_LIGHT_CORRECTION, False
+                        ),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_LIGHT_CORRECTION_PAUSE,
+                        description={
+                            "suggested_value": self.config_entry.options.get(
+                                CONF_LIGHT_CORRECTION_PAUSE
+                            )
+                        },
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain=["input_boolean", "switch"]
+                        )
+                    ),
                 },
             ),
         )

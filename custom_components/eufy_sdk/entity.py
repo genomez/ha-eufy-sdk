@@ -17,9 +17,10 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import CommandReceipt, EufySdkApiClientError
+from .api import CommandReceipt, EufySdkApiClientError, late_contrary_event
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
+from .light_correction import LightCorrection
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -306,6 +307,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     # sets both would silently show the property's own label instead of its name —
     # every per-bit switch reading "Ai Detect Type", say.
     _named_by_translation = False
+    _light_correction: LightCorrection | None = None
 
     def __init__(
         self,
@@ -341,6 +343,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._command_receipt: CommandReceipt | None = None
         self._command_profile: str | None = None
         self._write_tasks: set[asyncio.Task] = set()
+        self._light_correction: LightCorrection | None = None
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to valued reports for this property in this lifecycle."""
@@ -370,6 +373,14 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     @callback
     def _property_event_filter(self, data: dict[str, Any]) -> bool:
         """Match the HA event data dictionary using the cache scalar contract."""
+        if self._prop == "light" and not self._removed:
+            if data.get("event") == "bridgeDisconnected":
+                return True
+            if (
+                data.get("deviceSn") == self._sn
+                and late_contrary_event(data) is not None
+            ):
+                return True
         if (
             self._removed
             or data.get("event") != "propertyChanged"
@@ -389,6 +400,21 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     def _handle_property_changed(self, event: Event) -> None:
         """Keep bounded light settling; release other holds on reports."""
         if not self._property_event_filter(event.data):
+            return
+        if event.data.get("event") == "bridgeDisconnected":
+            if self._light_correction is not None:
+                self._light_correction.stop("closed")
+                self.async_write_ha_state()
+            return
+        if event.data.get("event") == "lateContraryEffect":
+            if (
+                self._light_correction is None
+                and getattr(self.client, "late_contrary_effects_supported", False)
+                is True
+            ):
+                self._light_correction = LightCorrection(self)
+            if self._light_correction is not None:
+                self._light_correction.event(event.data)
             return
         # A report during RPC has unknown ordering relative to the command.
         # Non-light properties keep it authoritative; successful light writes
@@ -426,6 +452,15 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         """Keep successful optimistic state owned by the latest write/lifecycle."""
         if self._removed:
             return
+        if self._prop == "light":
+            if (
+                self._light_correction is None
+                and getattr(self.client, "late_contrary_effects_supported", False)
+                is True
+            ):
+                self._light_correction = LightCorrection(self)
+            if self._light_correction is not None:
+                self._light_correction.start(value)
         self._write_generation += 1
         owner = self._write_generation
         report_generation = self._report_generation
@@ -469,6 +504,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
         if self._removed or lifecycle != self._lifecycle_generation:
             return
+        if owner == self._write_generation and self._light_correction is not None:
+            self._light_correction.receipt(receipt)
         if isinstance(receipt, CommandReceipt) and not receipt.accepted:
             if owner == self._write_generation:
                 self._command_receipt = receipt
@@ -704,6 +741,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Invalidate writes, queued callbacks and pulls when this lifecycle ends."""
         self._removed = True
+        if self._light_correction is not None:
+            self._light_correction.stop("closed")
         for task in tuple(getattr(self, "_write_tasks", ())):
             if task is not asyncio.current_task():
                 task.cancel()

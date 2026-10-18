@@ -56,6 +56,56 @@ BOUNDED_PROFILE = "bounded-state-v1"
 BOUNDED_CALLER_SECONDS = 80
 BOUNDED_CLOCK_MAX_MS = 1000
 CLOCK_TOKEN_MAX_LENGTH = 128
+DEVICE_SN_MAX_LENGTH = 128
+LATE_CONTRARY_WINDOW_MS = 600000
+LATE_CONTRARY_STATES = frozenset(
+    {"contrary", "matched", "expired", "superseded", "closed", "recovery_settled"}
+)
+
+
+def late_contrary_event(value: Any) -> dict[str, Any] | None:
+    """Project the finite SDK-confirmed light observation contract."""
+    if (
+        not isinstance(value, dict)
+        or value.get("event") != "lateContraryEffect"
+        or not isinstance(value.get("deviceSn"), str)
+        or not 1 <= len(value["deviceSn"]) <= DEVICE_SN_MAX_LENGTH
+        or value.get("property") != "light"
+        or type(value.get("intent")) is not int
+        or not 0 < value["intent"] <= 2**53 - 1
+        or type(value.get("desiredValue")) is not bool
+        or type(value.get("recoveryBusy")) is not bool
+        or not isinstance(value.get("state"), str)
+        or value["state"] not in LATE_CONTRARY_STATES
+        or not _finite_number(value.get("ageMs"))
+        or not 0 <= value["ageMs"] <= LATE_CONTRARY_WINDOW_MS
+        or ("observedValue" in value and type(value["observedValue"]) is not bool)
+        or (
+            value["state"] == "contrary"
+            and (
+                type(value.get("observedValue")) is not bool
+                or value["observedValue"] is value["desiredValue"]
+            )
+        )
+    ):
+        return None
+    return {
+        key: value[key]
+        for key in (
+            "event",
+            "deviceSn",
+            "property",
+            "intent",
+            "desiredValue",
+            "observedValue",
+            "ageMs",
+            "state",
+            "recoveryBusy",
+        )
+        if key in value
+    }
+
+
 COMMAND_RECEIPT_STATUSES = frozenset(
     {
         "validation_failed",
@@ -209,11 +259,31 @@ class EufySdkApiClient:
         self._webrtc_relay_enabled = False
         self._webrtc_relay_listener: Callable[[bool], None] | None = None
         self._bounded_capability = False
+        self._late_contrary_capability = False
         self._bounded_requests: dict[int, aiohttp.ClientWebSocketResponse] = {}
         self._bounded_invocations: dict[
             tuple[str, str], _BoundedPropertyInvocation
         ] = {}
         self._cancel_tasks: set[asyncio.Task] = set()
+        self._correction_requests: dict[
+            tuple[str, str], tuple[int, aiohttp.ClientWebSocketResponse]
+        ] = {}
+
+    @property
+    def late_contrary_effects_supported(self) -> bool:
+        """Require versioned confirmation and the complete bounded write contract."""
+        return self.bounded_state_writes_supported and self._late_contrary_capability
+
+    def _set_late_contrary_capability(self, capability: Any) -> None:
+        """Require explicit versioned correction confirmation support."""
+        self._late_contrary_capability = (
+            isinstance(capability, dict)
+            and type(capability.get("version")) is int
+            and capability["version"] == 1
+            and type(capability.get("watchWindowMs")) is int
+            and capability["watchWindowMs"] == LATE_CONTRARY_WINDOW_MS
+            and capability.get("confirmation") is True
+        )
 
     @property
     def bounded_state_writes_supported(self) -> bool:
@@ -248,7 +318,9 @@ class EufySdkApiClient:
             and 0 < clock["maxUncertaintyMs"] <= BOUNDED_CLOCK_MAX_MS
         )
 
-    def _schedule_command_cancel(self, mid: int, transport: Any) -> None:
+    def _schedule_command_cancel(
+        self, mid: int, transport: Any, *, keep_observation: bool = False
+    ) -> None:
         """Send only to the owning socket, without renewing a caller's lifetime."""
         if transport.closed:
             return
@@ -263,12 +335,19 @@ class EufySdkApiClient:
                             "cmd": "boundedStateCancel",
                             "version": 1,
                             "requestId": mid,
+                            **({"keepObservation": True} if keep_observation else {}),
                         }
                     )
 
         task = asyncio.create_task(send())
         self._cancel_tasks.add(task)
         task.add_done_callback(self._cancel_tasks.discard)
+
+    def pause_light_correction(self, sn: str) -> None:
+        """Cancel an unsent correction while retaining its receipt and observation."""
+        request = self._correction_requests.get((sn, "light"))
+        if request is not None:
+            self._schedule_command_cancel(*request, keep_observation=True)
 
     @property
     def webrtc_relay_enabled(self) -> bool:
@@ -347,8 +426,12 @@ class EufySdkApiClient:
 
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
+        had_late_contrary = self._late_contrary_capability
         self._closing = True
         self._bounded_capability = False
+        self._late_contrary_capability = False
+        if had_late_contrary and self._on_event:
+            self._on_event({"event": "bridgeDisconnected"})
         for mid, transport in tuple(self._bounded_requests.items()):
             self._schedule_command_cancel(mid, transport)
         if self._cancel_tasks:
@@ -371,7 +454,7 @@ class EufySdkApiClient:
                 )
         self._pending.clear()
 
-    async def _receive_loop(self) -> None:
+    async def _receive_loop(self) -> None:  # noqa: PLR0912
         """Read frames: resolve pending requests by id, dispatch events."""
         if self._ws is None:
             return
@@ -382,6 +465,7 @@ class EufySdkApiClient:
                 data = msg.json()
                 if data.get("event") == "hello":
                     self._set_bounded_capability(data.get("boundedStateWrites"))
+                    self._set_late_contrary_capability(data.get("lateContraryEffects"))
                     # Keep the last advertisement through a disconnect. The next
                     # hello (including an old bridge's absent field) replaces it.
                     enabled = data.get("webrtcRelay") is True
@@ -400,6 +484,10 @@ class EufySdkApiClient:
                     if handler is not None:
                         handler(data)
                 elif data.get("event") and self._on_event:
+                    if data["event"] == "lateContraryEffect":
+                        data = late_contrary_event(data)
+                        if data is None or not self.late_contrary_effects_supported:
+                            continue
                     self._on_event(data)
         except (aiohttp.ClientError, asyncio.CancelledError):
             pass
@@ -407,8 +495,12 @@ class EufySdkApiClient:
             # Clear the socket so `connected` reports the drop, fail in-flight requests,
             # and (unless deliberately closing) reconnect so events resume promptly, not
             # only on the next poll.
+            had_late_contrary = self._late_contrary_capability
             self._ws = None
             self._bounded_capability = False
+            self._late_contrary_capability = False
+            if had_late_contrary and self._on_event:
+                self._on_event({"event": "bridgeDisconnected"})
             self._invalidate_webrtc_sessions()
             for fut in self._pending.values():
                 if not fut.done():
@@ -448,6 +540,8 @@ class EufySdkApiClient:
         _transport: aiohttp.ClientWebSocketResponse | None = None,
         *,
         _cancel_on_abort: bool = False,
+        _send_guard: Callable[[], bool] | None = None,
+        _correction_key: tuple[str, str] | None = None,
         **args: Any,
     ) -> dict[str, Any]:
         """Send a command and await its reply. Raises on `ok: false`."""
@@ -456,6 +550,9 @@ class EufySdkApiClient:
         ):
             msg = "not connected"
             raise EufySdkApiClientCommunicationError(msg)
+        if _send_guard is not None and not _send_guard():
+            message = "light_correction_paused_before_send"
+            raise EufySdkApiClientCommunicationError(message)
         self._next_id += 1
         mid = self._next_id
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
@@ -463,6 +560,8 @@ class EufySdkApiClient:
         transport = self._ws
         if _cancel_on_abort:
             self._bounded_requests[mid] = transport
+        if _correction_key is not None:
+            self._correction_requests[_correction_key] = (mid, transport)
         try:
             await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
             async with asyncio.timeout(timeout):
@@ -484,6 +583,11 @@ class EufySdkApiClient:
         finally:
             self._pending.pop(mid, None)
             self._bounded_requests.pop(mid, None)
+            if (
+                _correction_key is not None
+                and self._correction_requests.get(_correction_key) == (mid, transport)
+            ):
+                self._correction_requests.pop(_correction_key, None)
         if not reply.get("ok"):
             code = reply.get("code")
             msg = (
@@ -629,10 +733,65 @@ class EufySdkApiClient:
         )
         return reply.get("result") or []
 
-    async def set_property(  # noqa: PLR0915
-        self, sn: str, name: str, value: Any, *, bounded: bool = False
+    async def confirm_light(self, sn: str, intent: int) -> dict[str, Any]:
+        """Request a bounded, read-only confirmation on the existing SDK session."""
+        if (
+            not self.late_contrary_effects_supported
+            or type(intent) is not int
+            or not 0 < intent <= 2**53 - 1
+        ):
+            message = "light_confirmation_unavailable"
+            raise EufySdkApiClientCommunicationError(message)
+        response = await self.rpc(
+            "device.confirmLight", timeout=8, sn=sn, intent=intent
+        )
+        reply = response.get("confirmation")
+        if (
+            not isinstance(reply, dict)
+            or type(reply.get("intent")) is not int
+            or reply["intent"] != intent
+            or type(reply.get("desiredValue")) is not bool
+            or type(reply.get("confirmed")) is not bool
+            or type(reply.get("recoveryBusy")) is not bool
+            or not _finite_number(reply.get("ageMs"))
+            or not 0 <= reply["ageMs"] <= LATE_CONTRARY_WINDOW_MS
+            or ("observedValue" in reply and type(reply["observedValue"]) is not bool)
+            or (reply["confirmed"] and "observedValue" not in reply)
+        ):
+            message = "light_confirmation_invalid"
+            raise EufySdkApiClientCommunicationError(message)
+        return {
+            key: reply[key]
+            for key in (
+                "intent",
+                "desiredValue",
+                "observedValue",
+                "confirmed",
+                "recoveryBusy",
+                "ageMs",
+            )
+            if key in reply
+        }
+
+    async def set_property(  # noqa: PLR0912, PLR0915
+        self,
+        sn: str,
+        name: str,
+        value: Any,
+        *,
+        bounded: bool = False,
+        correction: bool = False,
+        _send_guard: Callable[[], bool] | None = None,
     ) -> CommandReceipt | None:
         """Opt eligible scalar writes into one frozen caller lifetime."""
+        if correction and (
+            not bounded
+            or name != "light"
+            or type(value) is not bool
+            or not self.late_contrary_effects_supported
+        ):
+            message = "light_correction_unavailable"
+            raise EufySdkApiClientCommunicationError(message)
         if (
             not bounded
             or name != "light"
@@ -717,6 +876,10 @@ class EufySdkApiClient:
                     timeout=remaining_ms / 1000,
                     _transport=transport,
                     _cancel_on_abort=True,
+                    **(
+                        {"_send_guard": _send_guard, "_correction_key": key}
+                        if correction else {}
+                    ),
                     sn=sn,
                     name=name,
                     value=value,
@@ -728,6 +891,7 @@ class EufySdkApiClient:
                         "clockToken": clock["clockToken"],
                         "callerReceivedAtMs": received_ms,
                         "clockUncertaintyMs": uncertainty_ms,
+                        **({"correction": True} if correction else {}),
                     },
                 )
                 return _command_receipt(reply.get("receipt"))

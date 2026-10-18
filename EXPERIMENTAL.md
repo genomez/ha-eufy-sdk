@@ -68,3 +68,44 @@ Do not post credentials, tokens, session files, account identifiers, device seri
 Fixes should retain explicit stream start/stop, cleanup on navigation/removal/visibility changes, and ordinary state-read/session-renewal behavior. No automatic retries or hidden camera starts should be added to hide a failure.
 
 Target contributions at `s1-experimental`. The existing default branch belongs to the earlier fork history; its workflows and support claims are not those of this source preview. The inherited HACS minimum-version metadata is not a qualified compatibility range for this preview.
+
+## Optional contrary light correction
+
+The integration options include **Correct confirmed contrary light states**
+(`light_correction_enabled`, default off) and an optional **Pause light corrections
+helper** (`light_correction_pause_entity`, no helper by default). The pause selector
+accepts an `input_boolean` or `switch`. A selected helper pauses corrections while
+on, unavailable, or unknown; off resumes eligible work. Observation events and
+attributes remain available with automatic correction disabled.
+
+This requires a bridge advertising `lateContraryEffects` version 1, a 600000 ms
+watch, confirmation support, and bounded state writes. An older bridge keeps its
+existing write behavior. Only a new explicit HA light command establishes correction
+authority, including commands issued by HA automations. A newer command immediately
+replaces the previous lineage. Either requested direction is supported.
+
+The latest explicit command owns one monotonic ten-minute window. Only an SDK
+confirmed contrary event can schedule corrections, at 15, 60, and 300 seconds from
+the first confirmation. Each send requires a fresh qualified SDK read, and sends
+are at least 45 seconds apart, including overdue work after a pause. Corrections
+retain the original window and maximum three-send budget. A reported match cancels
+pending work while retaining the watch for a later reversal. SDK recovery activity
+must settle before a fresh read and correction. Disconnect and entity removal end
+the lineage; reconnect never resumes it.
+
+A pause during preparation prevents dispatch. A submitted correction is cancelled
+through the bounded protocol while retaining its receipt and passive observation.
+A definitive cancellation before send refunds the send budget; an attempted or
+uncertain send does not. After the third correction receipt, the controller allows
+15 seconds for settling before a final fresh read. Confirmed continued disagreement
+raises one persistent notification and one `eufy_sdk_light_correction_failed` event;
+a matching report/read suppresses that failure. An unavailable or unqualified read
+does not authorize a correction or assert confirmed failure.
+
+Corrective receipts remain separate from the explicit command receipt and do not
+create an optimistic light state. Actual reported state and existing pending-accepted
+presentation remain authoritative. `last_contrary_at` and `correction_window_until`
+are UTC display timestamps; elapsed-time enforcement uses a monotonic clock.
+SDK reports cannot identify whether an opposite change came from delayed device
+work, motion lighting, or the Eufy app. Enabling correction can override those
+external changes. Offline tests do not establish physical-device acceptance.
