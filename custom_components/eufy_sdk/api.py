@@ -59,7 +59,10 @@ CLOCK_TOKEN_MAX_LENGTH = 128
 DEVICE_SN_MAX_LENGTH = 128
 LATE_CONTRARY_WINDOW_MS = 600000
 LATE_CONTRARY_STATES = frozenset(
-    {"contrary", "matched", "expired", "superseded", "closed", "recovery_settled"}
+    {
+        "contrary", "matched", "expired", "superseded", "closed", "recovery_settled",
+        "suspended", "verification_exhausted", "detection_exhausted",
+    }
 )
 
 
@@ -757,6 +760,10 @@ class EufySdkApiClient:
             or not 0 <= reply["ageMs"] <= LATE_CONTRARY_WINDOW_MS
             or ("observedValue" in reply and type(reply["observedValue"]) is not bool)
             or (reply["confirmed"] and "observedValue" not in reply)
+            or (
+                "reason" in reply
+                and (reply["reason"] != "read_budget_exhausted" or reply["confirmed"])
+            )
         ):
             message = "light_confirmation_invalid"
             raise EufySdkApiClientCommunicationError(message)
@@ -769,11 +776,12 @@ class EufySdkApiClient:
                 "confirmed",
                 "recoveryBusy",
                 "ageMs",
+                "reason",
             )
             if key in reply
         }
 
-    async def set_property(  # noqa: PLR0912, PLR0915
+    async def set_property(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         sn: str,
         name: str,
@@ -781,9 +789,24 @@ class EufySdkApiClient:
         *,
         bounded: bool = False,
         correction: bool = False,
+        correction_expires_at: float | None = None,
+        correction_expires_at_ms: float | None = None,
         _send_guard: Callable[[], bool] | None = None,
     ) -> CommandReceipt | None:
         """Opt eligible scalar writes into one frozen caller lifetime."""
+        if (
+            (correction_expires_at is None) != (correction_expires_at_ms is None)
+            or (
+                correction_expires_at is not None
+                and (
+                    not correction
+                    or not _finite_number(correction_expires_at)
+                    or not _finite_number(correction_expires_at_ms)
+                )
+            )
+        ):
+            message = "light_correction_invalid_deadline"
+            raise EufySdkApiClientCommunicationError(message)
         if correction and (
             not bounded
             or name != "light"
@@ -800,16 +823,33 @@ class EufySdkApiClient:
         ):
             await self.rpc("device.set", sn=sn, name=name, value=value)
             return None
+        loop = asyncio.get_running_loop()
+        born = loop.time()
+        born_wall_ms = time.time() * 1000
+        expires_ms = born_wall_ms + BOUNDED_CALLER_SECONDS * 1000
+        caller_deadline = born + BOUNDED_CALLER_SECONDS
+        if correction_expires_at is not None:
+            remaining_authority = correction_expires_at - born
+            if not 0 < remaining_authority <= LATE_CONTRARY_WINDOW_MS / 1000:
+                message = "command_expired_before_send"
+                raise EufySdkApiClientCommunicationError(message)
+            if not (
+                0 < correction_expires_at_ms <= born_wall_ms + LATE_CONTRARY_WINDOW_MS
+            ):
+                message = "light_correction_invalid_deadline"
+                raise EufySdkApiClientCommunicationError(message)
+            caller_deadline = min(caller_deadline, correction_expires_at)
+            expires_ms = min(
+                expires_ms,
+                correction_expires_at_ms,
+                born_wall_ms + remaining_authority * 1000,
+            )
         key = (sn, name)
         previous = self._bounded_invocations.get(key)
         if previous is not None:
             previous.superseded = True
         invocation = _BoundedPropertyInvocation()
         self._bounded_invocations[key] = invocation
-        loop = asyncio.get_running_loop()
-        born = loop.time()
-        born_wall_ms = time.time() * 1000
-        expires_ms = born_wall_ms + BOUNDED_CALLER_SECONDS * 1000
         transport = self._ws
         clock_guard: asyncio.Task | None = None
         clock_changed = False
@@ -826,7 +866,7 @@ class EufySdkApiClient:
                     return
 
         try:
-            async with asyncio.timeout_at(born + BOUNDED_CALLER_SECONDS):
+            async with asyncio.timeout_at(caller_deadline):
                 clock = await self.rpc(
                     "boundedStateClock",
                     version=1,
@@ -865,7 +905,7 @@ class EufySdkApiClient:
                     message = "command_clock_unavailable"
                     raise EufySdkApiClientCommunicationError(message)
                 remaining_ms = min(
-                    expires_ms - received_ms, BOUNDED_CALLER_SECONDS * 1000 - elapsed_ms
+                    expires_ms - received_ms, (caller_deadline - loop.time()) * 1000
                 )
                 if remaining_ms <= 0:
                     message = "command_expired_before_send"
@@ -892,6 +932,11 @@ class EufySdkApiClient:
                         "callerReceivedAtMs": received_ms,
                         "clockUncertaintyMs": uncertainty_ms,
                         **({"correction": True} if correction else {}),
+                        **(
+                            {"correctionExpiresAtMs": correction_expires_at_ms}
+                            if correction_expires_at_ms is not None
+                            else {}
+                        ),
                     },
                 )
                 return _command_receipt(reply.get("receipt"))

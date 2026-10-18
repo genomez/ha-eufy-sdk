@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import test_bounded_state_writes as bounded
 import test_floodlight_state_hold as fixtures
 from aiohttp import WSMsgType
+from homeassistant.core import HassJob, HassJobType, HomeAssistant
 
 from custom_components.eufy_sdk.api import (
     CommandReceipt,
@@ -140,14 +141,38 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
                 break
             event = min(due, key=lambda event: event[0])
             self.now, event[2] = event[0], True
-            event[1](None)
+            self.dispatch(event[1], None)
             for _ in range(5):
                 await asyncio.sleep(0)
-            completed = [task for task in self.tasks if task.done()]
+            completed = [
+                task for task in self.tasks if task.done() and not task.cancelled()
+            ]
             if completed:
                 await asyncio.gather(*completed, return_exceptions=False)
-                self.tasks = [task for task in self.tasks if not task.done()]
+            self.tasks = [task for task in self.tasks if not task.done()]
         self.now = target
+
+    def dispatch(self, action, *args):
+        """Use actual HA job classification and loop dispatch without runtime I/O."""
+        job = HassJob(action)
+        self.assertIs(job.job_type, HassJobType.Callback)
+        host = SimpleNamespace(
+            loop=asyncio.get_running_loop(), _tasks=set(), _background_tasks=set()
+        )
+        HomeAssistant._async_add_hass_job(host, job, *args)
+
+    async def test_run_pause_and_expiry_jobs_are_all_loop_callbacks(self):
+        entity, _, _, _ = self.setup_light()
+        await entity.write(False)
+        self.emit()
+        actions = {
+            "expiry": self.events[0][1],
+            "run": self.events[-1][1],
+            "pause": entity.hass.bus.async_listen.call_args.args[1],
+        }
+        for name, action in actions.items():
+            with self.subTest(callback=name):
+                self.assertIs(HassJob(action).job_type, HassJobType.Callback)
 
     async def test_incident_match_15_8_then_contrary_32_corrects_at_47(self):
         entity, _, _, _ = self.setup_light()
@@ -161,7 +186,19 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.commands), 1)
         await self.advance(47)
         self.assertEqual(
-            self.commands[-1], (47, False, {"bounded": True, "correction": True})
+            self.commands[-1],
+            (
+                47,
+                False,
+                {
+                    "bounded": True,
+                    "correction": True,
+                    "correction_expires_at": 600,
+                    "correction_expires_at_ms": (
+                        entity._light_correction.expires_wall_ms
+                    ),
+                },
+            ),
         )
         self.assertIs(entity._command_receipt, original_receipt)
         self.assertEqual(entity._light_correction.born, 0)
@@ -183,19 +220,25 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
                     entity.extra_state_attributes["command_status"], "acknowledged"
                 )
 
-    async def test_unconfirmed_fresh_read_does_not_send_or_loop(self):
+    async def test_unconfirmed_fresh_read_retries_with_backoff_then_succeeds(self):
         entity, _, client, _ = self.setup_light()
         await entity.write(False)
-        client.confirm_light.side_effect = None
-        client.confirm_light.return_value = {
-            "desiredValue": False,
-            "confirmed": False,
-            "recoveryBusy": False,
-        }
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            result = await original(sn, intent)
+            result["confirmed"] = client.confirm_light.await_count != 1
+            return result
+
+        client.confirm_light.side_effect = read
         self.emit()
-        await self.advance(590)
+        await self.advance(34.999)
+        self._report(entity, True)
         self.assertEqual(len(self.commands), 1)
         self.assertEqual(client.confirm_light.await_count, 1)
+        await self.advance(35)
+        self.assertEqual(len(self.commands), 2)
+        self.assertEqual(client.confirm_light.await_count, 2)
 
     async def test_property_changed_alone_never_authorizes_correction(self):
         entity, _, client, _ = self.setup_light()
@@ -604,7 +647,7 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         self.emit()
         self.assertIsNotNone(entity.extra_state_attributes["last_contrary_at"])
         await self.advance(600)
-        self.assertEqual(entity._light_correction.state, "expired")
+        self.assertEqual(entity._light_correction.state, "failed")
         self.assertEqual(
             entity.extra_state_attributes["correction_window_until"], display
         )
@@ -637,7 +680,7 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.commands), 2)
         self.assertEqual(client.confirm_light.await_count, 1)
 
-    async def test_read_busy_waits_for_settle_instead_of_repeating_reads(self):
+    async def test_read_busy_retries_with_backoff_without_needing_settle_event(self):
         entity, _, client, _ = self.setup_light()
         await entity.write(False)
         previous = client.confirm_light.side_effect
@@ -652,9 +695,239 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         await self.advance(25)
         self.assertEqual(len(self.commands), 1)
         self.assertEqual(client.confirm_light.await_count, 1)
-        self.emit("recovery_settled")
-        await self.advance(25)
+        await self.advance(35)
         self.assertEqual(len(self.commands), 2)
+
+    async def test_failed_read_then_success_does_not_need_another_edge(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            if client.confirm_light.await_count == 1:
+                message = "temporary_failure"
+                raise EufySdkApiClientCommunicationError(message)
+            return await original(sn, intent)
+
+        client.confirm_light.side_effect = read
+        self.emit()
+        await self.advance(34.999)
+        self.assertEqual(len(self.commands), 1)
+        await self.advance(35)
+        self.assertEqual(len(self.commands), 2)
+
+    async def test_failed_final_read_then_success_notifies_once(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            if client.confirm_light.await_count == 4:
+                message = "temporary_failure"
+                raise EufySdkApiClientCommunicationError(message)
+            return await original(sn, intent)
+
+        client.confirm_light.side_effect = read
+        self.emit()
+        await self.advance(334.999)
+        self.notification.assert_not_called()
+        self.assertEqual(len(self.commands), 4)
+        await self.advance(335)
+        self.notification.assert_called_once()
+        self.assertEqual(client.confirm_light.await_count, 5)
+        await self.advance(590)
+        self.notification.assert_called_once()
+
+    async def test_confirmation_exhaustion_is_once_only_honest_and_terminal(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            return {
+                **await original(sn, intent),
+                "confirmed": False,
+                "reason": "read_budget_exhausted",
+            }
+
+        client.confirm_light.side_effect = read
+        self.emit()
+        await self.advance(15)
+        self.emit("verification_exhausted")
+        self.emit()
+        await self.advance(590)
+        self.assertEqual(len(self.commands), 1)
+        self.notification.assert_called_once()
+        self.assertIn("could not freshly verify", self.notification.call_args.args[1])
+        failures = [
+            call
+            for call in entity.hass.bus.async_fire.call_args_list
+            if call.args[0] == FAILURE_EVENT
+        ]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0].args[1]["reason"], "read_budget_exhausted")
+
+    async def test_negative_correction_receipt_reports_lost_protection_once(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+
+        async def rejected(*_, **_kwargs):
+            return CommandReceipt("queue_full", False, "unconfirmed")
+
+        client.set_property.side_effect = rejected
+        self.emit()
+        await self.advance(15)
+        self.assertEqual(entity._light_correction.state, "verification_exhausted")
+        self.assertEqual(entity._light_correction.failure_reason, "protection_lost")
+        self.emit()
+        await self.advance(590)
+        self.notification.assert_called_once()
+
+    async def test_remote_expiry_during_pending_final_reports_unverified_once(self):
+        entity, _, _, _ = self.setup_light()
+        await entity.write(False)
+        self.emit()
+        await self.advance(301)
+        self.emit("expired")
+        self.assertEqual(entity._light_correction.failure_reason, "window_expired")
+        self.assertEqual(entity._light_correction.state, "verification_exhausted")
+        await self.advance(600)
+        self.notification.assert_called_once()
+
+    async def test_budget_exhausted_before_final_check_reports_unverified_once(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            result = await original(sn, intent)
+            if client.confirm_light.await_count == 4:
+                result.update(confirmed=False, reason="read_budget_exhausted")
+            return result
+
+        client.confirm_light.side_effect = read
+        self.emit()
+        await self.advance(315)
+        self.assertEqual(len(self.commands), 4)
+        self.assertEqual(entity._light_correction.attempts, 3)
+        self.assertEqual(
+            entity._light_correction.failure_reason, "read_budget_exhausted"
+        )
+        self.assertIn("could not freshly verify", self.notification.call_args.args[1])
+        await self.advance(590)
+        self.notification.assert_called_once()
+
+    async def test_unqualified_reads_are_bounded_with_nonzero_retry_spacing(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            return {**await original(sn, intent), "confirmed": False}
+
+        client.confirm_light.side_effect = read
+        self.emit()
+        await self.advance(590)
+        self.assertEqual(client.confirm_light.await_count, 16)
+        self.assertEqual(len(self.commands), 1)
+        self.notification.assert_called_once()
+
+    async def test_suspended_before_first_contrary_resumes_with_fresh_reads(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        self.now = 61
+        self.emit("suspended")
+        await self.advance(80.999)
+        client.confirm_light.assert_not_awaited()
+        await self.advance(81)
+        self.assertEqual(len(self.commands), 1)
+        self.assertEqual(entity._light_correction.first_contrary, 81)
+        await self.advance(96)
+        self.assertEqual(client.confirm_light.await_count, 2)
+        self.assertEqual(len(self.commands), 2)
+        self.assertEqual(entity._light_correction.born, 0)
+
+    async def test_suspension_preserves_count_spacing_and_original_expiry(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        self.emit()
+        await self.advance(60)
+        self.assertEqual(len(self.commands), 3)
+        await self.advance(121)
+        self.emit("suspended")
+        await self.advance(141)
+        self.assertEqual(len(self.commands), 3)
+        await self.advance(300)
+        self.assertEqual(len(self.commands), 4)
+        self.assertEqual(entity._light_correction.attempts, 3)
+        self.assertEqual(entity._light_correction.born, 0)
+        self.assertEqual(client.confirm_light.await_count, 4)
+
+    async def test_detection_exhausted_match_then_later_opposite_episode(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        original = client.confirm_light.side_effect
+
+        async def read(sn, intent):
+            result = await original(sn, intent)
+            if client.confirm_light.await_count == 1:
+                result["observedValue"] = False
+            return result
+
+        client.confirm_light.side_effect = read
+        self.emit("detection_exhausted")
+        await self.advance(100)
+        self.assertEqual(client.confirm_light.await_count, 1)
+        self.emit("detection_exhausted")
+        await self.advance(135)
+        self.assertEqual(len(self.commands), 2)
+
+    async def test_suspended_with_option_off_does_no_device_work(self):
+        entity, _, client, _ = self.setup_light(enabled=False)
+        await entity.write(False)
+        self.emit("suspended")
+        await self.advance(590)
+        client.confirm_light.assert_not_awaited()
+        self.assertEqual(len(self.commands), 1)
+
+    async def test_retirement_after_third_match_resumes_verification_without_send(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        self.emit()
+        await self.advance(301)
+        self.emit("matched")
+        await self.advance(362)
+        self.emit("suspended")
+        await self.advance(382)
+        self.assertEqual(len(self.commands), 4)
+        self.assertEqual(client.confirm_light.await_count, 4)
+        self.assertEqual(entity._light_correction.failure_reason, "confirmed_opposite")
+        self.notification.assert_called_once()
+
+    async def test_actual_pause_and_expiry_jobs_cancel_active_queued_work(self):
+        entity, coordinator, client, _ = self.setup_light()
+        coordinator.config_entry.options[CONF_LIGHT_CORRECTION_PAUSE] = "switch.pause"
+        await entity.write(False)
+        waiting = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def queued_send(*_, **_kwargs):
+            try:
+                await waiting.wait()
+            finally:
+                cancelled.set()
+
+        client.set_property.side_effect = queued_send
+        self.emit()
+        await self.advance(15)
+        self.paused = True
+        listener = entity.hass.bus.async_listen.call_args.args[1]
+        self.dispatch(listener, SimpleNamespace(data={"entity_id": "switch.pause"}))
+        await asyncio.sleep(0)
+        client.pause_light_correction.assert_called_once()
+        await self.advance(600)
+        self.assertTrue(cancelled.is_set())
+        self.assertEqual(entity._light_correction.state, "verification_exhausted")
 
     async def test_own_superseded_transition_cannot_cancel_lineage(self):
         entity, _, client, _ = self.setup_light()
@@ -747,6 +1020,106 @@ class LightCorrectionProtocolTests(unittest.IsolatedAsyncioTestCase):
     """Use the actual RPC/WS layer with in-memory bridge replies."""
 
     client = bounded.BoundedProtocolTests.client
+
+    async def test_original_correction_expiry_bounds_caller_and_wire_deadlines(self):
+        client = self.client()
+        client._set_late_contrary_capability(CAPABILITY)
+        deadline = asyncio.get_running_loop().time() + 5
+        with patch(
+            "custom_components.eufy_sdk.api.time.time", side_effect=[1000, 1000.4]
+        ):
+            await client.set_property(
+                "fixture",
+                "light",
+                False,
+                bounded=True,
+                correction=True,
+                correction_expires_at=deadline,
+                correction_expires_at_ms=1005000,
+            )
+        execution = self.frames[-1]["execution"]
+        self.assertEqual(execution["correctionExpiresAtMs"], 1005000)
+        self.assertLessEqual(execution["callerExpiresAtMs"], 1005000)
+        self.assertLessEqual(execution["remainingBudgetMs"], 4600)
+
+    async def test_original_expiry_during_clock_exchange_prevents_dispatch(self):
+        client = self.client()
+        client._set_late_contrary_capability(CAPABILITY)
+        deadline = asyncio.get_running_loop().time() + 5
+        with (
+            patch(
+                "custom_components.eufy_sdk.api.time.time", side_effect=[1000, 1000.4]
+            ),
+            self.assertRaisesRegex(
+                EufySdkApiClientCommunicationError, "expired_before_send"
+            ),
+        ):
+            await client.set_property(
+                "fixture",
+                "light",
+                False,
+                bounded=True,
+                correction=True,
+                correction_expires_at=deadline,
+                correction_expires_at_ms=1000200,
+            )
+        self.assertEqual([frame["cmd"] for frame in self.frames], ["boundedStateClock"])
+        self.assertEqual(client._bounded_invocations, {})
+
+    async def test_correction_deadlines_are_paired_finite_and_correction_only(self):
+        client = self.client()
+        client._set_late_contrary_capability(CAPABILITY)
+        future = asyncio.get_running_loop().time() + 5
+        for correction, expires, wall in (
+            (True, future, None),
+            (True, None, 1005000),
+            (True, True, 1005000),
+            (True, float("nan"), 1005000),
+            (True, future, float("inf")),
+            (True, future, -1),
+            (True, future, 1600001),
+            (False, future, 1005000),
+            (True, asyncio.get_running_loop().time() - 1, 1005000),
+        ):
+            with (
+                self.subTest(correction=correction, expires=expires, wall=wall),
+                patch("custom_components.eufy_sdk.api.time.time", return_value=1000),
+                self.assertRaises(EufySdkApiClientCommunicationError),
+            ):
+                await client.set_property(
+                    "fixture",
+                    "light",
+                    False,
+                    bounded=True,
+                    correction=correction,
+                    correction_expires_at=expires,
+                    correction_expires_at_ms=wall,
+                )
+        self.assertEqual(self.frames, [])
+        self.assertEqual(client._bounded_invocations, {})
+
+    async def test_confirmation_reason_is_finite_unconfirmed_and_projected(self):
+        client = self.client()
+        client._set_late_contrary_capability(CAPABILITY)
+        base = {
+            "intent": 1,
+            "desiredValue": False,
+            "confirmed": False,
+            "recoveryBusy": False,
+            "ageMs": 35000,
+            "reason": "read_budget_exhausted",
+        }
+        client.rpc = AsyncMock(
+            return_value={"confirmation": {**base, "private": "discard"}}
+        )
+        self.assertEqual(await client.confirm_light("fixture", 1), base)
+        for invalid in (
+            {**base, "reason": "unknown"},
+            {**base, "confirmed": True, "observedValue": True},
+        ):
+            client.rpc.return_value = {"confirmation": invalid}
+            with self.assertRaises(EufySdkApiClientCommunicationError):
+                await client.confirm_light("fixture", 1)
 
     async def test_correction_flag_only_in_negotiated_bounded_write(self):
         client = self.client()

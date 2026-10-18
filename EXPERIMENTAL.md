@@ -84,14 +84,24 @@ existing write behavior. Only a new explicit HA light command establishes correc
 authority, including commands issued by HA automations. A newer command immediately
 replaces the previous lineage. Either requested direction is supported.
 
-The latest explicit command owns one monotonic ten-minute window. Only an SDK
-confirmed contrary event can schedule corrections, at 15, 60, and 300 seconds from
+The latest explicit command owns one monotonic ten-minute window. A fresh SDK
+confirmation of contrary state schedules corrections at 15, 60, and 300 seconds from
 the first confirmation. Each send requires a fresh qualified SDK read, and sends
 are at least 45 seconds apart, including overdue work after a pause. Corrections
 retain the original window and maximum three-send budget. A reported match cancels
-pending work while retaining the watch for a later reversal. SDK recovery activity
-must settle before a fresh read and correction. Disconnect and entity removal end
-the lineage; reconnect never resumes it.
+pending work while retaining the watch for a later reversal. The original expiry
+travels with each correction and bounds queued transport sends. Ordinary SDK
+recovery must settle before a fresh read and correction; correction-origin writes
+cannot create an additional SDK recovery child.
+
+Temporary unqualified, failed, or busy confirmation reads retry after 20 seconds
+within the original window. The SDK has eight automatic detection reads and sixteen
+separate explicit confirmation reads, reserving capacity for corrections and the
+final check. Detection exhaustion prompts fresh explicit verification. Routine SDK
+session retirement or replacement suspends evidence; enabled correction resumes
+through a fresh-session read, retaining the count, schedule, and expiry. Correction
+disabled causes no resume reads. Bridge disconnect and entity removal end the
+lineage; reconnecting the bridge does not replay it.
 
 A pause during preparation prevents dispatch. A submitted correction is cancelled
 through the bounded protocol while retaining its receipt and passive observation.
@@ -100,7 +110,11 @@ uncertain send does not. After the third correction receipt, the controller allo
 15 seconds for settling before a final fresh read. Confirmed continued disagreement
 raises one persistent notification and one `eufy_sdk_light_correction_failed` event;
 a matching report/read suppresses that failure. An unavailable or unqualified read
-does not authorize a correction or assert confirmed failure.
+does not authorize a correction or assert confirmed failure. Exhausted verification,
+lost protection, or expiry during unresolved verification instead produces one
+notification and event saying the light state could not be freshly verified.
+`light_correction_failure_reason` distinguishes this from `confirmed_opposite`;
+`verification_exhausted` is terminal for the lineage.
 
 Corrective receipts remain separate from the explicit command receipt and do not
 create an optimistic light state. Actual reported state and existing pending-accepted

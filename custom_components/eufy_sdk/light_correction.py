@@ -11,6 +11,7 @@ from time import monotonic
 from typing import Any
 
 from homeassistant.components import persistent_notification
+from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 
 from .api import CommandReceipt, EufySdkApiClientError
@@ -22,6 +23,8 @@ FAILURE_EVENT = "eufy_sdk_light_correction_failed"
 MAX_EARLY_EVENTS = 16
 MIN_CORRECTION_SPACING = 45
 FINAL_CONFIRMATION_DELAY = 15
+CONFIRMATION_RETRY_DELAY = 20
+MAX_CONFIRMATION_READS = 16
 
 
 class LightCorrection:
@@ -55,6 +58,10 @@ class LightCorrection:
         self.last_contrary_at: str | None = None
         self.window_until: str | None = None
         self.pause_requested = False
+        self.retry_due = 0.0
+        self.confirmation_reads = 0
+        self.expires_wall_ms = 0.0
+        self.failure_reason: str | None = None
 
     @property
     def enabled(self) -> bool:
@@ -87,6 +94,9 @@ class LightCorrection:
         self.window_until = (
             datetime.now(UTC) + timedelta(seconds=WINDOW_SECONDS)
         ).isoformat()
+        self.expires_wall_ms = (
+            datetime.fromisoformat(self.window_until).timestamp() * 1000
+        )
         self.first_contrary = None
         self.attempts = 0
         self.last_correction = None
@@ -95,18 +105,45 @@ class LightCorrection:
         self.recovery_busy = False
         self.failed = self.pending_final = False
         self.pause_requested = False
+        self.retry_due = 0.0
+        self.confirmation_reads = 0
+        self.failure_reason = None
         self.state = "watching"
         generation = self.generation
+
+        @callback
+        def expire(_: Any) -> None:
+            if generation != self.generation:
+                return
+            if (
+                self.enabled
+                and not self.failed
+                and self.state
+                in {
+                    "suspended",
+                    "unconfirmed",
+                    "read_or_write_failed",
+                    "recovery_busy",
+                    "contrary",
+                    "correcting",
+                    "paused",
+                }
+            ):
+                self._verification_failure("window_expired")
+            self.stop(self.state if self.failed else "expired")
+            self.entity.async_write_ha_state()
+
         self.expiry = async_call_later(
             self.entity.hass,
             WINDOW_SECONDS,
-            lambda _: self.stop("expired") if generation == self.generation else None,
+            expire,
         )
         if self.pause_unsub is None:
             self.pause_unsub = self.entity.hass.bus.async_listen(
                 "state_changed", self._pause_changed
             )
 
+    @callback
     def _pause_changed(self, event: Any) -> None:
         helper = getattr(self.entity.coordinator.config_entry, "options", {}).get(
             CONF_LIGHT_CORRECTION_PAUSE
@@ -139,7 +176,9 @@ class LightCorrection:
                 and not paused_correction
             )
         ):
-            self.stop("unavailable")
+            if correction and self.enabled:
+                self._verification_failure("protection_lost")
+            self.stop(self.state if self.failed else "unavailable")
             return
         self.intent = receipt.intent
         self.transition = False
@@ -147,7 +186,7 @@ class LightCorrection:
         for event in events:
             self.event(event)
 
-    def event(self, event: dict) -> None:
+    def event(self, event: dict) -> None:  # noqa: PLR0912, PLR0915
         """Only SDK-confirmed structured events can arm corrective work."""
         self.last_event = event.copy()
         if not self._live():
@@ -167,6 +206,16 @@ class LightCorrection:
                     self._cancel_timer()
                     self.pause_requested = True
                     self.entity.client.pause_light_correction(self.entity._sn)
+                elif event["state"] in {"suspended", "verification_exhausted"}:
+                    self.revision += 1
+                    self.observed = None
+                    if event["state"] == "verification_exhausted":
+                        self._verification_failure("read_budget_exhausted")
+                    else:
+                        self.state = "suspended"
+                        self.retry_due = monotonic() + CONFIRMATION_RETRY_DELAY
+                    self.pause_requested = True
+                    self.entity.client.pause_light_correction(self.entity._sn)
             if len(self.early) < MAX_EARLY_EVENTS:
                 self.early.append(event.copy())
             return
@@ -175,13 +224,36 @@ class LightCorrection:
         self.recovery_busy = event["recoveryBusy"]
         self.revision += 1
         state = event["state"]
+        if state == "verification_exhausted":
+            if self.enabled:
+                self._verification_failure("read_budget_exhausted")
+            return
         if state in {"expired", "superseded", "closed"}:
-            self.stop(state)
+            if state == "closed" and self.enabled:
+                self._verification_failure("protection_lost")
+            elif (
+                state == "expired"
+                and self.enabled
+                and (self.first_contrary is not None or self.state == "suspended")
+                and self.state != "matched"
+            ):
+                self._verification_failure("window_expired")
+            self.stop(self.state if self.failed else state)
+            return
+        if state in {"suspended", "detection_exhausted"}:
+            self.observed = None
+            self.state = "suspended"
+            if self.attempts == len(CORRECTION_DELAYS):
+                self.pending_final = True
+            self.retry_due = monotonic() + CONFIRMATION_RETRY_DELAY
+            self._schedule()
+            self.entity.async_write_ha_state()
             return
         self.observed = event.get("observedValue")
         if state == "matched" or self.observed is self.desired:
             self.state = "matched"
             self.pending_final = False
+            self.retry_due = 0.0
             self._cancel_timer()
         elif state == "contrary":
             self.last_contrary_at = datetime.now(UTC).isoformat()
@@ -199,7 +271,14 @@ class LightCorrection:
         return (
             self.desired is not None
             and self.state
-            not in {"expired", "superseded", "closed", "unavailable", "failed"}
+            not in {
+                "expired",
+                "superseded",
+                "closed",
+                "unavailable",
+                "failed",
+                "verification_exhausted",
+            }
             and not self.entity._removed
             and monotonic() < self.born + WINDOW_SECONDS
             and self.entity.client.late_contrary_effects_supported is True
@@ -211,23 +290,25 @@ class LightCorrection:
             self.timer()
             self.timer = None
 
-    def _schedule(self) -> None:
+    def _schedule(self) -> None:  # noqa: PLR0911
         self._cancel_timer()
-        if not self._live() or self.first_contrary is None or self.state == "matched":
+        if not self._live() or self.state == "matched":
             return
         if not self.enabled:
             return
         if self.paused:
             self.state = "paused"
             return
-        if self.recovery_busy:
+        if self.recovery_busy and not self.retry_due:
             self.state = "recovery_busy"
             return
         if self.task is not None and not self.task.done():
             return
         if self.attempts >= len(CORRECTION_DELAYS) and not self.pending_final:
             return
-        due = (
+        if self.first_contrary is None and not self.retry_due:
+            return
+        due = self.retry_due or (
             self.final_confirmation_due
             if self.pending_final
             else self.first_contrary + CORRECTION_DELAYS[self.attempts]
@@ -237,6 +318,7 @@ class LightCorrection:
         generation = self.generation
         timer_generation = self.timer_generation
 
+        @callback
         def run(_: Any) -> None:
             if timer_generation != self.timer_generation:
                 return
@@ -254,31 +336,49 @@ class LightCorrection:
     async def _read(self, generation: int) -> dict | None:  # noqa: PLR0911
         intent = self.intent
         revision = self.revision
+        if self.confirmation_reads >= MAX_CONFIRMATION_READS:
+            self._verification_failure("read_budget_exhausted")
+            return None
+        self.confirmation_reads += 1
         result = await self.entity.client.confirm_light(self.entity._sn, intent)
         if generation != self.generation or not self._live() or intent != self.intent:
             return None
         if result["desiredValue"] is not self.desired:
-            self.stop("unavailable")
+            if self.enabled:
+                self._verification_failure("protection_lost")
+            self.stop(self.state if self.failed else "unavailable")
             return None
         if revision != self.revision and (
-            self.state == "matched" or self.recovery_busy
+            self.state in {"matched", "suspended"} or self.recovery_busy
         ):
             return None
         self.recovery_busy = result["recoveryBusy"]
+        if result.get("reason") == "read_budget_exhausted":
+            self._verification_failure("read_budget_exhausted")
+            return None
         if self.recovery_busy:
             self.state = "recovery_busy"
+            self.retry_due = monotonic() + CONFIRMATION_RETRY_DELAY
             return None
         if not result["confirmed"] or type(result.get("observedValue")) is not bool:
             self.state = "unconfirmed"
+            self.retry_due = monotonic() + CONFIRMATION_RETRY_DELAY
             return None
         self.observed = result["observedValue"]
         if self.observed is self.desired:
             self.state = "matched"
             self.pending_final = False
+            self.retry_due = 0.0
+            return None
+        self.retry_due = 0.0
+        if self.first_contrary is None:
+            self.first_contrary = monotonic()
+            self.last_contrary_at = datetime.now(UTC).isoformat()
+            self.state = "contrary"
             return None
         return result
 
-    async def _run(self, generation: int) -> None:  # noqa: PLR0912
+    async def _run(self, generation: int) -> None:  # noqa: PLR0911, PLR0912, PLR0915
         previous_correction = self.last_correction
         attempt_started = False
         try:
@@ -297,6 +397,12 @@ class LightCorrection:
                 return
             if self.attempts >= len(CORRECTION_DELAYS):
                 return
+            due = self.first_contrary + CORRECTION_DELAYS[self.attempts]
+            if self.last_correction is not None:
+                due = max(due, self.last_correction + MIN_CORRECTION_SPACING)
+            if monotonic() < due:
+                self.state = "contrary"
+                return
             self.attempts += 1
             attempt_started = True
             self.last_correction = monotonic()
@@ -309,13 +415,15 @@ class LightCorrection:
                 self.desired,
                 bounded=True,
                 correction=True,
+                correction_expires_at=self.born + WINDOW_SECONDS,
+                correction_expires_at_ms=self.expires_wall_ms,
                 _send_guard=lambda: (
                     generation == self.generation
                     and self._live()
                     and self.enabled
                     and not self.paused
                     and not self.recovery_busy
-                    and self.state != "matched"
+                    and self.state not in {"matched", "suspended"}
                 ),
             )
             if generation != self.generation or not self._live():
@@ -332,7 +440,7 @@ class LightCorrection:
             ):
                 self.attempts -= 1
                 self.last_correction = previous_correction
-            if not self._live() or self.state == "matched":
+            if not self._live() or self.state in {"matched", "suspended"}:
                 return
             self.state = "contrary"
             if self.attempts == len(CORRECTION_DELAYS):
@@ -348,6 +456,11 @@ class LightCorrection:
                     self.last_correction = previous_correction
                 elif attempt_started:
                     self.last_correction = monotonic()
+                    if self.attempts == len(CORRECTION_DELAYS):
+                        self.pending_final = True
+                        self.final_confirmation_due = (
+                            monotonic() + FINAL_CONFIRMATION_DELAY
+                        )
                 if self.state != "matched":
                     self.state = (
                         "recovery_busy"
@@ -356,13 +469,23 @@ class LightCorrection:
                         if paused_before_send
                         else "read_or_write_failed"
                     )
+                    self.retry_due = (
+                        0.0
+                        if paused_before_send
+                        else monotonic() + CONFIRMATION_RETRY_DELAY
+                    )
         finally:
             if generation == self.generation:
                 self.transition = False
                 self.task = None
-                # Failed/unconfirmed reads wait for new SDK evidence instead of
-                # creating a zero-delay read loop at an overdue offset.
-                if self.state in {"contrary", "paused"}:
+                if self.state in {
+                    "contrary",
+                    "paused",
+                    "unconfirmed",
+                    "read_or_write_failed",
+                    "recovery_busy",
+                    "suspended",
+                }:
                     self._schedule()
                 self.entity.async_write_ha_state()
 
@@ -370,6 +493,7 @@ class LightCorrection:
         if self.failed or not self._live() or self.observed is self.desired:
             return
         self.failed = True
+        self.failure_reason = "confirmed_opposite"
         self.state = "failed"
         self.pending_final = False
         self._cancel_timer()
@@ -391,10 +515,49 @@ class LightCorrection:
             },
         )
 
+    def _verification_failure(self, reason: str) -> None:
+        """Report lost verification without inventing a confirmed opposite state."""
+        if self.failed:
+            return
+        self.failed = True
+        self.failure_reason = reason
+        self.state = "verification_exhausted"
+        self.pending_final = False
+        self._cancel_timer()
+        persistent_notification.async_create(
+            self.entity.hass,
+            f"{self.entity.entity_id} could not freshly verify the light state; "
+            "automatic correction protection has ended.",
+            title="Eufy light correction could not verify state",
+            notification_id=f"eufy_light_correction_{self.entity.unique_id}",
+        )
+        self.entity.hass.bus.async_fire(
+            FAILURE_EVENT,
+            {
+                "entity_id": self.entity.entity_id,
+                "desired_value": self.desired,
+                "observed_value": self.observed,
+                "correction_attempts": self.attempts,
+                "reason": reason,
+            },
+        )
+        self.entity.async_write_ha_state()
+
     def stop(self, state: str) -> None:
         """Revoke timers and in-flight work; callbacks cannot revive a lineage."""
+        if (
+            state == "closed"
+            and not self.entity._removed
+            and self.desired is not None
+            and monotonic() < self.born + WINDOW_SECONDS
+            and getattr(self.entity.coordinator.config_entry, "options", {}).get(
+                CONF_LIGHT_CORRECTION, False
+            )
+            is True
+        ):
+            self._verification_failure("protection_lost")
         self.generation += 1
-        self.state = state
+        self.state = self.state if self.failed and state == "closed" else state
         self._cancel_timer()
         if self.expiry is not None:
             self.expiry()
@@ -419,6 +582,7 @@ class LightCorrection:
             "light_correction_observed_value": self.observed,
             "light_correction_recovery_busy": self.recovery_busy,
             "light_correction_failed": self.failed,
+            "light_correction_failure_reason": self.failure_reason,
             "last_contrary_at": self.last_contrary_at,
             "correction_window_until": self.window_until,
         }
