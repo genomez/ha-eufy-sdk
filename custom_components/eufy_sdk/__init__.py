@@ -28,11 +28,13 @@ from .const import (
     DOMAIN,
     EVENT_TYPE,
     LOGGER,
+    MAX_DOORBELL_EVENT_IDS,
 )
 from .coordinator import EufySdkDataUpdateCoordinator
 from .data import EufySdkData
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
+from .pushmap import DOORBELL_EVENT
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -123,8 +125,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
 
     entry.async_on_unload(coordinator._clear_fast_retry)  # noqa: SLF001
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
+    doorbell_event_ids: dict[tuple[str, str], None] = {}
 
     def _on_event(evt: dict) -> None:  # noqa: PLR0912 - explicit bridge event dispatch
+        if evt.get("event") == DOORBELL_EVENT:
+            serial, event_id = evt.get("deviceSn"), evt.get("eventId")
+            if (
+                isinstance(serial, str) and serial
+                and isinstance(event_id, str) and event_id.strip()
+            ):
+                key = (serial, event_id)
+                if key in doorbell_event_ids:
+                    return
+                doorbell_event_ids[key] = None
+                if len(doorbell_event_ids) > MAX_DOORBELL_EVENT_IDS:
+                    doorbell_event_ids.pop(next(iter(doorbell_event_ids)))
+            # Identity-less pulses may be genuine repeats; never time-filter them.
         hass.bus.async_fire(EVENT_TYPE, evt)
         event = evt.get("event")
         # Pushes can arrive before the first device snapshot. Keep forwarding

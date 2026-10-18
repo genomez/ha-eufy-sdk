@@ -155,10 +155,12 @@
         "description": "How often the bridge polls the eufy cloud for device state. Lower is fresher but adds cloud traffic; the cloud itself only updates every few minutes.",
         "data": {
           "poll_interval_minutes": "Cloud poll interval (minutes)",
-          "soc_refresh_seconds": "Solarbank SOC-limit refresh (seconds)"
+          "soc_refresh_seconds": "Solarbank SOC-limit refresh (seconds)",
+          "legacy_doorbell_pressed": "Use legacy doorbell pressed event"
         },
         "data_description": {
-          "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank."
+          "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank.",
+          "legacy_doorbell_pressed": "Off: one ring event per press. On: one pressed event instead, for existing automations. Never sends both."
         }
       }
     }

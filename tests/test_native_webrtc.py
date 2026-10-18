@@ -5,7 +5,7 @@
 import asyncio
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import aiohttp
 from homeassistant.components.camera.webrtc import (
@@ -29,6 +29,7 @@ from custom_components.eufy_sdk.camera import (
 from custom_components.eufy_sdk.coordinator import EufySdkDataUpdateCoordinator
 from custom_components.eufy_sdk.native_webrtc import (
     MAX_PENDING_CANDIDATES,
+    WEBRTC_OFFER_TIMEOUT,
     NativeWebRTCMixin,
     is_s1_camera,
 )
@@ -316,6 +317,19 @@ class NativeWebRTCTests(unittest.IsolatedAsyncioTestCase):
         await (await self.offer())
         self.assertEqual(self.commands("webrtc.open")[0]["iceServers"], self.camera.ice_servers)
 
+    async def test_only_offer_gets_extended_timeout_and_close_remains_prompt(self):
+        self.client.release.clear()
+        task = await self.offer()
+        self.assertEqual(WEBRTC_OFFER_TIMEOUT, 45)
+        self.assertEqual(self.commands("webrtc.open")[0]["timeout"], 45)
+        self.camera.close_webrtc_session("synthetic-session")
+        self.assertFalse(self.camera._signaling_sessions)
+        self.assertFalse(self.client.callbacks)
+        await task
+        await self.drain_closes()
+        self.assertNotIn("timeout", self.commands("webrtc.close")[0])
+        self.assertEqual(len(self.commands("webrtc.open")), 1)
+
     async def test_candidate_bounds_fail_closed_in_both_directions(self):
         for direction in ("local", "remote"):
             with self.subTest(direction=direction):
@@ -393,6 +407,84 @@ class NativeWebRTCSelectionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class NativeWebRTCApiTests(unittest.IsolatedAsyncioTestCase):
+    async def test_default_rpc_timeout_stays_15_and_offer_override_is_local(self):
+        original_timeout = asyncio.timeout
+        client = EufySdkApiClient("synthetic-host", 3000, Mock())
+        client._ws = Mock(closed=False)
+        async def reply(payload: dict) -> None:
+            self.assertNotIn("timeout", payload)
+            client._pending[payload["id"]].set_result({"ok": True})
+        client._ws.send_json = AsyncMock(side_effect=reply)
+        with patch(
+            "custom_components.eufy_sdk.api.asyncio.timeout", wraps=original_timeout,
+        ) as timeout:
+            await client.rpc("devices.list")
+            await client.rpc("webrtc.open", timeout=WEBRTC_OFFER_TIMEOUT)
+            await client.rpc("webrtc.close")
+            await client.rpc("webrtc.candidate")
+        self.assertEqual(
+            [call.args[0] for call in timeout.call_args_list], [15, 45, 15, 15],
+        )
+        self.assertEqual(client._pending, {})
+
+    async def test_canceling_extended_offer_clears_pending_waiter(self):
+        client = EufySdkApiClient("synthetic-host", 3000, Mock())
+        started = asyncio.Event()
+        client._ws = Mock(closed=False)
+        async def send(_payload: dict) -> None:
+            started.set()
+        client._ws.send_json = AsyncMock(side_effect=send)
+        task = asyncio.create_task(
+            client.rpc("webrtc.open", timeout=WEBRTC_OFFER_TIMEOUT),
+        )
+        await started.wait()
+        self.assertEqual(len(client._pending), 1)
+        pending = next(iter(client._pending.values()))
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertEqual(client._pending, {})
+        self.assertTrue(pending.cancelled())
+
+    async def test_close_near_offer_deadline_cancels_immediately_without_retry(self):
+        client = EufySdkApiClient("synthetic-host", 3000, Mock())
+        client._ws = Mock(closed=False)
+        camera = FakeCamera(client)
+        messages, commands = [], []
+        sent = asyncio.Event()
+
+        async def send(payload: dict) -> None:
+            commands.append(payload["cmd"])
+            if payload["cmd"] == "webrtc.open":
+                sent.set()
+            else:
+                client._pending[payload["id"]].set_result({"ok": True})
+
+        client._ws.send_json = AsyncMock(side_effect=send)
+        loop = asyncio.get_running_loop()
+        original_time = loop.time
+        elapsed = 0
+        with patch.object(loop, "time", side_effect=lambda: original_time() + elapsed):
+            task = asyncio.create_task(camera.async_handle_async_webrtc_offer(
+                "synthetic-offer", "synthetic-session", messages.append,
+            ))
+            await sent.wait()
+            elapsed = WEBRTC_OFFER_TIMEOUT - 0.1
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            camera.close_webrtc_session("synthetic-session")
+            self.assertFalse(camera._signaling_sessions)
+            self.assertFalse(client._webrtc_callbacks)
+            await task
+            if camera._signaling_close_tasks:
+                await asyncio.gather(*tuple(camera._signaling_close_tasks))
+            elapsed = WEBRTC_OFFER_TIMEOUT + 1
+            await asyncio.sleep(0)
+            self.assertEqual(commands, ["webrtc.open", "webrtc.close"])
+            self.assertEqual(messages, [])
+            self.assertFalse(client._pending)
+        await camera.async_will_remove_from_hass()
+
     async def test_retired_transport_cannot_send_on_replacement(self):
         client = EufySdkApiClient("synthetic-host", 3000, Mock())
         client._ws = Mock(closed=False)

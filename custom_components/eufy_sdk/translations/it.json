@@ -141,7 +141,11 @@
         "title": "Opzioni del bridge eufy",
         "description": "Ogni quanto il bridge interroga il cloud eufy per conoscere lo stato dei dispositivi. Un intervallo breve dà dati più aggiornati ma aumenta il traffico verso il cloud, che comunque si aggiorna solo ogni pochi minuti.",
         "data": {
-          "poll_interval_minutes": "Intervallo di interrogazione del cloud (minuti)"
+          "poll_interval_minutes": "Intervallo di interrogazione del cloud (minuti)",
+          "legacy_doorbell_pressed": "Usa l'evento pressed precedente del campanello"
+        },
+        "data_description": {
+          "legacy_doorbell_pressed": "Disattivato: un evento ring per pressione. Attivato: un solo evento pressed al suo posto, per le automazioni esistenti. Non invia mai entrambi."
         }
       }
     }
