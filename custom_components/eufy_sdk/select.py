@@ -18,7 +18,6 @@ from .entity import (
     EufySdkPropertyEntity,
     EufySolixEntity,
     classify,
-    has_capability,
     remove_stale_solix_entities,
     solix_devices_with,
 )
@@ -83,7 +82,7 @@ async def async_setup_entry(
     entities.extend(
         EufySdkPresetSelect(coordinator, sn)
         for sn, dev in coordinator.data.items()
-        if has_capability(dev, "ptz")
+        if presets.movement_supported(dev)
     )
     entities.extend(
         EufySdkSnapshotPolicySelect(coordinator, sn)

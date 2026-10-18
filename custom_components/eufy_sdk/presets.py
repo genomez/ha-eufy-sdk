@@ -99,12 +99,26 @@ def list_supported(device: dict[str, Any]) -> bool:
     manifest = device.get("decodedProperties") or {}
     if manifest.get("bound") is not True:
         return False
+    return _advertises_action(manifest, "preset.list")
+
+
+def movement_supported(device: dict[str, Any]) -> bool:
+    """Require preset movement in bound manifests; retain older PTZ fallbacks."""
+    if "ptz" not in device.get("capabilities", []):
+        return False
+    manifest = device.get("decodedProperties") or {}
+    if manifest.get("bound") is not True:
+        return True
+    return _advertises_action(manifest, ACTION_GOTO)
+
+
+def _advertises_action(manifest: dict[str, Any], name: str) -> bool:
+    """Find an action on the bound PTZ surface."""
     for capability in manifest.get("details", []):
         if capability.get("accessor") != "ptz":
             continue
-        return "preset.list" in capability.get("undescribedActions", []) or any(
-            action.get("name") == "preset.list"
-            for action in capability.get("actions", [])
+        return name in capability.get("undescribedActions", []) or any(
+            action.get("name") == name for action in capability.get("actions", [])
         )
     return False
 

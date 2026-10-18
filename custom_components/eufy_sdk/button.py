@@ -63,7 +63,8 @@ async def async_setup_entry(
             EufySdkPtzButton(coordinator, sn, action, meta)
             for action, meta in _PTZ_STEPS.items()
         )
-        entities.append(EufySdkGotoPresetButton(coordinator, sn))
+        if presets.movement_supported(dev):
+            entities.append(EufySdkGotoPresetButton(coordinator, sn))
     async_add_entities(entities)
 
 

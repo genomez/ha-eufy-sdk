@@ -7,8 +7,10 @@ from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.eufy_sdk import presets
 from custom_components.eufy_sdk.button import EufySdkGotoPresetButton
+from custom_components.eufy_sdk.button import async_setup_entry as setup_buttons
 from custom_components.eufy_sdk.entity import EufySdkDeviceEntity
 from custom_components.eufy_sdk.select import ATTR_SLOTS, EufySdkPresetSelect
+from custom_components.eufy_sdk.select import async_setup_entry as setup_selects
 
 
 def snapshot(supported: bool) -> dict:
@@ -29,6 +31,34 @@ def snapshot(supported: bool) -> dict:
 
 
 class SlotTests(unittest.TestCase):
+    def test_bound_movement_requires_preview_on_the_ptz_surface(self):
+        device = snapshot(True)
+        device["capabilities"] = ["ptz"]
+        self.assertFalse(presets.movement_supported(device))
+        detail = device["decodedProperties"]["details"][0]
+        detail["actions"] = [{"name": "preset.preview"}]
+        self.assertTrue(presets.movement_supported(device))
+        detail["actions"] = []
+        detail["undescribedActions"] = ["preset.preview"]
+        self.assertTrue(presets.movement_supported(device))
+        detail["accessor"] = "camera"
+        self.assertFalse(presets.movement_supported(device))
+
+    def test_legacy_and_unbound_ptz_keep_preset_movement(self):
+        self.assertTrue(presets.movement_supported({"capabilities": ["ptz"]}))
+        device = snapshot(False)
+        device["capabilities"] = ["ptz"]
+        device["decodedProperties"]["bound"] = False
+        self.assertTrue(presets.movement_supported(device))
+        self.assertFalse(presets.movement_supported({}))
+
+    def test_bound_manifest_without_ptz_details_has_no_preset_movement(self):
+        self.assertFalse(
+            presets.movement_supported(
+                {"capabilities": ["ptz"], "decodedProperties": {"bound": True}}
+            )
+        )
+
     def test_fallback_numbers_are_not_occupied_evidence(self):
         slots = presets.fallback_slots()
         self.assertEqual(len(slots), 8)
@@ -61,6 +91,54 @@ class SlotTests(unittest.TestCase):
 
 
 class SelectTests(unittest.IsolatedAsyncioTestCase):
+    async def test_setup_keeps_directions_but_omits_rotation_only_presets(self):
+        device = snapshot(False)
+        device["capabilities"] = ["ptz"]
+        device["decodedProperties"]["details"][0]["undescribedActions"] = [
+            "left",
+            "right",
+            "up",
+            "down",
+        ]
+        await self.check_setup(device, preset_count=0)
+
+    async def test_setup_preserves_existing_bound_and_legacy_presets(self):
+        for model in ("T8425", "T8170"):
+            with self.subTest(model=model):
+                device = snapshot(True)
+                device["model"] = model
+                device["capabilities"] = ["ptz"]
+                device["decodedProperties"]["details"][0]["actions"] = [
+                    {"name": "preset.preview"}
+                ]
+                await self.check_setup(device, preset_count=1)
+        for device in (
+            {"capabilities": ["ptz"]},
+            {"capabilities": ["ptz"], "decodedProperties": {"bound": False}},
+        ):
+            await self.check_setup(device, preset_count=1)
+
+    async def check_setup(self, device: dict, preset_count: int):
+        runtime = SimpleNamespace(
+            preset_slots={},
+            selected_preset={},
+            properties={},
+        )
+        entry = SimpleNamespace(runtime_data=runtime)
+        runtime.coordinator = Mock(
+            data={"synthetic": device}, config_entry=entry, solix_devices={}
+        )
+        buttons = []
+        selects = []
+        await setup_buttons(Mock(), entry, buttons.extend)
+        await setup_selects(Mock(), entry, selects.extend)
+        self.assertEqual(len(buttons), 4 + preset_count)
+        self.assertEqual(
+            sum(isinstance(item, EufySdkGotoPresetButton) for item in buttons),
+            preset_count,
+        )
+        self.assertEqual(len(selects), preset_count)
+
     def entity(self, supported: bool):
         runtime = SimpleNamespace(
             client=Mock(
@@ -146,6 +224,21 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         button = EufySdkGotoPresetButton(entity.coordinator, "synthetic")
         await button.async_press()
         runtime.client.action.assert_awaited_once_with("synthetic", "preset.preview", 5)
+
+    async def test_named_camera_slots_preserve_arbitrary_returned_ids(self):
+        entity, runtime = self.entity(True)
+        runtime.client.action = AsyncMock()
+        runtime.client.preset_slots.return_value = [
+            {"id": 9, "raw": {"name": "right", "enable": 1}},
+            {"id": 2, "raw": {"name": "left", "enable": 1}},
+            {"id": 6, "raw": {"name": "mid", "enable": 1}},
+        ]
+        await entity._reread()
+        self.assertEqual(entity.options, ["2", "6", "9"])
+        await entity.async_select_option("6")
+        button = EufySdkGotoPresetButton(entity.coordinator, "synthetic")
+        await button.async_press()
+        runtime.client.action.assert_awaited_once_with("synthetic", "preset.preview", 6)
 
     async def test_confirmed_empty_slot_still_refuses_movement(self):
         entity, runtime = self.entity(True)
