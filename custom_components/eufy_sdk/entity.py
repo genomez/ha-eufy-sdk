@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import CommandReceipt, EufySdkApiClientError
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 
@@ -336,6 +338,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._pending_reconcile: tuple[int, int, int] | None = None
         self._property_event_unsub: Callable[[], None] | None = None
         self._removed = False
+        self._command_receipt: CommandReceipt | None = None
+        self._command_profile: str | None = None
+        self._write_tasks: set[asyncio.Task] = set()
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to valued reports for this property in this lifecycle."""
@@ -417,7 +422,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         """Whether this property accepts writes without reporting its value."""
         return bool(self._spec.get("writeOnly"))
 
-    async def write(self, value: Any) -> None:
+    async def write(self, value: Any) -> None:  # noqa: PLR0912
         """Keep successful optimistic state owned by the latest write/lifecycle."""
         if self._removed:
             return
@@ -426,10 +431,52 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         report_generation = self._report_generation
         lifecycle = self._lifecycle_generation
         light_marker = self._light_state_marker() if self._prop == "light" else None
-        await self.client.set_property(self._sn, self._prop, value)
+        bounded = (
+            self._prop == "light"
+            and type(value) is bool
+            and self._spec.get("boundedStateWrites") is True
+        )
+        task = asyncio.current_task()
+        if not hasattr(self, "_write_tasks"):
+            self._write_tasks = set()
+        if bounded:
+            self._write_tasks.add(task)
+        try:
+            if bounded:
+                receipt = await self.client.set_property(
+                    self._sn, self._prop, value, bounded=True
+                )
+            else:
+                receipt = await self.client.set_property(self._sn, self._prop, value)
+        finally:
+            self._write_tasks.discard(task)
 
         if self._removed or lifecycle != self._lifecycle_generation:
             return
+        if isinstance(receipt, CommandReceipt) and not receipt.accepted:
+            if owner == self._write_generation:
+                self._command_receipt = receipt
+                self._command_profile = "bounded-state-v1"
+                self.async_write_ha_state()
+            phase = "after_send" if receipt.send_attempted else "before_send"
+            message = (
+                f"command_superseded_{phase}"
+                if receipt.superseded
+                else f"command_{receipt.status}"
+            )
+            raise EufySdkApiClientError(message)
+        if owner != self._write_generation:
+            if not self.write_only and (
+                not isinstance(receipt, CommandReceipt) or receipt.accepted
+            ):
+                self._schedule_post_write_refresh(owner)
+            return
+        if isinstance(receipt, CommandReceipt):
+            self._command_receipt = receipt
+            self._command_profile = "bounded-state-v1"
+        elif bounded:
+            self._command_receipt = None
+            self._command_profile = "legacy"
         if owner == self._write_generation and (
             self._prop == "light" or report_generation == self._report_generation
         ):
@@ -627,6 +674,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Invalidate writes, queued callbacks and pulls when this lifecycle ends."""
         self._removed = True
+        for task in tuple(getattr(self, "_write_tasks", ())):
+            if task is not asyncio.current_task():
+                task.cancel()
         self._lifecycle_generation += 1
         self._write_generation += 1
         self._report_generation += 1

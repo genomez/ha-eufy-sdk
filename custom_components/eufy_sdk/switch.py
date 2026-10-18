@@ -131,13 +131,28 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
         """Expose device receipt time and value separately from optimistic state."""
         observations = self.coordinator.property_observations or {}
         receipt = observations.get(self._sn, {}).get(self._prop)
-        if not receipt or type(receipt["value"]) is not bool:
-            return {}
-        return {
-            "device_observed_at": receipt["observed_at"],
-            "device_observed_value": receipt["value"],
-            "device_observation_source": "rtc",
-        }
+        attributes = {}
+        if receipt and type(receipt["value"]) is bool:
+            attributes.update(
+                {
+                    "device_observed_at": receipt["observed_at"],
+                    "device_observed_value": receipt["value"],
+                    "device_observation_source": "rtc",
+                }
+            )
+        if self._command_profile is not None:
+            attributes["command_profile"] = self._command_profile
+        if self._command_receipt is not None:
+            attributes.update(
+                {
+                    "command_status": self._command_receipt.status,
+                    "command_effect": self._command_receipt.effect,
+                    "command_send_attempted": self._command_receipt.send_attempted,
+                }
+            )
+            if self._command_receipt.superseded:
+                attributes["command_superseded"] = True
+        return attributes
 
     @property
     def is_on(self) -> bool | None:

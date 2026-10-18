@@ -9,8 +9,11 @@ unsolicited `{event}` messages go to `on_event`. See the bridge's `docs/ws-proto
 from __future__ import annotations
 
 import asyncio
+import math
+import time
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import aiohttp
 from homeassistant.exceptions import HomeAssistantError
@@ -36,8 +39,129 @@ COMMAND_ERROR_CODES = frozenset(
         "command_connect_timeout",
         "command_unsupported",
         "command_other_error",
+        "command_validation_failed",
+        "command_clock_unavailable",
+        "command_duplicate_request",
+        "command_queue_full",
+        "command_superseded_before_send",
+        "command_superseded_after_send",
+        "command_cancelled_before_send",
+        "command_cancelled_after_send",
+        "command_closed_before_send",
+        "command_closed_after_send",
     }
 )
+
+BOUNDED_PROFILE = "bounded-state-v1"
+BOUNDED_CALLER_SECONDS = 80
+BOUNDED_CLOCK_MAX_MS = 1000
+CLOCK_TOKEN_MAX_LENGTH = 128
+COMMAND_RECEIPT_STATUSES = frozenset(
+    {
+        "validation_failed",
+        "connect_timeout",
+        "queue_full",
+        "expired_before_send",
+        "superseded_before_send",
+        "cancelled_before_send",
+        "closed_before_send",
+        "acknowledged",
+        "pending_accepted",
+        "rejected",
+        "ack_timeout",
+        "cancelled_after_send",
+        "closed_after_send",
+        "not_sent",
+        "expired_after_send",
+    }
+)
+COMMAND_EFFECTS = frozenset({"unconfirmed", "unknown", "confirmed_report"})
+type CommandStatus = Literal[
+    "validation_failed",
+    "connect_timeout",
+    "queue_full",
+    "expired_before_send",
+    "superseded_before_send",
+    "cancelled_before_send",
+    "closed_before_send",
+    "acknowledged",
+    "pending_accepted",
+    "rejected",
+    "ack_timeout",
+    "cancelled_after_send",
+    "closed_after_send",
+    "not_sent",
+    "expired_after_send",
+]
+type CommandEffect = Literal["unconfirmed", "unknown", "confirmed_report"]
+
+
+@dataclass(frozen=True)
+class CommandReceipt:
+    """Finite per-invocation evidence; peer acceptance is not a state report."""
+
+    status: CommandStatus
+    send_attempted: bool
+    effect: CommandEffect
+    attempt: int | None = None
+    intent: int | None = None
+    superseded: bool = False
+
+    @property
+    def accepted(self) -> bool:
+        """Whether this invocation received transport acceptance."""
+        return not self.superseded and self.status in {
+            "acknowledged", "pending_accepted"
+        }
+
+
+@dataclass
+class _BoundedPropertyInvocation:
+    """Keep older preparations superseded after a newer caller has completed."""
+
+    superseded: bool = False
+
+
+def _finite_number(value: Any) -> bool:
+    """Reject booleans, nonfinite values and numeric overflow."""
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _command_receipt(value: Any) -> CommandReceipt:
+    """Keep a detached, closed receipt schema and discard untrusted fields."""
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("status"), str)
+        or value["status"] not in COMMAND_RECEIPT_STATUSES
+        or type(value.get("sendAttempted")) is not bool
+        or not isinstance(value.get("effect"), str)
+        or value["effect"] not in COMMAND_EFFECTS
+        or (
+            value["status"] in {"acknowledged", "pending_accepted"}
+            and value["sendAttempted"] is not True
+        )
+        or (value["status"].endswith("_before_send") and value["sendAttempted"])
+        or ("superseded" in value and type(value["superseded"]) is not bool)
+    ):
+        message = "bridge_invalid_receipt"
+        raise EufySdkApiClientCommunicationError(message)
+    ordinals = {
+        key: value[key]
+        if type(value.get(key)) is int and 0 <= value[key] <= 2**53 - 1
+        else None
+        for key in ("attempt", "intent")
+    }
+    return CommandReceipt(
+        cast("CommandStatus", value["status"]),
+        value["sendAttempted"],
+        cast("CommandEffect", value["effect"]),
+        superseded=value.get("superseded", False),
+        **ordinals,
+    )
+
 
 WEBRTC_ERROR_CODES = frozenset({
     "webrtc_busy", "webrtc_releasing", "webrtc_unsupported",
@@ -84,6 +208,67 @@ class EufySdkApiClient:
         self._webrtc_callbacks: dict[str, Callable[[dict[str, Any]], None]] = {}
         self._webrtc_relay_enabled = False
         self._webrtc_relay_listener: Callable[[bool], None] | None = None
+        self._bounded_capability = False
+        self._bounded_requests: dict[int, aiohttp.ClientWebSocketResponse] = {}
+        self._bounded_invocations: dict[
+            tuple[str, str], _BoundedPropertyInvocation
+        ] = {}
+        self._cancel_tasks: set[asyncio.Task] = set()
+
+    @property
+    def bounded_state_writes_supported(self) -> bool:
+        """Whether this socket advertises the complete versioned contract."""
+        return self.connected and self._bounded_capability
+
+    def _set_bounded_capability(self, capability: Any) -> None:
+        """Require every negotiated bound; an older bridge stays legacy."""
+        maxima = {
+            "admissionMaxMs": 60000,
+            "activeMaxMs": 12000,
+            "sdkTotalMaxMs": 72000,
+            "bridgeMaxMs": 75000,
+            "callerMaxMs": 80000,
+        }
+        clock = capability.get("clock") if isinstance(capability, dict) else None
+        self._bounded_capability = (
+            isinstance(capability, dict)
+            and type(capability.get("version")) is int
+            and capability["version"] == 1
+            and capability.get("profile") == BOUNDED_PROFILE
+            and capability.get("cancellation") is True
+            and capability.get("receipts") is True
+            and all(
+                type(capability.get(key)) is int and capability[key] == value
+                for key, value in maxima.items()
+            )
+            and isinstance(clock, dict)
+            and type(clock.get("version")) is int
+            and clock["version"] == 1
+            and type(clock.get("maxUncertaintyMs")) is int
+            and 0 < clock["maxUncertaintyMs"] <= BOUNDED_CLOCK_MAX_MS
+        )
+
+    def _schedule_command_cancel(self, mid: int, transport: Any) -> None:
+        """Send only to the owning socket, without renewing a caller's lifetime."""
+        if transport.closed:
+            return
+
+        async def send() -> None:
+            with suppress(aiohttp.ClientError, OSError, TimeoutError):
+                async with asyncio.timeout(0.25):
+                    self._next_id += 1
+                    await transport.send_json(
+                        {
+                            "id": self._next_id,
+                            "cmd": "boundedStateCancel",
+                            "version": 1,
+                            "requestId": mid,
+                        }
+                    )
+
+        task = asyncio.create_task(send())
+        self._cancel_tasks.add(task)
+        task.add_done_callback(self._cancel_tasks.discard)
 
     @property
     def webrtc_relay_enabled(self) -> bool:
@@ -124,6 +309,7 @@ class EufySdkApiClient:
     async def reset_connection(self) -> None:
         """Retire a wedged bridge socket while preserving reconnect behavior."""
         async with self._connect_lock:
+            self._bounded_capability = False
             self._invalidate_webrtc_sessions()
             ws, task = self._ws, self._recv_task
             self._ws = None
@@ -162,6 +348,11 @@ class EufySdkApiClient:
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
         self._closing = True
+        self._bounded_capability = False
+        for mid, transport in tuple(self._bounded_requests.items()):
+            self._schedule_command_cancel(mid, transport)
+        if self._cancel_tasks:
+            await asyncio.gather(*tuple(self._cancel_tasks), return_exceptions=True)
         self._webrtc_relay_listener = None
         self._invalidate_webrtc_sessions()
         if self._reconnect_task:
@@ -190,6 +381,7 @@ class EufySdkApiClient:
                     continue
                 data = msg.json()
                 if data.get("event") == "hello":
+                    self._set_bounded_capability(data.get("boundedStateWrites"))
                     # Keep the last advertisement through a disconnect. The next
                     # hello (including an old bridge's absent field) replaces it.
                     enabled = data.get("webrtcRelay") is True
@@ -216,6 +408,7 @@ class EufySdkApiClient:
             # and (unless deliberately closing) reconnect so events resume promptly, not
             # only on the next poll.
             self._ws = None
+            self._bounded_capability = False
             self._invalidate_webrtc_sessions()
             for fut in self._pending.values():
                 if not fut.done():
@@ -253,36 +446,54 @@ class EufySdkApiClient:
         cmd: str,
         timeout: float = 15,  # noqa: ASYNC109 — deliberate per-call timeout API
         _transport: aiohttp.ClientWebSocketResponse | None = None,
+        *,
+        _cancel_on_abort: bool = False,
         **args: Any,
     ) -> dict[str, Any]:
         """Send a command and await its reply. Raises on `ok: false`."""
-        if not self.connected or (_transport is not None and self._ws is not _transport):
+        if not self.connected or (
+            _transport is not None and self._ws is not _transport
+        ):
             msg = "not connected"
             raise EufySdkApiClientCommunicationError(msg)
         self._next_id += 1
         mid = self._next_id
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
         self._pending[mid] = fut
+        transport = self._ws
+        if _cancel_on_abort:
+            self._bounded_requests[mid] = transport
         try:
             await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
             async with asyncio.timeout(timeout):
                 reply = await fut
         except TimeoutError:
+            if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
+                self._schedule_command_cancel(mid, transport)
             self._pending.pop(mid, None)
             msg = "bridge_request_timeout"
             raise EufySdkApiClientCommunicationError(msg) from None
+        except asyncio.CancelledError:
+            if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
+                self._schedule_command_cancel(mid, transport)
+            raise
         except (aiohttp.ClientError, OSError):
             self._pending.pop(mid, None)
             msg = "bridge_send_failed"
             raise EufySdkApiClientCommunicationError(msg) from None
         finally:
             self._pending.pop(mid, None)
+            self._bounded_requests.pop(mid, None)
         if not reply.get("ok"):
             code = reply.get("code")
             msg = (
                 code
-                if isinstance(code, str) and code in (
-                    WEBRTC_ERROR_CODES if cmd.startswith("webrtc.") else COMMAND_ERROR_CODES
+                if isinstance(code, str)
+                and code
+                in (
+                    WEBRTC_ERROR_CODES
+                    if cmd.startswith("webrtc.")
+                    else COMMAND_ERROR_CODES
                 )
                 else "bridge_request_rejected"
             )
@@ -418,9 +629,124 @@ class EufySdkApiClient:
         )
         return reply.get("result") or []
 
-    async def set_property(self, sn: str, name: str, value: Any) -> None:
-        """Write a device property."""
-        await self.rpc("device.set", sn=sn, name=name, value=value)
+    async def set_property(  # noqa: PLR0915
+        self, sn: str, name: str, value: Any, *, bounded: bool = False
+    ) -> CommandReceipt | None:
+        """Opt eligible scalar writes into one frozen caller lifetime."""
+        if (
+            not bounded
+            or name != "light"
+            or type(value) is not bool
+            or not self.bounded_state_writes_supported
+        ):
+            await self.rpc("device.set", sn=sn, name=name, value=value)
+            return None
+        key = (sn, name)
+        previous = self._bounded_invocations.get(key)
+        if previous is not None:
+            previous.superseded = True
+        invocation = _BoundedPropertyInvocation()
+        self._bounded_invocations[key] = invocation
+        loop = asyncio.get_running_loop()
+        born = loop.time()
+        born_wall_ms = time.time() * 1000
+        expires_ms = born_wall_ms + BOUNDED_CALLER_SECONDS * 1000
+        transport = self._ws
+        clock_guard: asyncio.Task | None = None
+        clock_changed = False
+        caller = asyncio.current_task()
+
+        async def watch_clock(uncertainty_ms: float) -> None:
+            nonlocal clock_changed
+            while True:
+                await asyncio.sleep(0.1)
+                elapsed = (loop.time() - born) * 1000
+                if abs(time.time() * 1000 - born_wall_ms - elapsed) > uncertainty_ms:
+                    clock_changed = True
+                    caller.cancel()
+                    return
+
+        try:
+            async with asyncio.timeout_at(born + BOUNDED_CALLER_SECONDS):
+                clock = await self.rpc(
+                    "boundedStateClock",
+                    version=1,
+                    callerSentAtMs=born_wall_ms,
+                    _transport=transport,
+                )
+                if invocation.superseded:
+                    return CommandReceipt(
+                        "superseded_before_send",
+                        send_attempted=False,
+                        effect="unconfirmed",
+                    )
+                received_ms = time.time() * 1000
+                elapsed_ms = (loop.time() - born) * 1000
+                sent = clock.get("bridgeSentAtMs")
+                received = clock.get("bridgeReceivedAtMs")
+                if (
+                    type(clock.get("version")) is not int
+                    or clock["version"] != 1
+                    or clock.get("callerSentAtMs") != born_wall_ms
+                    or not _finite_number(sent)
+                    or not _finite_number(received)
+                    or sent < received
+                    or received_ms < born_wall_ms
+                    or not isinstance(clock.get("clockToken"), str)
+                    or not 1 <= len(clock["clockToken"]) <= CLOCK_TOKEN_MAX_LENGTH
+                    or abs(received_ms - born_wall_ms - elapsed_ms)
+                    > BOUNDED_CLOCK_MAX_MS
+                ):
+                    message = "command_clock_unavailable"
+                    raise EufySdkApiClientCommunicationError(message)
+                uncertainty_ms = (
+                    received_ms - born_wall_ms - (sent - received)
+                ) / 2 + 1
+                if not 0 < uncertainty_ms <= BOUNDED_CLOCK_MAX_MS:
+                    message = "command_clock_unavailable"
+                    raise EufySdkApiClientCommunicationError(message)
+                remaining_ms = min(
+                    expires_ms - received_ms, BOUNDED_CALLER_SECONDS * 1000 - elapsed_ms
+                )
+                if remaining_ms <= 0:
+                    message = "command_expired_before_send"
+                    raise EufySdkApiClientCommunicationError(message)
+                clock_guard = asyncio.create_task(watch_clock(uncertainty_ms))
+                reply = await self.rpc(
+                    "device.set",
+                    timeout=remaining_ms / 1000,
+                    _transport=transport,
+                    _cancel_on_abort=True,
+                    sn=sn,
+                    name=name,
+                    value=value,
+                    execution={
+                        "version": 1,
+                        "profile": BOUNDED_PROFILE,
+                        "callerExpiresAtMs": expires_ms,
+                        "remainingBudgetMs": remaining_ms,
+                        "clockToken": clock["clockToken"],
+                        "callerReceivedAtMs": received_ms,
+                        "clockUncertaintyMs": uncertainty_ms,
+                    },
+                )
+                return _command_receipt(reply.get("receipt"))
+        except TimeoutError:
+            message = "bridge_request_timeout"
+            raise EufySdkApiClientCommunicationError(message) from None
+        except asyncio.CancelledError:
+            if clock_changed:
+                caller.uncancel()
+                message = "command_clock_unavailable"
+                raise EufySdkApiClientCommunicationError(message) from None
+            raise
+        finally:
+            if self._bounded_invocations.get(key) is invocation:
+                self._bounded_invocations.pop(key)
+            if clock_guard is not None:
+                clock_guard.cancel()
+                with suppress(asyncio.CancelledError):
+                    await clock_guard
 
     async def reboot(self, sn: str) -> None:
         """Reboot a HomeBase (hub-only; it drops offline for a minute or two)."""
