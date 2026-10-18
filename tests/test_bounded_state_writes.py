@@ -415,7 +415,94 @@ class BoundedEntityTests(unittest.IsolatedAsyncioTestCase):
     def bounded_entity(self):
         entity, coordinator, client, seen = self._entity()
         entity._spec["boundedStateWrites"] = True
+        client.bounded_state_writes_supported = True
+        client.get_properties = AsyncMock(return_value=[entity._spec.copy()])
         return entity, coordinator, client, seen
+
+    async def test_late_station_eligibility_uses_fresh_spec_without_entity_reload(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        entity._spec.pop("boundedStateWrites")
+        await entity.write(True)
+        client.get_properties.assert_awaited_once_with("fixture-device")
+        client.set_property.assert_awaited_once_with(
+            "fixture-device", "light", True, bounded=True
+        )
+        self.assertTrue(entity._spec["boundedStateWrites"])
+
+    async def test_fresh_ineligible_specs_keep_legacy_writes(self):
+        for specs in (
+            [],
+            [{"name": "light"}],
+            [{"name": "light", "boundedStateWrites": False}],
+            [{"name": "light", "boundedStateWrites": 1}],
+            [{"name": "other", "boundedStateWrites": True}],
+        ):
+            with self.subTest(specs=specs):
+                entity, _coordinator, client, _seen = self.bounded_entity()
+                client.get_properties.return_value = specs
+                await entity.write(False)
+                client.set_property.assert_awaited_once_with(
+                    "fixture-device", "light", False
+                )
+                self.assertFalse(entity._spec["boundedStateWrites"])
+
+    async def test_legacy_bridge_skips_manifest_refresh(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        client.bounded_state_writes_supported = False
+        await entity.write(True)
+        client.get_properties.assert_not_awaited()
+        client.set_property.assert_awaited_once_with("fixture-device", "light", True)
+
+    async def test_manifest_failure_does_not_send_using_stale_eligibility(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        client.get_properties.side_effect = EufySdkApiClientError("bridge_update_failed")
+        with self.assertRaisesRegex(EufySdkApiClientError, "bridge_update_failed"):
+            await entity.write(True)
+        client.set_property.assert_not_awaited()
+        self.assertEqual(entity._write_tasks, set())
+
+    async def test_delayed_old_manifest_cannot_send_after_newer_write(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        gate = asyncio.Event()
+        started = asyncio.Event()
+
+        async def specs(_sn):
+            if not started.is_set():
+                started.set()
+                await gate.wait()
+            return [{"name": "light", "boundedStateWrites": True}]
+
+        client.get_properties.side_effect = specs
+        older = asyncio.create_task(entity.write(True))
+        await started.wait()
+        await entity.write(False)
+        gate.set()
+        with self.assertRaisesRegex(
+            EufySdkApiClientError, "command_superseded_before_send"
+        ):
+            await older
+        client.set_property.assert_awaited_once_with(
+            "fixture-device", "light", False, bounded=True
+        )
+
+    async def test_unload_cancels_eligibility_refresh_without_sending(self):
+        entity, _coordinator, client, _seen = self.bounded_entity()
+        started = asyncio.Event()
+
+        async def specs(_sn):
+            started.set()
+            await asyncio.Event().wait()
+
+        client.get_properties.side_effect = specs
+        task = asyncio.create_task(entity.write(True))
+        await started.wait()
+        with patch.object(
+            CoordinatorEntity, "async_will_remove_from_hass", new=AsyncMock()
+        ):
+            await entity.async_will_remove_from_hass()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        client.set_property.assert_not_awaited()
 
     async def test_pending_acceptance_is_unconfirmed_and_report_is_separate(self):
         entity, coordinator, client, _seen = self.bounded_entity()

@@ -431,17 +431,33 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         report_generation = self._report_generation
         lifecycle = self._lifecycle_generation
         light_marker = self._light_state_marker() if self._prop == "light" else None
-        bounded = (
+        refresh_eligibility = (
             self._prop == "light"
             and type(value) is bool
-            and self._spec.get("boundedStateWrites") is True
+            and self.client.bounded_state_writes_supported
         )
+        bounded = False
         task = asyncio.current_task()
         if not hasattr(self, "_write_tasks"):
             self._write_tasks = set()
-        if bounded:
+        if refresh_eligibility:
             self._write_tasks.add(task)
         try:
+            if refresh_eligibility:
+                # Station facts can arrive after entity setup. Read eligibility
+                # at the write boundary rather than retaining that setup snapshot.
+                specs = await self.client.get_properties(self._sn)
+                if self._removed or lifecycle != self._lifecycle_generation:
+                    return
+                if owner != self._write_generation:
+                    message = "command_superseded_before_send"
+                    raise EufySdkApiClientError(message)
+                bounded = any(
+                    spec.get("name") == self._prop
+                    and spec.get("boundedStateWrites") is True
+                    for spec in specs
+                )
+                self._spec["boundedStateWrites"] = bounded
             if bounded:
                 receipt = await self.client.set_property(
                     self._sn, self._prop, value, bounded=True

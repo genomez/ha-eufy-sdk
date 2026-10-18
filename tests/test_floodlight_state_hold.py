@@ -36,7 +36,9 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         )
         self.offline_timer = offline_timer.start()
         self.addCleanup(offline_timer.stop)
-        client = SimpleNamespace(set_property=AsyncMock())
+        client = SimpleNamespace(
+            set_property=AsyncMock(), bounded_state_writes_supported=False
+        )
         coordinator = SimpleNamespace(
             data={"fixture-device": {"state": {prop: initial}}},
             config_entry=SimpleNamespace(runtime_data=SimpleNamespace(client=client)),

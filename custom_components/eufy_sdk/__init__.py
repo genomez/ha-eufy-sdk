@@ -223,8 +223,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     # Reload when the options change, so a new poll interval is applied.
     entry.async_on_unload(entry.add_update_listener(_async_reload_on_update))
 
-    # Property manifests are static per device — fetch once so the platforms can
-    # build switch/select/number/sensor entities. A device that fails is skipped.
+    # Fetch initial manifests so the platforms can build property entities.
+    # Light write eligibility is refreshed per write as parent facts can arrive later.
+    # A device that fails is skipped.
     properties: dict[str, list] = {}
     for sn, dev in coordinator.data.items():
         if dev.get("error"):
