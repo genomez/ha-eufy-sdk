@@ -15,6 +15,8 @@ from webrtc_models import RTCIceCandidateInit
 from .api import EufySdkApiClientError, WEBRTC_ERROR_CODES
 
 MAX_PENDING_CANDIDATES = 64
+# Relay admission (12 s) + stock go2rtc producer startup (30 s) + signaling (3 s).
+WEBRTC_OFFER_TIMEOUT = 45
 
 
 def is_s1_camera(coordinator, sn):
@@ -137,6 +139,7 @@ class NativeWebRTCMixin:
             session.forwarded = True
             reply = await client.rpc("webrtc.open", sessionId=session_id, sn=self._sn,
                                      sdp=offer_sdp, iceServers=config.get("iceServers", []),
+                                     timeout=WEBRTC_OFFER_TIMEOUT,
                                      _transport=session.transport)
             if not self._live(session):
                 return

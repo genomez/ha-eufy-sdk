@@ -17,6 +17,7 @@ from .api import (
 )
 from .const import (
     CONF_HOST,
+    CONF_LEGACY_DOORBELL_PRESSED,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_SOC_REFRESH,
@@ -387,13 +388,13 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class EufySdkOptionsFlow(config_entries.OptionsFlow):
-    """Options: cloud poll interval (min) + Solarbank SOC-limit refresh (sec)."""
+    """Configure polling and doorbell event compatibility."""
 
     async def async_step_init(
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Show and save the poll interval and the SOC-limit refresh interval."""
+        """Show and save polling and doorbell event options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         current = self.config_entry.options.get(
@@ -428,6 +429,12 @@ class EufySdkOptionsFlow(config_entries.OptionsFlow):
                             mode=selector.NumberSelectorMode.BOX,
                         ),
                     ),
+                    vol.Required(
+                        CONF_LEGACY_DOORBELL_PRESSED,
+                        default=self.config_entry.options.get(
+                            CONF_LEGACY_DOORBELL_PRESSED, False
+                        ),
+                    ): selector.BooleanSelector(),
                 },
             ),
         )

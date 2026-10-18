@@ -142,10 +142,12 @@
         "description": "Hoe vaak de bridge de eufy-cloud bevraagt voor de apparaatstatus. Lager is actueler maar geeft meer cloudverkeer; de cloud zelf werkt toch maar om de paar minuten bij.",
         "data": {
           "poll_interval_minutes": "Cloud-pollinterval (minuten)",
-          "soc_refresh_seconds": "Vernieuwingsinterval Solarbank SOC-limiet (seconden)"
+          "soc_refresh_seconds": "Vernieuwingsinterval Solarbank SOC-limiet (seconden)",
+          "legacy_doorbell_pressed": "Oude pressed-gebeurtenis voor de deurbel gebruiken"
         },
         "data_description": {
-          "soc_refresh_seconds": "Hoe vaak HA de laad-/ontlaadlimieten van een Solarbank opnieuw uitleest uit de cloud, zodat een wijziging via de app zichtbaar wordt op de schuifregelaars. Geldt alleen als je een Solarbank hebt."
+          "soc_refresh_seconds": "Hoe vaak HA de laad-/ontlaadlimieten van een Solarbank opnieuw uitleest uit de cloud, zodat een wijziging via de app zichtbaar wordt op de schuifregelaars. Geldt alleen als je een Solarbank hebt.",
+          "legacy_doorbell_pressed": "Uit: één ring-gebeurtenis per druk. Aan: in plaats daarvan één pressed-gebeurtenis voor bestaande automatiseringen. Verstuurt nooit beide."
         }
       }
     }

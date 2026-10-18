@@ -31,6 +31,10 @@ DEFAULT_POLL_INTERVAL_MIN = 10
 CONF_SOC_REFRESH = "soc_refresh_seconds"
 DEFAULT_SOC_REFRESH_SEC = 60
 
+# Emit the legacy doorbell event instead of the standard ring, never both.
+CONF_LEGACY_DOORBELL_PRESSED = "legacy_doorbell_pressed"
+MAX_DOORBELL_EVENT_IDS = 256
+
 # Schema version this integration targets (the bridge sends its own in `hello`/`ready`).
 SUPPORTED_SCHEMA = 1
 

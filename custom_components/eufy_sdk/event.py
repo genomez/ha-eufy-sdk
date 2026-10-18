@@ -1,7 +1,5 @@
 """Event platform — discrete push events (doorbell, package, sound, …) in real time."""
 
-# Modified 2026-10-17: publish standard doorbell ring events alongside legacy presses.
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -13,7 +11,7 @@ from homeassistant.components.event import (
 )
 from homeassistant.core import callback
 
-from .const import EVENT_TYPE
+from .const import CONF_LEGACY_DOORBELL_PRESSED, EVENT_TYPE
 from .entity import EufySdkDeviceEntity
 from .pushmap import (
     DETECTION_CAPABILITIES,
@@ -41,7 +39,15 @@ async def async_setup_entry(
     for sn, dev in coordinator.data.items():
         caps = set(dev.get("capabilities", []))
         if "doorbell" in caps:
-            entities.append(EufySdkDoorbellEvent(coordinator, sn))
+            entities.append(
+                EufySdkDoorbellEvent(
+                    coordinator,
+                    sn,
+                    legacy_pressed=entry.options.get(
+                        CONF_LEGACY_DOORBELL_PRESSED, False
+                    ),
+                )
+            )
         if caps & DETECTION_CAPABILITIES:
             entities.append(EufySdkDetectionEvent(coordinator, sn))
     async_add_entities(entities)
@@ -82,23 +88,23 @@ class EufySdkDoorbellEvent(_EufySdkBusEvent):
     _attr_translation_key = "doorbell"
     _attr_device_class = EventDeviceClass.DOORBELL
 
-    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        *,
+        legacy_pressed: bool = False,
+    ) -> None:
         """Bind to a doorbell device."""
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_doorbell_event"
-        self._attr_event_types = [DOORBELL_EVENT_TYPE, DoorbellEventType.RING]
-
-    def _event_types_for(self, bus_event: str | None) -> tuple[str, ...]:
-        """Retain legacy triggers, then leave the standard ring as the last event."""
-        if self._match(bus_event) is None:
-            return ()
-        # Each event needs its own state write so existing pressed automations
-        # observe it before ring becomes the current event_type.
-        return (DOORBELL_EVENT_TYPE, DoorbellEventType.RING)
+        self._attr_event_types = [
+            DOORBELL_EVENT_TYPE if legacy_pressed else DoorbellEventType.RING
+        ]
 
     def _match(self, bus_event: str | None) -> str | None:
         """Fire on a doorbell press."""
-        return DOORBELL_EVENT_TYPE if bus_event == DOORBELL_EVENT else None
+        return self._attr_event_types[0] if bus_event == DOORBELL_EVENT else None
 
 
 class EufySdkDetectionEvent(_EufySdkBusEvent):

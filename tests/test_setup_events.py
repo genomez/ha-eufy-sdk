@@ -5,7 +5,12 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import custom_components.eufy_sdk as integration
-from custom_components.eufy_sdk.const import CONF_HOST, CONF_PORT
+from custom_components.eufy_sdk.const import (
+    CONF_HOST,
+    CONF_PORT,
+    MAX_DOORBELL_EVENT_IDS,
+)
+from custom_components.eufy_sdk.event import EufySdkDoorbellEvent
 from custom_components.eufy_sdk.switch import EufySdkSwitch
 
 
@@ -55,8 +60,77 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(callbacks), 1)
 
         self.on_event = callbacks[0]
+        self.bus = hass.bus
         self.coordinator = coordinator
         self.scheduled = scheduled
+
+    async def test_doorbell_duplicate_identity_reaches_all_ha_consumers_once(self):
+        for legacy_pressed in (False, True):
+            with self.subTest(legacy_pressed=legacy_pressed):
+                entity = EufySdkDoorbellEvent(
+                    self.coordinator,
+                    "synthetic-doorbell",
+                    legacy_pressed=legacy_pressed,
+                )
+                writes = []
+                entity.async_write_ha_state = Mock(
+                    side_effect=lambda writes=writes, entity=entity: writes.append(
+                        dict(entity.state_attributes)
+                    )
+                )
+                self.bus.async_fire.side_effect = lambda _type, data, entity=entity: (
+                    entity._handle_event(Mock(data=data))  # noqa: SLF001
+                )
+                for identity in ("synthetic-a", "synthetic-b", "synthetic-a"):
+                    self.on_event(
+                        {
+                            "event": "doorbellPress",
+                            "deviceSn": "synthetic-doorbell",
+                            "eventId": f"{legacy_pressed}-{identity}",
+                        }
+                    )
+                expected = "pressed" if legacy_pressed else "ring"
+                self.assertEqual(writes, [{"event_type": expected}] * 2)
+        self.assertEqual(self.bus.async_fire.call_count, 4)
+
+    async def test_doorbell_identity_is_device_scoped_and_only_filters_presses(self):
+        for serial, event in (
+            ("synthetic-a", "doorbellPress"),
+            ("synthetic-b", "doorbellPress"),
+            ("synthetic-a", "motion"),
+            ("synthetic-a", "motion"),
+        ):
+            self.on_event(
+                {"event": event, "deviceSn": serial, "eventId": "synthetic-id"}
+            )
+        self.assertEqual(self.bus.async_fire.call_count, 4)
+
+    async def test_doorbell_without_valid_identity_keeps_real_repeats(self):
+        for identity in (None, "", " ", 42):
+            for _ in range(2):
+                self.on_event(
+                    {
+                        "event": "doorbellPress",
+                        "deviceSn": "synthetic-doorbell",
+                        "eventId": identity,
+                    }
+                )
+        self.assertEqual(self.bus.async_fire.call_count, 8)
+
+    async def test_doorbell_identity_cache_is_bounded_without_timer(self):
+        for index in range(MAX_DOORBELL_EVENT_IDS + 1):
+            self.on_event(
+                {
+                    "event": "doorbellPress",
+                    "deviceSn": "synthetic-doorbell",
+                    "eventId": str(index),
+                }
+            )
+        self.on_event(
+            {"event": "doorbellPress", "deviceSn": "synthetic-doorbell", "eventId": "0"}
+        )
+        self.assertEqual(self.bus.async_fire.call_count, MAX_DOORBELL_EVENT_IDS + 2)
+        self.assertEqual(self.scheduled, [])
 
     async def test_observation_callback_reaches_switch_attributes(self):
 
