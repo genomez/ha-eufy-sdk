@@ -47,11 +47,9 @@ SUPPORTED_SCHEMA = 1
 ALARM_AUTO_CLEAR_SECONDS = 600
 
 # How many preset slots to offer before the camera has ever been asked. A last
-# resort, not the normal path: the slots are read from the camera (see presets.py)
-# and the select remembers the last answer across restarts, so this count is only
-# ever seen on the very first start with the camera asleep. The SDK documents this
-# many; some models report more, and the first successful read corrects it.
-PRESET_SLOTS = 8
+# resort: reported slots replace these choices, including indices beyond this
+# range. Four matches the app's slots 1-4; their wire indices remain 0-3.
+PRESET_SLOTS = 4
 
 # Where the preset select keeps the slots it last read, so they survive a restart.
 ATTR_SLOTS = "slots"

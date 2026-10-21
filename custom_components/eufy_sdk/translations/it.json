@@ -29,9 +29,6 @@
       },
       "pan_right": {
         "name": "Ruota a destra"
-      },
-      "preset_goto": {
-        "name": "Vai al preset"
       }
     },
     "event": {

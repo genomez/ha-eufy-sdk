@@ -6,10 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.const import EntityCategory
-from homeassistant.exceptions import HomeAssistantError
 
-from . import presets
-from .const import DOMAIN
 from .entity import EufySdkDeviceEntity, has_capability
 
 if TYPE_CHECKING:
@@ -53,7 +50,7 @@ async def async_setup_entry(
         for sn, dev in coordinator.data.items()
         if dev.get("stream")
     )
-    # The d-pad and the preset actions, gated on the `ptz` capability the bridge
+    # The d-pad, gated on the `ptz` capability the bridge
     # reports: a fixed camera has no `ptz` surface, so the bridge would refuse every
     # verb and the buttons would sit there as dead controls.
     for sn, dev in coordinator.data.items():
@@ -63,8 +60,6 @@ async def async_setup_entry(
             EufySdkPtzButton(coordinator, sn, action, meta)
             for action, meta in _PTZ_STEPS.items()
         )
-        if presets.movement_supported(dev):
-            entities.append(EufySdkGotoPresetButton(coordinator, sn))
     async_add_entities(entities)
 
 
@@ -138,66 +133,3 @@ class EufySdkPtzButton(EufySdkDeviceEntity, ButtonEntity):
         """Send this button's PTZ action to the bridge."""
         client = self.client
         await client.action(self._sn, self._action, *self._args)
-
-
-class _EufySdkPresetButton(EufySdkPtzButton):
-    """Base for the two preset actions: both act on the slot the select holds."""
-
-    _action: str
-    _slug: str
-
-    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
-        """Bind to a pan-tilt camera serial."""
-        super().__init__(
-            coordinator,
-            sn,
-            self._action,
-            {"key": self._attr_translation_key, "icon": self._attr_icon},
-        )
-        # The base derives the id from the action; these two are named for what they
-        # DO, so a later change of verb (goto → preview, as already happened) does not
-        # orphan the entity the user has in their dashboards.
-        self._attr_unique_id = f"{sn}_{self._slug}"
-
-    @property
-    def _slot(self) -> int:
-        """Return the slot the select points at, or the camera's first one."""
-        entry = self.coordinator.config_entry
-        slots = presets.slots_for(entry, self._sn)
-        default = slots[0].index if slots else 0
-        return entry.runtime_data.selected_preset.get(self._sn, default)
-
-    @property
-    def _args(self) -> tuple[int]:
-        """Pass the selected slot as the action's only argument."""
-        return (self._slot,)
-
-
-class EufySdkGotoPresetButton(_EufySdkPresetButton):
-    """
-    Swing the camera onto the stored position the select points at.
-
-    An empty slot is a silent no-op on the wire — the camera drops the frame and
-    reports nothing — so a go-to against one looks like a dead button. Where the
-    camera has told us the slot is empty, refuse it here instead and say why.
-    """
-
-    _action = presets.ACTION_GOTO
-    _slug = "preset_goto"
-    _attr_icon = "mdi:target"
-    _attr_translation_key = "preset_goto"
-
-    async def async_press(self) -> None:
-        """Move to the selected slot, unless the camera says it holds nothing."""
-        entry = self.coordinator.config_entry
-        slot = self._slot
-        known = {s.index: s for s in presets.slots_for(entry, self._sn)}
-        if (chosen := known.get(slot)) is not None and chosen.occupied is False:
-            # Translated rather than spelled out here: this one surfaces in the UI,
-            # unlike the log lines, so it follows the user's language.
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="preset_empty",
-                translation_placeholders={"slot": str(slot)},
-            )
-        await super().async_press()

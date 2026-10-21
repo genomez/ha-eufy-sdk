@@ -29,9 +29,6 @@
       },
       "pan_right": {
         "name": "Pan right"
-      },
-      "preset_goto": {
-        "name": "Go to preset"
       }
     },
     "event": {

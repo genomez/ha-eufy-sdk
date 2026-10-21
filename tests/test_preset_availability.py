@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, Mock, patch
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.eufy_sdk import presets
-from custom_components.eufy_sdk.button import EufySdkGotoPresetButton
 from custom_components.eufy_sdk.button import async_setup_entry as setup_buttons
 from custom_components.eufy_sdk.entity import EufySdkDeviceEntity
 from custom_components.eufy_sdk.select import ATTR_SLOTS, EufySdkPresetSelect
@@ -61,17 +60,16 @@ class SlotTests(unittest.TestCase):
 
     def test_fallback_numbers_are_not_occupied_evidence(self):
         slots = presets.fallback_slots()
-        self.assertEqual(len(slots), 8)
+        self.assertEqual(len(slots), 4)
         self.assertTrue(all(s.occupied is None for s in slots))
         self.assertTrue(all("unverified" in s.label for s in slots))
-        self.assertEqual(presets.from_dicts(presets.as_dicts(slots)), slots)
+        self.assertEqual(presets.from_dicts(presets.as_dicts(slots)), [])
 
     def test_observed_slots_round_trip_and_legacy_choice_stays_unverified(self):
         slots = [presets.PresetSlot(2, True, True), presets.PresetSlot(4, False, False)]
         self.assertEqual(presets.from_dicts(presets.as_dicts(slots)), slots)
         legacy = presets.from_dicts([{"index": 5, "occupied": True, "default": False}])
-        self.assertEqual(legacy[0].index, 5)
-        self.assertIsNone(legacy[0].occupied)
+        self.assertEqual(legacy, [])
         empty = presets.from_dicts([{"index": 4, "occupied": False, "default": False}])
         self.assertIs(empty[0].occupied, False)
 
@@ -132,22 +130,22 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         selects = []
         await setup_buttons(Mock(), entry, buttons.extend)
         await setup_selects(Mock(), entry, selects.extend)
-        self.assertEqual(len(buttons), 4 + preset_count)
+        self.assertEqual(len(buttons), 4)
         self.assertEqual(
-            sum(isinstance(item, EufySdkGotoPresetButton) for item in buttons),
-            preset_count,
+            [item._action for item in buttons], ["up", "down", "left", "right"]
         )
         self.assertEqual(len(selects), preset_count)
 
     def entity(self, supported: bool):
         runtime = SimpleNamespace(
             client=Mock(
+                action=AsyncMock(),
                 preset_slots=AsyncMock(
                     return_value=[
                         {"id": 2, "raw": {"enable": 1, "isdefault": 1}},
                         {"id": 4, "raw": {"enable": 0}},
                     ]
-                )
+                ),
             ),
             preset_slots={},
             selected_preset={},
@@ -177,31 +175,31 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         entity.hass.async_create_task.assert_not_called()
         self.assertEqual(runtime.preset_slots["synthetic"], saved)
         self.assertEqual(runtime.selected_preset["synthetic"], 4)
-        self.assertEqual(entity.current_option, "4 · empty")
+        self.assertEqual(entity.current_option, "5 · empty")
 
     async def test_supported_startup_reads_once_and_publishes_device_slots(self):
         entity, runtime = self.entity(True)
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await entity.async_added_to_hass()
         runtime.client.preset_slots.assert_awaited_once_with("synthetic")
-        self.assertEqual(entity.options, ["2 · HOME", "4 · empty"])
+        self.assertEqual(entity.options, ["3 · default", "5 · empty"])
 
     async def test_supported_stream_refresh_and_failed_read_preserve_selection(self):
         entity, runtime = self.entity(True)
         saved = [presets.PresetSlot(2, True, True), presets.PresetSlot(4, True, False)]
         presets.remember(entity.coordinator.config_entry, "synthetic", saved)
         entity._apply(saved)
-        await entity.async_select_option("4")
+        await entity.async_select_option("5")
         runtime.client.preset_slots.side_effect = RuntimeError("synthetic failure")
         with patch.object(EufySdkDeviceEntity, "_handle_coordinator_update"):
             entity._handle_coordinator_update()
         pending = entity.hass.async_create_task.call_args.args[0]
         await pending
         runtime.client.preset_slots.assert_awaited_once()
-        self.assertEqual(entity.current_option, "4")
+        self.assertEqual(entity.current_option, "5")
         self.assertEqual(runtime.preset_slots["synthetic"], saved)
 
-    async def test_legacy_fallback_choice_survives_without_claiming_occupancy(self):
+    async def test_legacy_fallback_returns_to_four_without_claiming_occupancy(self):
         entity, runtime = self.entity(False)
         entity.async_get_last_state.return_value = SimpleNamespace(
             state="5",
@@ -213,17 +211,15 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         )
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await entity.async_added_to_hass()
-        self.assertEqual(runtime.selected_preset["synthetic"], 5)
-        self.assertEqual(entity.current_option, "5 · unverified")
+        self.assertEqual(runtime.selected_preset["synthetic"], 0)
+        self.assertEqual(entity.current_option, "1 · default · unverified")
         runtime.client.preset_slots.assert_not_awaited()
 
     async def test_unknown_occupancy_does_not_disable_existing_preset_movement(self):
         entity, runtime = self.entity(False)
         runtime.client.action = AsyncMock()
-        runtime.selected_preset["synthetic"] = 5
-        button = EufySdkGotoPresetButton(entity.coordinator, "synthetic")
-        await button.async_press()
-        runtime.client.action.assert_awaited_once_with("synthetic", "preset.preview", 5)
+        await entity.async_select_option(entity.options[3])
+        runtime.client.action.assert_awaited_once_with("synthetic", "preset.preview", 3)
 
     async def test_named_camera_slots_preserve_arbitrary_returned_ids(self):
         entity, runtime = self.entity(True)
@@ -234,17 +230,14 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
             {"id": 6, "raw": {"name": "mid", "enable": 1}},
         ]
         await entity._reread()
-        self.assertEqual(entity.options, ["2", "6", "9"])
-        await entity.async_select_option("6")
-        button = EufySdkGotoPresetButton(entity.coordinator, "synthetic")
-        await button.async_press()
+        self.assertEqual(entity.options, ["3", "7", "10"])
+        await entity.async_select_option("7")
         runtime.client.action.assert_awaited_once_with("synthetic", "preset.preview", 6)
 
     async def test_confirmed_empty_slot_still_refuses_movement(self):
         entity, runtime = self.entity(True)
         runtime.client.action = AsyncMock()
-        runtime.preset_slots["synthetic"] = [presets.PresetSlot(2, False, False)]
-        button = EufySdkGotoPresetButton(entity.coordinator, "synthetic")
+        entity._apply([presets.PresetSlot(2, False, False)])
         with self.assertRaises(HomeAssistantError):
-            await button.async_press()
+            await entity.async_select_option(entity.options[0])
         runtime.client.action.assert_not_awaited()

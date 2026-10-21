@@ -29,9 +29,6 @@
       },
       "pan_right": {
         "name": "Draaien naar rechts"
-      },
-      "preset_goto": {
-        "name": "Ga naar voorinstelling"
       }
     },
     "event": {

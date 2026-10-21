@@ -12,7 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import presets
-from .const import ATTR_SLOTS, SLOT_REREAD_SECS
+from .const import ATTR_SLOTS, DOMAIN, SLOT_REREAD_SECS
 from .entity import (
     EufySdkDeviceEntity,
     EufySdkPropertyEntity,
@@ -225,7 +225,7 @@ class EufySolixScreenOffSelect(EufySolixEntity, SelectEntity):
 
 class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
     """
-    Which stored preset slot this camera's go-to / save buttons act on.
+    Move to a stored preset when selected, retaining the local last choice.
 
     Which slot is chosen is not a device reading: nothing on the wire reports where
     a camera is parked or which preset it last used, so the CHOICE is local and gets
@@ -243,12 +243,16 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_preset_slot"
         self._last_read = 0.0
+        self._selected_index: int | None = None
         self._apply(presets.slots_for(coordinator.config_entry, sn))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Carry the slots in the state, so the next start can restore them."""
-        return {ATTR_SLOTS: presets.as_dicts(self._slots)}
+        return {
+            ATTR_SLOTS: presets.as_dicts(self._slots),
+            "selected_index": self._selected_index,
+        }
 
     async def async_added_to_hass(self) -> None:
         """Restore last run's slots and choice, then ask the camera for the truth."""
@@ -256,13 +260,15 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
         entry = self.coordinator.config_entry
         last = await self.async_get_last_state()
         if last is not None:
-            # Preserve slot numbers and the local choice, including unverified ones.
+            # Restore only slots with report/occupancy provenance. Old synthetic
+            # eight-slot lists must not override the four-slot fallback.
             if restored := presets.from_dicts(last.attributes.get(ATTR_SLOTS)):
                 presets.remember(entry, self._sn, restored)
                 self._apply(restored)
-            # The stored state is a LABEL, and labels move — an empty slot is named
-            # differently once saved. Match on the slot number inside it.
-            self._select_slot(_slot_in(last.state))
+            # New states carry the wire index explicitly. Legacy labels used
+            # zero-based numbers, so parse those only when the new field is absent.
+            chosen = last.attributes.get("selected_index")
+            self._select_slot(chosen if type(chosen) is int else _slot_in(last.state))
         self._publish()
         # Best-effort: the camera may be asleep, and a battery camera must not be
         # woken just to refresh a list. Whatever we already have stands until then.
@@ -298,34 +304,45 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
         self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
-        """Point this camera's preset buttons at another slot."""
-        self._attr_current_option = option
+        """Move to the selected preset and retain the choice after a successful send."""
+        chosen = next((slot for slot in self._slots if slot.label == option), None)
+        if chosen is None:
+            msg = "Unknown preset option"
+            raise HomeAssistantError(msg)
+        if chosen.occupied is False:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="preset_empty",
+                translation_placeholders={"slot": str(chosen.index + 1)},
+            )
+        await self.client.action(self._sn, presets.ACTION_GOTO, chosen.index)
+        self._select_slot(chosen.index)
         self._publish()
         self.async_write_ha_state()
 
     def _apply(self, slots: list[presets.PresetSlot]) -> None:
         """Rebuild the options from the slots, keeping the chosen one if it survives."""
         self._slots = slots
-        chosen = _slot_in(self._attr_current_option)
+        chosen = self._selected_index
         self._attr_options = [s.label for s in slots]
         self._select_slot(chosen)
 
     def _select_slot(self, slot: int | None) -> None:
         """Select the option for a slot number, falling back to the first one."""
         match = next((s for s in self._slots if s.index == slot), None)
-        self._attr_current_option = (
-            match.label if match else (self._slots[0].label if self._slots else None)
-        )
+        chosen = match or (self._slots[0] if self._slots else None)
+        self._selected_index = chosen.index if chosen else None
+        self._attr_current_option = chosen.label if chosen else None
 
     def _publish(self) -> None:
-        """Share the slot with the button platform through the entry's runtime data."""
-        slot = _slot_in(self._attr_current_option)
+        """Retain the local wire index independently of the app-facing label."""
+        slot = self._selected_index
         if slot is not None:
             self.coordinator.config_entry.runtime_data.selected_preset[self._sn] = slot
 
 
 def _slot_in(label: str | None) -> int | None:
-    """Read the slot number out of a label ('0 · HOME' -> 0)."""
+    """Read a wire index from a legacy zero-based label ('0 · HOME' -> 0)."""
     if not label:
         return None
     head = label.split(" ", 1)[0]

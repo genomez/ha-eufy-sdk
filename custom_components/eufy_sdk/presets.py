@@ -4,13 +4,12 @@ Stored presets — reading them from the camera, and naming them.
 Presets are the saved positions; moving the camera by hand is the PTZ d-pad, and
 lives in the button platform. The slots belong to the camera, not to us: how many
 there are and how they are numbered varies by model, and only the camera knows
-which ones hold a position. So the select's options are READ over P2P rather than
-generated, and the reading and labelling live here — the select builds the
-options, the buttons read them back.
+which ones hold a position. The select reads options over P2P when supported and
+moves to the selected position; reading and labelling live here.
 
 Reading is a P2P request/reply, so it answers only while the camera is awake. A
 sleeping battery camera times out instead of returning an empty list, which is
-why every read here is best-effort and callers fall back to bare slot numbers.
+why every read here is best-effort and callers fall back to four unverified slots.
 """
 
 from __future__ import annotations
@@ -42,23 +41,25 @@ class PresetSlot:
     index: int
     occupied: bool | None
     is_default: bool
+    reported: bool = False
 
     @property
     def label(self) -> str:
         """
         Render how the slot reads in the select.
 
-        The default position is the one the camera returns to, so it is named
-        rather than numbered — but it keeps its index, since that is what the
-        buttons send. An empty slot stays in the list (you need it to save a NEW
-        position) and says so, because a go-to against it would otherwise do
-        nothing at all, silently.
+        App numbering is one-based; wire indices are unchanged. Reported slots
+        are confirmed choices even if the reply omits occupancy. Empty reported
+        slots remain visible, but the select refuses to move to them.
         """
-        if self.occupied is None:
-            return f"{self.index} · unverified"
-        if self.is_default:
-            return f"{self.index} · HOME"
-        return str(self.index) if self.occupied else f"{self.index} · empty"
+        label = str(self.index + 1)
+        if self.index == 0 or self.is_default:
+            label += " · default"
+        if self.occupied is False:
+            label += " · empty"
+        elif self.occupied is None and not self.reported:
+            label += " · unverified"
+        return label
 
 
 def fallback_slots() -> list[PresetSlot]:
@@ -67,7 +68,9 @@ def fallback_slots() -> list[PresetSlot]:
 
     Occupancy is unknown: numbered choices are not evidence of saved positions.
     """
-    return [PresetSlot(i, occupied=None, is_default=False) for i in range(PRESET_SLOTS)]
+    return [
+        PresetSlot(i, occupied=None, is_default=i == 0) for i in range(PRESET_SLOTS)
+    ]
 
 
 def parse_slots(result: Any) -> list[PresetSlot]:
@@ -76,7 +79,7 @@ def parse_slots(result: Any) -> list[PresetSlot]:
 
     Each entry carries the SDK's normalised `id` plus the camera's own `raw`
     reply, whose fields vary by model — commonly `index`, `enable` and
-    `isdefault`. Absent occupancy flags remain unverified.
+    `isdefault`. A returned slot is confirmed even without an occupancy flag.
     """
     slots: list[PresetSlot] = []
     for entry in result or []:
@@ -88,7 +91,8 @@ def parse_slots(result: Any) -> list[PresetSlot]:
             PresetSlot(
                 index=int(index),
                 occupied=(raw["enable"] != 0 if "enable" in raw else None),
-                is_default=bool(raw.get("isdefault", 0)),
+                is_default=int(index) == 0 or bool(raw.get("isdefault", 0)),
+                reported=True,
             )
         )
     return sorted(slots, key=lambda s: s.index)
@@ -138,7 +142,7 @@ async def async_refresh_slots(entry: EufySdkConfigEntry, sn: str) -> list[Preset
     """Re-read the slots into runtime data, keeping what we had on failure."""
     runtime = entry.runtime_data
     slots = await async_read_slots(runtime.client, sn)
-    if slots:
+    if slots is not None:
         runtime.preset_slots[sn] = slots
     return runtime.preset_slots.get(sn) or fallback_slots()
 
@@ -161,18 +165,25 @@ def as_dicts(slots: list[PresetSlot]) -> list[dict[str, Any]]:
             "occupied": s.occupied,
             "default": s.is_default,
             "observed": s.occupied is not None,
+            "reported": s.reported,
         }
         for s in slots
     ]
 
 
 def from_dicts(raw: Any) -> list[PresetSlot]:
-    """Restore choices; old records without observation provenance stay unverified."""
+    """Restore reported/observed choices, discarding old synthetic fallback lists."""
     if not isinstance(raw, list):
         return []
     slots = []
     for item in raw:
         if not isinstance(item, dict) or "index" not in item:
+            continue
+        if not (
+            item.get("reported") is True
+            or (item.get("observed") is True and isinstance(item.get("occupied"), bool))
+            or item.get("occupied") is False
+        ):
             continue
         slots.append(
             PresetSlot(
@@ -184,6 +195,7 @@ def from_dicts(raw: Any) -> list[PresetSlot]:
                     else None
                 ),
                 is_default=bool(item.get("default", False)),
+                reported=item.get("reported") is True,
             )
         )
     return slots
