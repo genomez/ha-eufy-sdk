@@ -431,6 +431,12 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                 self._light_correction.observe(event.data)
             return
         if event.data.get("event") in MOTION_EVENTS:
+            if (
+                self._light_correction is None
+                and getattr(self.client, "late_contrary_effects_supported", False)
+                is True
+            ):
+                self._light_correction = LightCorrection(self)
             if self._light_correction is not None:
                 self._light_correction.motion()
             return

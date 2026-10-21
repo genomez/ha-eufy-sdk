@@ -28,6 +28,7 @@ CONFIRMATION_RETRY_DELAY = 20
 MAX_CONFIRMATION_READS = 16
 UNCOMMANDED_GRACE_SECONDS = 300
 UNCOMMANDED_CAP_SECONDS = 900
+MOTION_LOOKBACK_SECONDS = 60
 
 
 class LightCorrection:
@@ -48,7 +49,7 @@ class LightCorrection:
         self.failed = False
         self.pending_final = False
         self.transition = False
-        self.early: list[dict] = []
+        self.early: list[tuple[dict, float]] = []
         self.timer = None
         self.timer_generation = 0
         self.expiry = None
@@ -74,6 +75,14 @@ class LightCorrection:
         self.uncommanded_cycle = False
         self.episode_consumed = False
         self.bootstrap = False
+        self.last_motion: float | None = None
+        self.window_on_since: float | None = None
+        self.write_dispatched = False
+        self.write_sent = False
+        self.motion_cancel_pending = False
+        self.observation_received: float | None = None
+        self.replaying = False
+        self.motion_expiry_pending = False
 
     def observe(self, event: dict) -> None:
         """Accept only ordered, fresh RTC observations received in this lifecycle."""
@@ -93,14 +102,17 @@ class LightCorrection:
             return
         previous = self.live_observed
         self.observation_stamp = stamp / 1000
+        self.observation_received = monotonic()
         if type(value) is not bool:
             self.live_observed = None
+            self.window_on_since = None
             if self.grace_due is not None or self.uncommanded_cycle:
                 self.stop("uncommanded_cancelled")
                 self.entity.async_write_ha_state()
             return
         self.live_observed = value
         if not value:
+            self.window_on_since = None
             self.episode_consumed = False
             if self.uncommanded_cycle:
                 self.stop("uncommanded_cancelled")
@@ -120,16 +132,60 @@ class LightCorrection:
             and not self.paused
             and not self._live()
         ):
-            self.stop("uncommanded_grace")
-            self.episode_consumed = True
-            self.observed = True
-            self.grace_started = monotonic()
-            self._schedule_grace()
+            self._start_grace(monotonic())
 
     def motion(self) -> None:
-        """Extend this camera's ON grace without moving its hard deadline."""
+        """Record every motion receipt and protect an unsent contrary-ON episode."""
+        self.last_motion = monotonic()
         if self.grace_due is not None and self.live_observed is True:
             self._schedule_grace()
+        else:
+            self._motion_handoff()
+
+    def _start_grace(self, started: float) -> None:
+        self.stop("uncommanded_grace")
+        self.episode_consumed = True
+        self.observed = self.live_observed = True
+        self.grace_started = started
+        self._schedule_grace(max(started, self.last_motion or started))
+
+    def _motion_handoff(self) -> bool:
+        """Retire explicit OFF authority only before a known corrective send."""
+        if (
+            not (self._live() or self.motion_expiry_pending)
+            or self.uncommanded_cycle
+            or self.desired is not False
+            or self.ha_intent is not False
+            or self.window_on_since is None
+            or self.last_motion is None
+            or self.last_motion < self.window_on_since - MOTION_LOOKBACK_SECONDS
+            or self.write_sent
+            or self.failed
+            or not self.enabled
+            or self.paused
+            or self.replaying
+        ):
+            return False
+        if (
+            self.observation_received is not None
+            and self.observation_received > self.window_on_since
+            and self.live_observed is not True
+        ):
+            self.window_on_since = None
+            return False
+        if self.write_dispatched:
+            # A bridge request may still be queued. Only a bounded receipt can
+            # prove it was unsent; do not cancel the task and lose that evidence.
+            if not self.motion_cancel_pending:
+                self.motion_cancel_pending = True
+                self.pause_requested = True
+                self.entity.client.pause_light_correction(self.entity._sn)
+            return False
+        started = self.window_on_since
+        self.attempts = 0
+        self.last_correction = None
+        self._start_grace(started)
+        return True
 
     def check_policy(self) -> None:
         """Retire optional automatic work when its option or pause gate closes."""
@@ -142,11 +198,14 @@ class LightCorrection:
     def reset_observations(self) -> None:
         """Reconnect readiness is not a device transition or a retained baseline."""
         self.live_observed = None
+        self.last_motion = None
+        self.window_on_since = None
+        self.observation_received = None
         self.observation_stamp = time()
         if self.grace_due is not None or self.uncommanded_cycle:
             self.stop("uncommanded_cancelled")
 
-    def _schedule_grace(self) -> None:
+    def _schedule_grace(self, motion_at: float | None = None) -> None:
         self._cancel_timer()
         if not self.enabled or self.paused:
             self.stop("uncommanded_cancelled")
@@ -156,7 +215,8 @@ class LightCorrection:
                 "state_changed", self._pause_changed
             )
         self.grace_due = min(
-            monotonic() + UNCOMMANDED_GRACE_SECONDS,
+            (monotonic() if motion_at is None else motion_at)
+            + UNCOMMANDED_GRACE_SECONDS,
             self.grace_started + UNCOMMANDED_CAP_SECONDS,
         )
         self.grace_until = (
@@ -223,6 +283,8 @@ class LightCorrection:
         self.stop("superseded")
         self.uncommanded_cycle = automatic
         self.bootstrap = automatic
+        self.write_dispatched = self.write_sent = False
+        self.motion_cancel_pending = False
         if not automatic:
             self.ha_intent = None
             self.episode_consumed = False
@@ -250,23 +312,16 @@ class LightCorrection:
         def expire(_: Any) -> None:
             if generation != self.generation:
                 return
+            self.expiry = None
             if (
-                self.enabled
-                and not self.failed
-                and self.state
-                in {
-                    "suspended",
-                    "unconfirmed",
-                    "read_or_write_failed",
-                    "recovery_busy",
-                    "contrary",
-                    "correcting",
-                    "paused",
-                }
+                self.motion_cancel_pending
+                and self.write_dispatched
+                and not self.write_sent
             ):
-                self._verification_failure("window_expired")
-            self.stop(self.state if self.failed else "expired")
-            self.entity.async_write_ha_state()
+                # Keep the bounded reply, never the expired write authority.
+                self.motion_expiry_pending = True
+            else:
+                self._expire_window()
 
         self.expiry = async_call_later(
             self.entity.hass,
@@ -277,6 +332,25 @@ class LightCorrection:
             self.pause_unsub = self.entity.hass.bus.async_listen(
                 "state_changed", self._pause_changed
             )
+
+    def _expire_window(self) -> None:
+        if (
+            self.enabled
+            and not self.failed
+            and self.state
+            in {
+                "suspended",
+                "unconfirmed",
+                "read_or_write_failed",
+                "recovery_busy",
+                "contrary",
+                "correcting",
+                "paused",
+            }
+        ):
+            self._verification_failure("window_expired")
+        self.stop(self.state if self.failed else "expired")
+        self.entity.async_write_ha_state()
 
     @callback
     def _pause_changed(self, event: Any) -> None:
@@ -329,13 +403,19 @@ class LightCorrection:
             self.ha_intent = self.desired
         self.transition = False
         events, self.early = self.early, []
-        for event in events:
-            self.event(event)
+        self.replaying = True
+        for event, received_at in events:
+            self.event(event, received_at=received_at)
+        self.replaying = False
+        self._motion_handoff()
 
-    def event(self, event: dict) -> None:  # noqa: PLR0912, PLR0915
+    def event(  # noqa: PLR0911, PLR0912, PLR0915
+        self, event: dict, *, received_at: float | None = None
+    ) -> None:
         """Only SDK-confirmed structured events can arm corrective work."""
+        received_at = monotonic() if received_at is None else received_at
         self.last_event = event.copy()
-        if not self._live():
+        if not self._live() and not self.motion_expiry_pending:
             self.entity.async_write_ha_state()
             return
         if self.intent is None or self.transition:
@@ -345,6 +425,7 @@ class LightCorrection:
                 # while its superseded event may be our own replacement.
                 self.recovery_busy = event["recoveryBusy"]
                 if event["state"] == "matched":
+                    self.window_on_since = None
                     self.state = "matched"
                     self.observed = self.desired
                     self.pending_final = False
@@ -352,7 +433,12 @@ class LightCorrection:
                     self._cancel_timer()
                     self.pause_requested = True
                     self.entity.client.pause_light_correction(self.entity._sn)
-                elif event["state"] in {"suspended", "verification_exhausted"}:
+                elif event["state"] in {
+                    "suspended",
+                    "detection_exhausted",
+                    "verification_exhausted",
+                }:
+                    self.window_on_since = None
                     self.revision += 1
                     self.observed = None
                     if event["state"] == "verification_exhausted":
@@ -363,7 +449,7 @@ class LightCorrection:
                     self.pause_requested = True
                     self.entity.client.pause_light_correction(self.entity._sn)
             if len(self.early) < MAX_EARLY_EVENTS:
-                self.early.append(event.copy())
+                self.early.append((event.copy(), received_at))
             return
         if event["intent"] != self.intent or event["desiredValue"] is not self.desired:
             return
@@ -375,6 +461,8 @@ class LightCorrection:
                 self._verification_failure("read_budget_exhausted")
             return
         if state in {"expired", "superseded", "closed"}:
+            if state == "expired" and self.motion_expiry_pending:
+                return
             if state == "closed" and self.enabled:
                 self._verification_failure("protection_lost")
             elif (
@@ -387,6 +475,7 @@ class LightCorrection:
             self.stop(self.state if self.failed else state)
             return
         if state in {"suspended", "detection_exhausted"}:
+            self.window_on_since = None
             self.observed = None
             self.state = "suspended"
             if self.attempts == len(CORRECTION_DELAYS):
@@ -397,6 +486,7 @@ class LightCorrection:
             return
         self.observed = event.get("observedValue")
         if state == "matched" or self.observed is self.desired:
+            self.window_on_since = None
             self.state = "matched"
             self.pending_final = False
             self.retry_due = 0.0
@@ -406,6 +496,11 @@ class LightCorrection:
             if self.first_contrary is None:
                 self.first_contrary = monotonic()
             self.state = "contrary"
+            if self.desired is False and self.observed is True:
+                if self.window_on_since is None:
+                    self.window_on_since = received_at
+                if self._motion_handoff():
+                    return
             if self.attempts == len(CORRECTION_DELAYS):
                 self.pending_final = True
             self._schedule()
@@ -481,7 +576,7 @@ class LightCorrection:
 
         self.timer = async_call_later(self.entity.hass, max(0, due - monotonic()), run)
 
-    async def _read(self, generation: int) -> dict | None:  # noqa: PLR0911
+    async def _read(self, generation: int) -> dict | None:  # noqa: PLR0911, PLR0912
         if self.bootstrap:
             # No expired SDK lineage can confirm or admit a correction. The
             # first bounded OFF establishes one; subsequent reads use it normally.
@@ -520,17 +615,37 @@ class LightCorrection:
             return None
         self.observed = result["observedValue"]
         if self.observed is self.desired:
+            self.window_on_since = None
             self.state = "matched"
             self.pending_final = False
             self.retry_due = 0.0
             return None
         self.retry_due = 0.0
+        if self.desired is False and self.observed is True:
+            if self.window_on_since is None:
+                self.window_on_since = monotonic()
+            if self._motion_handoff():
+                return None
         if self.first_contrary is None:
             self.first_contrary = monotonic()
             self.last_contrary_at = datetime.now(UTC).isoformat()
             self.state = "contrary"
             return None
         return result
+
+    def _admit_write(self, generation: int) -> bool:
+        """Mark transport dispatch before its first await, after the final guard."""
+        allowed = (
+            generation == self.generation
+            and self._live()
+            and self.enabled
+            and not self.paused
+            and not self.recovery_busy
+            and self.state not in {"matched", "suspended"}
+        )
+        if allowed:
+            self.write_dispatched = True
+        return allowed
 
     async def _run(self, generation: int) -> None:  # noqa: PLR0911, PLR0912, PLR0915
         previous_correction = self.last_correction
@@ -581,22 +696,26 @@ class LightCorrection:
                         "correction_expires_at_ms": self.expires_wall_ms,
                     }
                 ),
-                _send_guard=lambda: (
-                    generation == self.generation
-                    and self._live()
-                    and self.enabled
-                    and not self.paused
-                    and not self.recovery_busy
-                    and self.state not in {"matched", "suspended"}
-                ),
+                _send_guard=lambda: self._admit_write(generation),
             )
-            if generation != self.generation or not self._live():
+            if generation != self.generation or not (
+                self._live() or self.motion_expiry_pending
+            ):
                 return
+            if isinstance(receipt, CommandReceipt):
+                self.write_sent |= receipt.send_attempted
+                self.write_dispatched = False
             # Completion is a conservative spacing anchor after any queue and
             # ACK wait. Admission time alone cannot bound the physical send gap.
             self.last_correction = monotonic()
             self.bootstrap = False
             self.receipt(receipt, correction=True)
+            if generation != self.generation:
+                return
+            self.motion_cancel_pending = False
+            if self.motion_expiry_pending:
+                self._expire_window()
+                return
             if (
                 isinstance(receipt, CommandReceipt)
                 and receipt.status == "cancelled_before_send"
@@ -614,8 +733,17 @@ class LightCorrection:
                 # Matching SDK evidence can cancel this timer in the meantime.
                 self.final_confirmation_due = monotonic() + FINAL_CONFIRMATION_DELAY
         except EufySdkApiClientError as error:
-            if generation == self.generation and self._live():
+            if generation == self.generation and (
+                self._live() or self.motion_expiry_pending
+            ):
                 paused_before_send = str(error) == "light_correction_paused_before_send"
+                # A lost reply after dispatch cannot establish an unsent write.
+                if self.write_dispatched:
+                    self.write_sent = True
+                self.write_dispatched = self.motion_cancel_pending = False
+                if self.motion_expiry_pending:
+                    self._expire_window()
+                    return
                 if paused_before_send and attempt_started:
                     self.attempts -= 1
                     self.last_correction = previous_correction
@@ -718,6 +846,7 @@ class LightCorrection:
             state == "closed"
             and not self.entity._removed
             and self.desired is not None
+            and self.grace_due is None
             and monotonic() < self.born + WINDOW_SECONDS
             and getattr(self.entity.coordinator.config_entry, "options", {}).get(
                 CONF_LIGHT_CORRECTION, False
@@ -726,10 +855,13 @@ class LightCorrection:
         ):
             self._verification_failure("protection_lost")
         self.generation += 1
+        self.motion_expiry_pending = False
+        self.window_on_since = None
         self.grace_started = self.grace_due = None
         self.grace_until = None
         if state == "closed":
             self.live_observed = None
+            self.last_motion = None
             self.observation_stamp = time()
         self.state = self.state if self.failed and state == "closed" else state
         self._cancel_timer()
