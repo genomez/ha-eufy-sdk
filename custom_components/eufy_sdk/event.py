@@ -98,13 +98,18 @@ class EufySdkDoorbellEvent(_EufySdkBusEvent):
         """Bind to a doorbell device."""
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_doorbell_event"
-        self._attr_event_types = [
+        # HA requires doorbell entities to advertise "ring"; legacy mode still
+        # fires only "pressed".
+        self._fire_type = (
             DOORBELL_EVENT_TYPE if legacy_pressed else DoorbellEventType.RING
-        ]
+        )
+        self._attr_event_types = [DoorbellEventType.RING]
+        if legacy_pressed:
+            self._attr_event_types.append(DOORBELL_EVENT_TYPE)
 
     def _match(self, bus_event: str | None) -> str | None:
         """Fire on a doorbell press."""
-        return self._attr_event_types[0] if bus_event == DOORBELL_EVENT else None
+        return self._fire_type if bus_event == DOORBELL_EVENT else None
 
 
 class EufySdkDetectionEvent(_EufySdkBusEvent):

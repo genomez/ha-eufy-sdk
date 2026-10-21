@@ -78,7 +78,8 @@ class DoorbellEventTests(unittest.TestCase):
 
     def test_legacy_option_emits_only_pressed(self):
         entity, writes = make_entity(legacy_pressed=True)
-        self.assertEqual(entity.event_types, [DOORBELL_EVENT_TYPE])
+        self.assertEqual(entity.event_types, ["ring", DOORBELL_EVENT_TYPE])
+        self.assertIn(DoorbellEventType.RING, entity.event_types)
         entity._handle_event(
             Mock(data={"deviceSn": "doorbell", "event": "doorbellPress"})
         )
@@ -160,7 +161,7 @@ class DoorbellSetupTests(unittest.IsolatedAsyncioTestCase):
         )
         entities = []
         await async_setup_entry(Mock(), entry, entities.extend)
-        self.assertEqual(entities[0].event_types, ["pressed"])
+        self.assertEqual(entities[0].event_types, ["ring", "pressed"])
 
 
 class DoorbellOptionsTests(unittest.IsolatedAsyncioTestCase):
