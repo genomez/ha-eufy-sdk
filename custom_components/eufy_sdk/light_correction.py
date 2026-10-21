@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from time import monotonic
+from time import monotonic, time
 from typing import Any
 
 from homeassistant.components import persistent_notification
@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_call_later
 
 from .api import CommandReceipt, EufySdkApiClientError
 from .const import CONF_LIGHT_CORRECTION, CONF_LIGHT_CORRECTION_PAUSE
+from .property_sync import MAX_OBSERVATION_AGE_SECONDS
 
 WINDOW_SECONDS = 600
 CORRECTION_DELAYS = (15, 60, 300)
@@ -25,6 +26,8 @@ MIN_CORRECTION_SPACING = 45
 FINAL_CONFIRMATION_DELAY = 15
 CONFIRMATION_RETRY_DELAY = 20
 MAX_CONFIRMATION_READS = 16
+UNCOMMANDED_GRACE_SECONDS = 300
+UNCOMMANDED_CAP_SECONDS = 900
 
 
 class LightCorrection:
@@ -62,6 +65,136 @@ class LightCorrection:
         self.confirmation_reads = 0
         self.expires_wall_ms = 0.0
         self.failure_reason: str | None = None
+        self.ha_intent: bool | None = None
+        self.live_observed: bool | None = None
+        self.observation_stamp = time()
+        self.grace_started: float | None = None
+        self.grace_due: float | None = None
+        self.grace_until: str | None = None
+        self.uncommanded_cycle = False
+        self.episode_consumed = False
+        self.bootstrap = False
+
+    def observe(self, event: dict) -> None:
+        """Accept only ordered, fresh RTC observations received in this lifecycle."""
+        stamp = event.get("observedAtMs")
+        values = event.get("properties")
+        value = values.get("light") if isinstance(values, dict) else None
+        if (
+            event.get("source") != "rtc"
+            or not isinstance(values, dict)
+            or "light" not in values
+            or type(stamp) not in (int, float)
+            or not 0 <= time() - stamp / 1000 <= MAX_OBSERVATION_AGE_SECONDS
+            or stamp / 1000 <= self.observation_stamp
+            or self.entity._removed
+            or self.entity._sn not in (self.entity.coordinator.data or {})
+        ):
+            return
+        previous = self.live_observed
+        self.observation_stamp = stamp / 1000
+        if type(value) is not bool:
+            self.live_observed = None
+            if self.grace_due is not None or self.uncommanded_cycle:
+                self.stop("uncommanded_cancelled")
+                self.entity.async_write_ha_state()
+            return
+        self.live_observed = value
+        if not value:
+            self.episode_consumed = False
+            if self.uncommanded_cycle:
+                self.stop("uncommanded_cancelled")
+                self.entity.async_write_ha_state()
+        if self.grace_due is not None:
+            self.observed = value
+            if not value or not self.enabled or self.paused:
+                self.stop("uncommanded_cancelled")
+            self.entity.async_write_ha_state()
+            return
+        if (
+            previous is False
+            and value is True
+            and self.ha_intent is False
+            and not self.episode_consumed
+            and self.enabled
+            and not self.paused
+            and not self._live()
+        ):
+            self.stop("uncommanded_grace")
+            self.episode_consumed = True
+            self.observed = True
+            self.grace_started = monotonic()
+            self._schedule_grace()
+
+    def motion(self) -> None:
+        """Extend this camera's ON grace without moving its hard deadline."""
+        if self.grace_due is not None and self.live_observed is True:
+            self._schedule_grace()
+
+    def check_policy(self) -> None:
+        """Retire optional automatic work when its option or pause gate closes."""
+        if (self.grace_due is not None or self.uncommanded_cycle) and (
+            not self.enabled or self.paused
+        ):
+            self.entity.client.pause_light_correction(self.entity._sn)
+            self.stop("uncommanded_cancelled")
+
+    def reset_observations(self) -> None:
+        """Reconnect readiness is not a device transition or a retained baseline."""
+        self.live_observed = None
+        self.observation_stamp = time()
+        if self.grace_due is not None or self.uncommanded_cycle:
+            self.stop("uncommanded_cancelled")
+
+    def _schedule_grace(self) -> None:
+        self._cancel_timer()
+        if not self.enabled or self.paused:
+            self.stop("uncommanded_cancelled")
+            return
+        if self.pause_unsub is None:
+            self.pause_unsub = self.entity.hass.bus.async_listen(
+                "state_changed", self._pause_changed
+            )
+        self.grace_due = min(
+            monotonic() + UNCOMMANDED_GRACE_SECONDS,
+            self.grace_started + UNCOMMANDED_CAP_SECONDS,
+        )
+        self.grace_until = (
+            datetime.now(UTC) + timedelta(seconds=self.grace_due - monotonic())
+        ).isoformat()
+        generation = self.generation
+        timer_generation = self.timer_generation
+
+        @callback
+        def expire(_: Any) -> None:
+            if (
+                generation != self.generation
+                or timer_generation != self.timer_generation
+            ):
+                return
+            self.timer = None
+            if (
+                not self.enabled
+                or self.paused
+                or self.entity._removed
+                or self.ha_intent is not False
+                or self.live_observed is not True
+            ):
+                self.stop("uncommanded_cancelled")
+            else:
+                previous_correction = self.last_correction
+                self.start(value=False, automatic=True)
+                self.last_correction = previous_correction
+                self.first_contrary = monotonic() - CORRECTION_DELAYS[0]
+                self.observed = True
+                self.state = "contrary"
+                self._schedule()
+            self.entity.async_write_ha_state()
+
+        self.timer = async_call_later(
+            self.entity.hass, max(0, self.grace_due - monotonic()), expire
+        )
+        self.entity.async_write_ha_state()
 
     @property
     def enabled(self) -> bool:
@@ -85,9 +218,14 @@ class LightCorrection:
         state = self.entity.hass.states.get(helper)
         return state is None or state.state != "off"
 
-    def start(self, value: Any) -> None:
+    def start(self, value: Any, *, automatic: bool = False) -> None:
         """Every explicit command immediately revokes its predecessor's authority."""
         self.stop("superseded")
+        self.uncommanded_cycle = automatic
+        self.bootstrap = automatic
+        if not automatic:
+            self.ha_intent = None
+            self.episode_consumed = False
         self.intent = None
         self.desired = value if type(value) is bool else None
         self.born = monotonic()
@@ -149,6 +287,15 @@ class LightCorrection:
             if self.paused and not self.pause_requested:
                 self.pause_requested = True
                 self.entity.client.pause_light_correction(self.entity._sn)
+            if self.uncommanded_cycle and self.paused:
+                self.check_policy()
+                self.entity.async_write_ha_state()
+                return
+            if self.grace_due is not None:
+                if self.paused:
+                    self.stop("uncommanded_cancelled")
+                    self.entity.async_write_ha_state()
+                return
             self._schedule()
 
     def receipt(
@@ -178,6 +325,8 @@ class LightCorrection:
             self.stop(self.state if self.failed else "unavailable")
             return
         self.intent = receipt.intent
+        if not correction and not self.uncommanded_cycle:
+            self.ha_intent = self.desired
         self.transition = False
         events, self.early = self.early, []
         for event in events:
@@ -275,6 +424,8 @@ class LightCorrection:
                 "unavailable",
                 "failed",
                 "verification_exhausted",
+                "uncommanded_cancelled",
+                "uncommanded_grace",
             }
             and not self.entity._removed
             and monotonic() < self.born + WINDOW_SECONDS
@@ -331,6 +482,12 @@ class LightCorrection:
         self.timer = async_call_later(self.entity.hass, max(0, due - monotonic()), run)
 
     async def _read(self, generation: int) -> dict | None:  # noqa: PLR0911
+        if self.bootstrap:
+            # No expired SDK lineage can confirm or admit a correction. The
+            # first bounded OFF establishes one; subsequent reads use it normally.
+            if self.live_observed is True and self.ha_intent is False:
+                return {"observedValue": True}
+            return None
         intent = self.intent
         revision = self.revision
         if self.confirmation_reads >= MAX_CONFIRMATION_READS:
@@ -409,14 +566,21 @@ class LightCorrection:
             self.expires_wall_ms = (
                 datetime.now(UTC).timestamp() + self.born + WINDOW_SECONDS - monotonic()
             ) * 1000
+            bootstrap = self.bootstrap
             receipt = await self.entity.client.set_property(
                 self.entity._sn,
                 "light",
                 self.desired,
                 bounded=True,
-                correction=True,
-                correction_expires_at=self.born + WINDOW_SECONDS,
-                correction_expires_at_ms=self.expires_wall_ms,
+                correction=not bootstrap,
+                **(
+                    {}
+                    if bootstrap
+                    else {
+                        "correction_expires_at": self.born + WINDOW_SECONDS,
+                        "correction_expires_at_ms": self.expires_wall_ms,
+                    }
+                ),
                 _send_guard=lambda: (
                     generation == self.generation
                     and self._live()
@@ -431,6 +595,7 @@ class LightCorrection:
             # Completion is a conservative spacing anchor after any queue and
             # ACK wait. Admission time alone cannot bound the physical send gap.
             self.last_correction = monotonic()
+            self.bootstrap = False
             self.receipt(receipt, correction=True)
             if (
                 isinstance(receipt, CommandReceipt)
@@ -456,6 +621,10 @@ class LightCorrection:
                     self.last_correction = previous_correction
                 elif attempt_started:
                     self.last_correction = monotonic()
+                    if self.bootstrap:
+                        self.bootstrap = False
+                        self._verification_failure("protection_lost")
+                        return
                     if self.attempts == len(CORRECTION_DELAYS):
                         self.pending_final = True
                         self.final_confirmation_due = (
@@ -557,6 +726,11 @@ class LightCorrection:
         ):
             self._verification_failure("protection_lost")
         self.generation += 1
+        self.grace_started = self.grace_due = None
+        self.grace_until = None
+        if state == "closed":
+            self.live_observed = None
+            self.observation_stamp = time()
         self.state = self.state if self.failed and state == "closed" else state
         self._cancel_timer()
         if self.expiry is not None:
@@ -585,6 +759,7 @@ class LightCorrection:
             "light_correction_failure_reason": self.failure_reason,
             "last_contrary_at": self.last_contrary_at,
             "correction_window_until": self.window_until,
+            "light_correction_grace_until": self.grace_until,
         }
         if self.last_event is not None:
             attributes.update(

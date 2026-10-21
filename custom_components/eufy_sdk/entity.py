@@ -21,6 +21,7 @@ from .api import CommandReceipt, EufySdkApiClientError, late_contrary_event
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 from .light_correction import LightCorrection
+from .pushmap import MOTION_EVENTS
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -374,7 +375,12 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     def _property_event_filter(self, data: dict[str, Any]) -> bool:
         """Match the HA event data dictionary using the cache scalar contract."""
         if self._prop == "light" and not self._removed:
-            if data.get("event") == "bridgeDisconnected":
+            if data.get("event") in {"bridgeDisconnected", "ready"}:
+                return True
+            if data.get("deviceSn") == self._sn and (
+                data.get("event") in MOTION_EVENTS
+                or data.get("event") == "propertiesObserved"
+            ):
                 return True
             if (
                 data.get("deviceSn") == self._sn
@@ -397,7 +403,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         )
 
     @callback
-    def _handle_property_changed(self, event: Event) -> None:
+    def _handle_property_changed(self, event: Event) -> None:  # noqa: PLR0911, PLR0912
         """Keep bounded light settling; release other holds on reports."""
         if not self._property_event_filter(event.data):
             return
@@ -405,6 +411,10 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             if self._light_correction is not None:
                 self._light_correction.stop("closed")
                 self.async_write_ha_state()
+            return
+        if event.data.get("event") == "ready":
+            if self._light_correction is not None:
+                self._light_correction.reset_observations()
             return
         if event.data.get("event") == "lateContraryEffect":
             if (
@@ -415,6 +425,14 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                 self._light_correction = LightCorrection(self)
             if self._light_correction is not None:
                 self._light_correction.event(event.data)
+            return
+        if event.data.get("event") == "propertiesObserved":
+            if self._light_correction is not None:
+                self._light_correction.observe(event.data)
+            return
+        if event.data.get("event") in MOTION_EVENTS:
+            if self._light_correction is not None:
+                self._light_correction.motion()
             return
         # A report during RPC has unknown ordering relative to the command.
         # Non-light properties keep it authoritative; successful light writes
@@ -735,6 +753,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             return
         self._release_reconciled_hold()
         if self._prop == "light":
+            if self._light_correction is not None:
+                self._light_correction.check_policy()
             self._update_light_candidate()
         super()._handle_coordinator_update()
 

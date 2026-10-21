@@ -269,7 +269,7 @@ class EufySdkApiClient:
         ] = {}
         self._cancel_tasks: set[asyncio.Task] = set()
         self._correction_requests: dict[
-            tuple[str, str], tuple[int, aiohttp.ClientWebSocketResponse]
+            tuple[str, str], tuple[int, aiohttp.ClientWebSocketResponse, bool]
         ] = {}
 
     @property
@@ -347,10 +347,13 @@ class EufySdkApiClient:
         task.add_done_callback(self._cancel_tasks.discard)
 
     def pause_light_correction(self, sn: str) -> None:
-        """Cancel an unsent correction while retaining its receipt and observation."""
+        """Cancel automatic work; only correction origins retain observations."""
         request = self._correction_requests.get((sn, "light"))
         if request is not None:
-            self._schedule_command_cancel(*request, keep_observation=True)
+            mid, transport, keep_observation = request
+            self._schedule_command_cancel(
+                mid, transport, keep_observation=keep_observation
+            )
 
     @property
     def webrtc_relay_enabled(self) -> bool:
@@ -545,6 +548,7 @@ class EufySdkApiClient:
         _cancel_on_abort: bool = False,
         _send_guard: Callable[[], bool] | None = None,
         _correction_key: tuple[str, str] | None = None,
+        _correction_keep_observation: bool = True,
         **args: Any,
     ) -> dict[str, Any]:
         """Send a command and await its reply. Raises on `ok: false`."""
@@ -564,7 +568,9 @@ class EufySdkApiClient:
         if _cancel_on_abort:
             self._bounded_requests[mid] = transport
         if _correction_key is not None:
-            self._correction_requests[_correction_key] = (mid, transport)
+            self._correction_requests[_correction_key] = (
+                mid, transport, _correction_keep_observation
+            )
         try:
             await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
             async with asyncio.timeout(timeout):
@@ -588,7 +594,8 @@ class EufySdkApiClient:
             self._bounded_requests.pop(mid, None)
             if (
                 _correction_key is not None
-                and self._correction_requests.get(_correction_key) == (mid, transport)
+                and self._correction_requests.get(_correction_key)
+                == (mid, transport, _correction_keep_observation)
             ):
                 self._correction_requests.pop(_correction_key, None)
         if not reply.get("ok"):
@@ -917,8 +924,12 @@ class EufySdkApiClient:
                     _transport=transport,
                     _cancel_on_abort=True,
                     **(
-                        {"_send_guard": _send_guard, "_correction_key": key}
-                        if correction else {}
+                        {
+                            "_send_guard": _send_guard,
+                            "_correction_key": key,
+                            "_correction_keep_observation": correction,
+                        }
+                        if correction or _send_guard is not None else {}
                     ),
                     sn=sn,
                     name=name,
