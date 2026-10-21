@@ -395,7 +395,7 @@ class LightCorrection:
             )
         ):
             if correction and self.enabled:
-                self._verification_failure("protection_lost")
+                self._verification_failure("protection_lost", receipt=receipt)
             self.stop(self.state if self.failed else "unavailable")
             return
         self.intent = receipt.intent
@@ -812,7 +812,9 @@ class LightCorrection:
             },
         )
 
-    def _verification_failure(self, reason: str) -> None:
+    def _verification_failure(
+        self, reason: str, *, receipt: CommandReceipt | None = None
+    ) -> None:
         """Report lost verification without inventing a confirmed opposite state."""
         if self.failed:
             return
@@ -821,11 +823,33 @@ class LightCorrection:
         self.state = "verification_exhausted"
         self.pending_final = False
         self._cancel_timer()
+        command = "off" if self.desired is False else "on"
+        if isinstance(receipt, CommandReceipt) and receipt.status == "rejected":
+            message = (
+                f"The HomeBase refused the {command} command for "
+                f"{self.entity.entity_id}; automatic correction protection has ended."
+            )
+            title = "Eufy light correction command refused"
+        elif isinstance(receipt, CommandReceipt) and receipt.status in {
+            "queue_full",
+            "validation_failed",
+            "not_sent",
+        }:
+            message = (
+                f"The bridge did not accept the {command} command for "
+                f"{self.entity.entity_id}; automatic correction protection has ended."
+            )
+            title = "Eufy light correction command not accepted"
+        else:
+            message = (
+                f"{self.entity.entity_id} could not freshly verify the light state; "
+                "automatic correction protection has ended."
+            )
+            title = "Eufy light correction could not verify state"
         persistent_notification.async_create(
             self.entity.hass,
-            f"{self.entity.entity_id} could not freshly verify the light state; "
-            "automatic correction protection has ended.",
-            title="Eufy light correction could not verify state",
+            message,
+            title=title,
             notification_id=f"eufy_light_correction_{self.entity.unique_id}",
         )
         self.entity.hass.bus.async_fire(

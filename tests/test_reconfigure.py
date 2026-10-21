@@ -7,16 +7,17 @@ from types import MappingProxyType
 from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
+from homeassistant import config_entries, loader
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry, entity_registry, frame
+
 from custom_components.eufy_sdk import config_flow
 from custom_components.eufy_sdk.api import (
     EufySdkApiClientCommunicationError,
     EufySdkApiClientError,
 )
 from custom_components.eufy_sdk.const import DOMAIN
-from homeassistant import config_entries, loader
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import device_registry, entity_registry, frame
 
 
 class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
@@ -66,7 +67,11 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def _entry(
-        self, host: str, port: int, *, unique_id: str | None = None,
+        self,
+        host: str,
+        port: int,
+        *,
+        unique_id: str | None = None,
     ) -> config_entries.ConfigEntry:
         entry = config_entries.ConfigEntry(
             version=1,
@@ -87,8 +92,13 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
     @staticmethod
     def _record(entry: config_entries.ConfigEntry) -> tuple:
         return (
-            entry.entry_id, entry.version, entry.minor_version, entry.title,
-            dict(entry.data), dict(entry.options), entry.unique_id,
+            entry.entry_id,
+            entry.version,
+            entry.minor_version,
+            entry.title,
+            dict(entry.data),
+            dict(entry.options),
+            entry.unique_id,
         )
 
     def _unchanged(self) -> None:
@@ -97,15 +107,23 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
         self.client.retrigger_auth.assert_not_awaited()
 
     def _success(
-        self, result: dict[str, Any], host: str = "new.invalid", port: int = 4012,
+        self,
+        result: dict[str, Any],
+        host: str = "new.invalid",
+        port: int = 4012,
     ) -> None:
         self.assertEqual(result["type"], FlowResultType.ABORT)
         self.assertEqual(result["reason"], "reconfigure_successful")
         self.assertEqual(self.entry.entry_id, self.original[0])
         self.assertEqual((self.entry.version, self.entry.minor_version), (1, 1))
-        self.assertEqual(self.entry.data, {
-            "host": host, "port": port, "retained": {"value": "synthetic"},
-        })
+        self.assertEqual(
+            self.entry.data,
+            {
+                "host": host,
+                "port": port,
+                "retained": {"value": "synthetic"},
+            },
+        )
         self.assertEqual(self.entry.options, self.original[5])
         self.assertEqual(self.entry.unique_id, f"{host}:{port}")
         self.assertEqual(self.entry.title, f"eufy bridge ({host})")
@@ -118,9 +136,13 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
         result = await self.flow.async_step_reconfigure()
         self.assertEqual(result["type"], FlowResultType.FORM)
         self.assertEqual(result["step_id"], "reconfigure")
-        self.assertEqual(result["data_schema"]({}), {
-            "host": "old.invalid", "port": 3012.0,
-        })
+        self.assertEqual(
+            result["data_schema"]({}),
+            {
+                "host": "old.invalid",
+                "port": 3012.0,
+            },
+        )
         self.construct.assert_not_called()
         self._unchanged()
 
@@ -132,41 +154,71 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
             identifiers={(DOMAIN, "SYNTHETIC_DEVICE")},
         )
         entity = er.async_get_or_create(
-            "sensor", DOMAIN, "SYNTHETIC_ENTITY", config_entry=self.entry,
+            "sensor",
+            DOMAIN,
+            "SYNTHETIC_ENTITY",
+            config_entry=self.entry,
             device_id=device.id,
         )
-        before = (entity.entity_id, entity.unique_id, entity.config_entry_id,
-                  entity.device_id, device.identifiers, device.config_entry_id)
-        result = await self.flow.async_step_reconfigure({
-            "host": " new.invalid ", "port": 4012.0,
-        })
+        before = (
+            entity.entity_id,
+            entity.unique_id,
+            entity.config_entry_id,
+            entity.device_id,
+            set(device.identifiers),
+            set(device.config_entries),
+        )
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": " new.invalid ",
+                "port": 4012.0,
+            }
+        )
         self._success(result)
         self.reload.assert_called_once_with(self.entry.entry_id)
         self.client.close.assert_awaited_once()
-        self.assertEqual(before, (
-            entity.entity_id, entity.unique_id, entity.config_entry_id,
-            entity.device_id, device.identifiers, device.config_entry_id,
-        ))
+        entity = er.async_get(entity.entity_id)
+        device = dr.async_get(device.id)
+        self.assertEqual(
+            before,
+            (
+                entity.entity_id,
+                entity.unique_id,
+                entity.config_entry_id,
+                entity.device_id,
+                device.identifiers,
+                device.config_entries,
+            ),
+        )
 
     async def test_same_endpoint_validates_without_reload_or_mutation(self):
-        result = await self.flow.async_step_reconfigure({
-            "host": "old.invalid", "port": 3012,
-        })
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": "old.invalid",
+                "port": 3012,
+            }
+        )
         self._success(result, "old.invalid", 3012)
         self._unchanged()
         self.client.connect.assert_awaited_once()
 
     async def test_existing_update_listener_owns_one_reload(self):
         async def listener(
-            hass: HomeAssistant, entry: config_entries.ConfigEntry,
+            hass: HomeAssistant,
+            entry: config_entries.ConfigEntry,
         ) -> None:
             hass.config_entries.async_schedule_reload(entry.entry_id)
 
         remove = self.entry.add_update_listener(listener)
         try:
-            self._success(await self.flow.async_step_reconfigure({
-                "host": "new.invalid", "port": 4012,
-            }))
+            self._success(
+                await self.flow.async_step_reconfigure(
+                    {
+                        "host": "new.invalid",
+                        "port": 4012,
+                    }
+                )
+            )
             await self.hass.async_block_till_done()
             self.reload.assert_called_once_with(self.entry.entry_id)
         finally:
@@ -183,9 +235,12 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
             "synthetic-private-marker"
         )
         with self.assertLogs(config_flow.LOGGER, level="WARNING") as logs:
-            result = await self.flow.async_step_reconfigure({
-                "host": "new.invalid", "port": 4012,
-            })
+            result = await self.flow.async_step_reconfigure(
+                {
+                    "host": "new.invalid",
+                    "port": 4012,
+                }
+            )
         self.assertEqual(result["errors"], {"base": "cannot_connect"})
         self.assertNotIn("synthetic-private-marker", str(logs.output))
         self.client.close.assert_awaited_once()
@@ -194,32 +249,43 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_auth_status_failure_closes_without_mutation(self):
         self.client.auth_status.side_effect = EufySdkApiClientError("synthetic")
-        result = await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        })
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": "new.invalid",
+                "port": 4012,
+            }
+        )
         self.assertEqual(result["reason"], "cannot_connect")
         self.client.close.assert_awaited_once()
         self._unchanged()
 
     async def test_incomplete_auth_never_mutates_or_retriggers(self):
         for state, reason in (
-            ("pending", "auth_pending"), ("blocked", "auth_blocked"),
-            ("cooldown", "auth_cooldown"), ("unknown", "auth_not_ready"),
+            ("pending", "auth_pending"),
+            ("blocked", "auth_blocked"),
+            ("cooldown", "auth_cooldown"),
+            ("unknown", "auth_not_ready"),
         ):
             with self.subTest(state=state):
                 self.client.auth_status.return_value = {"state": state}
-                result = await self.flow.async_step_reconfigure({
-                    "host": "new.invalid", "port": 4012,
-                })
+                result = await self.flow.async_step_reconfigure(
+                    {
+                        "host": "new.invalid",
+                        "port": 4012,
+                    }
+                )
                 self.assertEqual(result["reason"], reason)
                 self._unchanged()
 
     async def test_collision_by_unique_id_before_io_preserves_both(self):
         other = await self._entry("other.invalid", 4012, unique_id="new.invalid:4012")
         prior = self._record(other)
-        result = await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        })
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": "new.invalid",
+                "port": 4012,
+            }
+        )
         self.assertEqual(result["reason"], "already_configured")
         self.assertEqual(self._record(other), prior)
         self.construct.assert_not_called()
@@ -227,18 +293,24 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_collision_by_data_even_if_other_unique_id_differs(self):
         await self._entry("new.invalid", 4012, unique_id="synthetic-legacy-id")
-        result = await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        })
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": "new.invalid",
+                "port": 4012,
+            }
+        )
         self.assertEqual(result["reason"], "already_configured")
         self.construct.assert_not_called()
         self._unchanged()
 
     async def test_explicit_twofa_updates_existing_entry_only_after_success(self):
         self.client.auth_status.return_value = {"state": "require_2fa"}
-        first = await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        })
+        first = await self.flow.async_step_reconfigure(
+            {
+                "host": "new.invalid",
+                "port": 4012,
+            }
+        )
         self.assertEqual(first["step_id"], "twofa")
         self._unchanged()
         self.client.submit_2fa.return_value = {"state": "require_2fa"}
@@ -251,9 +323,12 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_captcha_then_twofa_preserves_entry_until_authenticated(self):
         self.client.auth_status.return_value = {"state": "require_captcha"}
-        first = await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        })
+        first = await self.flow.async_step_reconfigure(
+            {
+                "host": "new.invalid",
+                "port": 4012,
+            }
+        )
         self.assertEqual(first["step_id"], "captcha")
         self._unchanged()
         self.client.submit_captcha.return_value = {"state": "require_captcha"}
@@ -283,9 +358,12 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancelled_auth_validation_does_not_mutate(self):
         self.client.auth_status.side_effect = asyncio.CancelledError
         with self.assertRaises(asyncio.CancelledError):
-            await self.flow.async_step_reconfigure({
-                "host": "new.invalid", "port": 4012,
-            })
+            await self.flow.async_step_reconfigure(
+                {
+                    "host": "new.invalid",
+                    "port": 4012,
+                }
+            )
         self._unchanged()
         self.client.close.assert_awaited_once()
 
@@ -315,9 +393,14 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
 
         self.client.connect.side_effect = connect
         self.client.close.side_effect = close
-        task = asyncio.create_task(self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        }))
+        task = asyncio.create_task(
+            self.flow.async_step_reconfigure(
+                {
+                    "host": "new.invalid",
+                    "port": 4012,
+                }
+            )
+        )
         await entered.wait()
         self.flow.async_remove()
         await asyncio.sleep(0)
@@ -340,9 +423,14 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
             return {"state": "ok"}
 
         self.client.auth_status.side_effect = auth
-        task = asyncio.create_task(self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        }))
+        task = asyncio.create_task(
+            self.flow.async_step_reconfigure(
+                {
+                    "host": "new.invalid",
+                    "port": 4012,
+                }
+            )
+        )
         await entered.wait()
         self.flow.async_remove()
         await asyncio.sleep(0)
@@ -358,9 +446,12 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(state=state):
                 self.client.close.reset_mock()
                 self.client.auth_status.return_value = {"state": state}
-                await self.flow.async_step_reconfigure({
-                    "host": "new.invalid", "port": 4012,
-                })
+                await self.flow.async_step_reconfigure(
+                    {
+                        "host": "new.invalid",
+                        "port": 4012,
+                    }
+                )
                 self.client.submit_2fa.side_effect = EufySdkApiClientError("synthetic")
                 self.client.submit_captcha.side_effect = EufySdkApiClientError(
                     "synthetic"
@@ -372,11 +463,19 @@ class ReconfigureTests(unittest.IsolatedAsyncioTestCase):
                 self._unchanged()
 
     async def test_reconfigure_back_restores_endpoint_data_and_identifiers(self):
-        self._success(await self.flow.async_step_reconfigure({
-            "host": "new.invalid", "port": 4012,
-        }))
-        result = await self.flow.async_step_reconfigure({
-            "host": "old.invalid", "port": 3012,
-        })
+        self._success(
+            await self.flow.async_step_reconfigure(
+                {
+                    "host": "new.invalid",
+                    "port": 4012,
+                }
+            )
+        )
+        result = await self.flow.async_step_reconfigure(
+            {
+                "host": "old.invalid",
+                "port": 3012,
+            }
+        )
         self._success(result, "old.invalid", 3012)
         self.assertEqual(self._record(self.entry), self.original)

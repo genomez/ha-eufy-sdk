@@ -1,5 +1,7 @@
 """Firmware presentation uses ordinary snapshots, never device commands."""
 
+# ruff: noqa: ANN001, ANN201, D101, D102, D103, INP001, PT009, S108, SLF001
+
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -155,9 +157,12 @@ class NativeFirmwareTests(unittest.IsolatedAsyncioTestCase):
         )
         other_entry = registry.async_get_or_create(
             config_entry_id="synthetic-other-entry",
-            identifiers={(DOMAIN, "synthetic")},
+            identifiers={(DOMAIN, "synthetic-other")},
             sw_version="1.1.1.1",
         )
+        self.assertNotEqual(sdk.id, other_entry.id)
+        self.assertEqual(sdk.config_entries, {"synthetic-entry"})
+        self.assertEqual(other_entry.config_entries, {"synthetic-other-entry"})
         coord = coordinator("4.4.0.4")
         entity = EufySdkInfoSensor(coord, "synthetic")
         entity.hass = hass
@@ -177,7 +182,8 @@ class NativeFirmwareTests(unittest.IsolatedAsyncioTestCase):
     ):
         hass = HomeAssistant("/tmp/offline-firmware-template")
         state = Template(
-            "{{ state_attr('sensor.homebases1_info', 'firmware_version') or 'unknown' }}",
+            "{{ state_attr('sensor.homebases1_info', 'firmware_version') "
+            "or 'unknown' }}",
             hass,
         )
         available = Template("{{ has_value('sensor.homebases1_info') }}", hass)

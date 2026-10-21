@@ -891,9 +891,71 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         await self.advance(15)
         self.assertEqual(entity._light_correction.state, "verification_exhausted")
         self.assertEqual(entity._light_correction.failure_reason, "protection_lost")
+        self.assertIn(
+            "bridge did not accept the off command", self.notification.call_args.args[1]
+        )
+        self.assertEqual(
+            self.notification.call_args.kwargs["title"],
+            "Eufy light correction command not accepted",
+        )
         self.emit()
         await self.advance(590)
         self.notification.assert_called_once()
+
+    async def test_rejected_correction_distinguishes_refusal_from_verification(self):
+        for desired in (False, True):
+            with self.subTest(desired=desired):
+                entity, _, client, _ = self.setup_light(desired=desired)
+                await entity.write(desired)
+                client.set_property.side_effect = None
+                client.set_property.return_value = CommandReceipt(
+                    "rejected", True, "unconfirmed", intent=2
+                )
+                self.emit()
+                await self.advance(15)
+                controller = entity._light_correction
+                self.assertEqual(controller.state, "verification_exhausted")
+                self.assertEqual(controller.failure_reason, "protection_lost")
+                self.assertEqual(controller.attempts, 1)
+                command = "on" if desired else "off"
+                self.assertEqual(
+                    self.notification.call_args.args[1],
+                    f"The HomeBase refused the {command} command for "
+                    "switch.fixture_light; "
+                    "automatic correction protection has ended.",
+                )
+                self.assertEqual(
+                    self.notification.call_args.kwargs["title"],
+                    "Eufy light correction command refused",
+                )
+                self.emit()
+                await self.advance(590)
+                self.notification.assert_called_once()
+                self.assertEqual(client.set_property.await_count, 2)
+                failures = [
+                    call
+                    for call in entity.hass.bus.async_fire.call_args_list
+                    if call.args[0] == FAILURE_EVENT
+                ]
+                self.assertEqual(len(failures), 1)
+                self.assertEqual(failures[0].args[1]["reason"], "protection_lost")
+
+    async def test_missing_correction_receipt_keeps_verification_wording(self):
+        entity, _, client, _ = self.setup_light()
+        await entity.write(False)
+        client.set_property.side_effect = None
+        client.set_property.return_value = None
+        self.emit()
+        await self.advance(15)
+        self.assertEqual(entity._light_correction.failure_reason, "protection_lost")
+        self.assertIn("could not freshly verify", self.notification.call_args.args[1])
+        self.assertEqual(
+            self.notification.call_args.kwargs["title"],
+            "Eufy light correction could not verify state",
+        )
+        await self.advance(590)
+        self.notification.assert_called_once()
+        self.assertEqual(client.set_property.await_count, 2)
 
     async def test_remote_expiry_during_pending_final_reports_unverified_once(self):
         entity, _, _, _ = self.setup_light()
