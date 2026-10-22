@@ -13,6 +13,7 @@ from .api import (
     EufySdkApiClientAuthenticationError,
     EufySdkApiClientCommunicationError,
     EufySdkApiClientError,
+    command_health_event,
 )
 
 if TYPE_CHECKING:
@@ -71,11 +72,30 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         if pending is not None:
             pending.setdefault(serial, {}).update(values)
 
+    def apply_command_health_event(self, event: dict) -> None:
+        """Validate SDK health before updating the cache or pending snapshot."""
+        event = command_health_event(event)
+        if event is not None:
+            self.record_command_health(
+                event["sn"],
+                {key: event[key] for key in ("status", "cooldownRemainingMs")},
+            )
+
+    def record_command_health(self, serial: str, health: dict) -> None:
+        """Retain health events that race an in-progress device snapshot."""
+        pending = getattr(self, "_pending_command_health", None)
+        if pending is not None:
+            pending[serial] = health
+        if serial in (self.data or {}):
+            self.data[serial]["commandHealth"] = health
+            self.async_update_listeners()
+
     async def _async_update_data(self) -> dict[str, dict]:
         """Journal concurrent events until the replacement snapshot is ready."""
         self.snapshot_generation += 1
         generation = self.snapshot_generation
         self._pending_state_events: dict[str, dict] | None = {}
+        self._pending_command_health: dict[str, dict] | None = {}
         try:
             snapshot = await self._read_snapshot()
             # Alarm lifecycle state belongs to this loaded entry and its bounded
@@ -89,6 +109,9 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             for serial, values in self._pending_state_events.items():
                 if serial in snapshot:
                     snapshot[serial].setdefault("state", {}).update(values)
+            for serial, health in self._pending_command_health.items():
+                if serial in snapshot:
+                    snapshot[serial]["commandHealth"] = health
         except ConfigEntryAuthFailed:
             self._clear_fast_retry()
             raise
@@ -102,6 +125,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             return snapshot
         finally:
             self._pending_state_events = None
+            self._pending_command_health = None
 
     async def _read_snapshot(self) -> dict[str, dict]:
         """Ensure the connection is up, confirm we're authed, and return the devices."""
@@ -143,5 +167,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         for device in devices:
             serial = device.get("sn")
             if isinstance(serial, str):
-                self.device_serial_counts[serial] = self.device_serial_counts.get(serial, 0) + 1
+                self.device_serial_counts[serial] = (
+                    self.device_serial_counts.get(serial, 0) + 1
+                )
         return {d["sn"]: d for d in devices if d.get("sn")}

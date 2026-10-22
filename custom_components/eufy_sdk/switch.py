@@ -150,6 +150,14 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
                     "command_send_attempted": self._command_receipt.send_attempted,
                 }
             )
+            if self._command_receipt.rejection_code is not None:
+                attributes["command_rejection_code"] = (
+                    self._command_receipt.rejection_code
+                )
+            if self._command_receipt.response_latency_ms is not None:
+                attributes["command_response_latency_ms"] = (
+                    self._command_receipt.response_latency_ms
+                )
             if self._command_receipt.superseded:
                 attributes["command_superseded"] = True
         if self._light_correction is not None:

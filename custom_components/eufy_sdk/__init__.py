@@ -131,8 +131,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         if evt.get("event") == DOORBELL_EVENT:
             serial, event_id = evt.get("deviceSn"), evt.get("eventId")
             if (
-                isinstance(serial, str) and serial
-                and isinstance(event_id, str) and event_id.strip()
+                isinstance(serial, str)
+                and serial
+                and isinstance(event_id, str)
+                and event_id.strip()
             ):
                 key = (serial, event_id)
                 if key in doorbell_event_ids:
@@ -151,7 +153,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
             "alarm",
         ):
             return
-        if event == "contactState":
+        if event == "commandHealth":
+            coordinator.apply_command_health_event(evt)
+        elif event == "contactState":
             sn = evt.get("deviceSn") or evt.get("sn")
             if sn and sn in coordinator.data and "open" in evt:
                 coordinator.data[sn].setdefault("state", {})["contact"] = bool(

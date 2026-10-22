@@ -60,8 +60,15 @@ DEVICE_SN_MAX_LENGTH = 128
 LATE_CONTRARY_WINDOW_MS = 600000
 LATE_CONTRARY_STATES = frozenset(
     {
-        "contrary", "matched", "expired", "superseded", "closed", "recovery_settled",
-        "suspended", "verification_exhausted", "detection_exhausted",
+        "contrary",
+        "matched",
+        "expired",
+        "superseded",
+        "closed",
+        "recovery_settled",
+        "suspended",
+        "verification_exhausted",
+        "detection_exhausted",
     }
 )
 
@@ -107,6 +114,37 @@ def late_contrary_event(value: Any) -> dict[str, Any] | None:
         )
         if key in value
     }
+
+
+def command_health(value: Any) -> dict[str, Any] | None:
+    """Project SDK-owned command-path health without implying device state."""
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("status"), str)
+        or value["status"] not in {"command_degraded", "healthy"}
+        or not _finite_number(value.get("cooldownRemainingMs"))
+        or not 0 <= value["cooldownRemainingMs"] <= LATE_CONTRARY_WINDOW_MS
+    ):
+        return None
+    return {key: value[key] for key in ("status", "cooldownRemainingMs")}
+
+
+def command_health_event(value: Any) -> dict[str, Any] | None:
+    """Validate the finite per-light health event and strip private fields."""
+    if (
+        not isinstance(value, dict)
+        or value.get("event") != "commandHealth"
+        or not isinstance(value.get("sn"), str)
+        or not 1 <= len(value["sn"]) <= DEVICE_SN_MAX_LENGTH
+        or value.get("property") != "light"
+    ):
+        return None
+    health = command_health(value)
+    return (
+        {"event": "commandHealth", "sn": value["sn"], "property": "light", **health}
+        if health
+        else None
+    )
 
 
 COMMAND_RECEIPT_STATUSES = frozenset(
@@ -159,12 +197,16 @@ class CommandReceipt:
     attempt: int | None = None
     intent: int | None = None
     superseded: bool = False
+    command_health: dict[str, Any] | None = None
+    rejection_code: int | None = None
+    response_latency_ms: float | None = None
 
     @property
     def accepted(self) -> bool:
         """Whether this invocation received transport acceptance."""
         return not self.superseded and self.status in {
-            "acknowledged", "pending_accepted"
+            "acknowledged",
+            "pending_accepted",
         }
 
 
@@ -212,14 +254,32 @@ def _command_receipt(value: Any) -> CommandReceipt:
         value["sendAttempted"],
         cast("CommandEffect", value["effect"]),
         superseded=value.get("superseded", False),
+        command_health=command_health(value.get("commandHealth")),
+        rejection_code=(
+            value["rejectionCode"]
+            if type(value.get("rejectionCode")) is int
+            and _finite_number(value["rejectionCode"])
+            else None
+        ),
+        response_latency_ms=(
+            value["responseLatencyMs"]
+            if _finite_number(value.get("responseLatencyMs"))
+            and value["responseLatencyMs"] >= 0
+            else None
+        ),
         **ordinals,
     )
 
 
-WEBRTC_ERROR_CODES = frozenset({
-    "webrtc_busy", "webrtc_releasing", "webrtc_unsupported",
-    "webrtc_closed", "webrtc_failed",
-})
+WEBRTC_ERROR_CODES = frozenset(
+    {
+        "webrtc_busy",
+        "webrtc_releasing",
+        "webrtc_unsupported",
+        "webrtc_closed",
+        "webrtc_failed",
+    }
+)
 
 
 class EufySdkApiClientCommunicationError(EufySdkApiClientError):
@@ -264,6 +324,7 @@ class EufySdkApiClient:
         self._bounded_capability = False
         self._late_contrary_capability = False
         self._bounded_requests: dict[int, aiohttp.ClientWebSocketResponse] = {}
+        self._observation_preserving_aborts: set[int] = set()
         self._bounded_invocations: dict[
             tuple[str, str], _BoundedPropertyInvocation
         ] = {}
@@ -351,6 +412,8 @@ class EufySdkApiClient:
         request = self._correction_requests.get((sn, "light"))
         if request is not None:
             mid, transport, keep_observation = request
+            if keep_observation:
+                self._observation_preserving_aborts.add(mid)
             self._schedule_command_cancel(
                 mid, transport, keep_observation=keep_observation
             )
@@ -360,7 +423,9 @@ class EufySdkApiClient:
         """Whether the latest bridge hello explicitly enabled the relay."""
         return self._webrtc_relay_enabled
 
-    def listen_webrtc_relay(self, listener: Callable[[bool], None]) -> Callable[[], None]:
+    def listen_webrtc_relay(
+        self, listener: Callable[[bool], None]
+    ) -> Callable[[], None]:
         """Watch capability changes after camera classes have been selected."""
         self._webrtc_relay_listener = listener
 
@@ -370,17 +435,19 @@ class EufySdkApiClient:
 
         return unsubscribe
 
-    def register_webrtc_session(self, session_id, callback):
+    def register_webrtc_session(
+        self, session_id: str, callback: Callable[[dict[str, Any]], None]
+    ) -> aiohttp.ClientWebSocketResponse | None:
         """Bind pushes to one session on the current transport, without connecting."""
         self._webrtc_callbacks[session_id] = callback
         return self._ws
 
-    def remove_webrtc_session(self, session_id):
+    def remove_webrtc_session(self, session_id: str) -> None:
         """Retire pushes before scheduling close."""
         self._webrtc_callbacks.pop(session_id, None)
 
-    def _invalidate_webrtc_sessions(self):
-        """A replacement transport never inherits sessions from its predecessor."""
+    def _invalidate_webrtc_sessions(self) -> None:
+        """Retire sessions before a replacement transport can inherit them."""
         callbacks = tuple(self._webrtc_callbacks.values())
         self._webrtc_callbacks.clear()
         for callback in callbacks:
@@ -494,6 +561,10 @@ class EufySdkApiClient:
                         data = late_contrary_event(data)
                         if data is None or not self.late_contrary_effects_supported:
                             continue
+                    elif data["event"] == "commandHealth":
+                        data = command_health_event(data)
+                        if data is None:
+                            continue
                     self._on_event(data)
         except (aiohttp.ClientError, asyncio.CancelledError):
             pass
@@ -569,7 +640,9 @@ class EufySdkApiClient:
             self._bounded_requests[mid] = transport
         if _correction_key is not None:
             self._correction_requests[_correction_key] = (
-                mid, transport, _correction_keep_observation
+                mid,
+                transport,
+                _correction_keep_observation,
             )
         try:
             await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
@@ -577,13 +650,21 @@ class EufySdkApiClient:
                 reply = await fut
         except TimeoutError:
             if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
-                self._schedule_command_cancel(mid, transport)
+                self._schedule_command_cancel(
+                    mid,
+                    transport,
+                    keep_observation=mid in self._observation_preserving_aborts,
+                )
             self._pending.pop(mid, None)
             msg = "bridge_request_timeout"
             raise EufySdkApiClientCommunicationError(msg) from None
         except asyncio.CancelledError:
             if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
-                self._schedule_command_cancel(mid, transport)
+                self._schedule_command_cancel(
+                    mid,
+                    transport,
+                    keep_observation=mid in self._observation_preserving_aborts,
+                )
             raise
         except (aiohttp.ClientError, OSError):
             self._pending.pop(mid, None)
@@ -592,11 +673,10 @@ class EufySdkApiClient:
         finally:
             self._pending.pop(mid, None)
             self._bounded_requests.pop(mid, None)
-            if (
-                _correction_key is not None
-                and self._correction_requests.get(_correction_key)
-                == (mid, transport, _correction_keep_observation)
-            ):
+            self._observation_preserving_aborts.discard(mid)
+            if _correction_key is not None and self._correction_requests.get(
+                _correction_key
+            ) == (mid, transport, _correction_keep_observation):
                 self._correction_requests.pop(_correction_key, None)
         if not reply.get("ok"):
             code = reply.get("code")
@@ -635,7 +715,18 @@ class EufySdkApiClient:
     async def list_devices(self) -> list[dict[str, Any]]:
         """Every device the bridge exposes (sn/name/model/codec/capabilities/state)."""
         return [
-            normalize_snapshot(device)
+            {
+                **{
+                    key: value
+                    for key, value in normalize_snapshot(device).items()
+                    if key != "commandHealth"
+                },
+                **(
+                    {"commandHealth": health}
+                    if (health := command_health(device.get("commandHealth")))
+                    else {}
+                ),
+            }
             for device in (await self.rpc("devices.list"))["devices"]
         ]
 
@@ -801,15 +892,12 @@ class EufySdkApiClient:
         _send_guard: Callable[[], bool] | None = None,
     ) -> CommandReceipt | None:
         """Opt eligible scalar writes into one frozen caller lifetime."""
-        if (
-            (correction_expires_at is None) != (correction_expires_at_ms is None)
-            or (
-                correction_expires_at is not None
-                and (
-                    not correction
-                    or not _finite_number(correction_expires_at)
-                    or not _finite_number(correction_expires_at_ms)
-                )
+        if (correction_expires_at is None) != (correction_expires_at_ms is None) or (
+            correction_expires_at is not None
+            and (
+                not correction
+                or not _finite_number(correction_expires_at)
+                or not _finite_number(correction_expires_at_ms)
             )
         ):
             message = "light_correction_invalid_deadline"
@@ -929,7 +1017,8 @@ class EufySdkApiClient:
                             "_correction_key": key,
                             "_correction_keep_observation": correction,
                         }
-                        if correction or _send_guard is not None else {}
+                        if correction or _send_guard is not None
+                        else {}
                     ),
                     sn=sn,
                     name=name,
@@ -950,7 +1039,17 @@ class EufySdkApiClient:
                         ),
                     },
                 )
-                return _command_receipt(reply.get("receipt"))
+                receipt = _command_receipt(reply.get("receipt"))
+                if receipt.command_health is not None and self._on_event:
+                    self._on_event(
+                        {
+                            "event": "commandHealth",
+                            "sn": sn,
+                            "property": "light",
+                            **receipt.command_health,
+                        }
+                    )
+                return receipt
         except TimeoutError:
             message = "bridge_request_timeout"
             raise EufySdkApiClientCommunicationError(message) from None

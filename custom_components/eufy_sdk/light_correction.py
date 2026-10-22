@@ -14,7 +14,7 @@ from homeassistant.components import persistent_notification
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 
-from .api import CommandReceipt, EufySdkApiClientError
+from .api import CommandReceipt, EufySdkApiClientError, command_health
 from .const import CONF_LIGHT_CORRECTION, CONF_LIGHT_CORRECTION_PAUSE
 from .property_sync import MAX_OBSERVATION_AGE_SECONDS
 
@@ -34,7 +34,7 @@ MOTION_LOOKBACK_SECONDS = 60
 class LightCorrection:
     """One monotonic lineage, one task, and at most three corrective writes."""
 
-    def __init__(self, entity: Any) -> None:
+    def __init__(self, entity: Any) -> None:  # noqa: PLR0915
         """Bind correction ownership to the entity lifecycle."""
         self.entity = entity
         self.generation = 0
@@ -83,6 +83,47 @@ class LightCorrection:
         self.observation_received: float | None = None
         self.replaying = False
         self.motion_expiry_pending = False
+        self.health_status: str | None = None
+        self.health_until = 0.0
+        self.health_timer = None
+        self.health_generation = 0
+
+    def health(self, value: Any) -> None:
+        """Mirror SDK gate changes; retain passive lineage and its fixed expiry."""
+        health = command_health(value)
+        if health is None or self.entity._removed:
+            return
+        self.health_generation += 1
+        generation = self.health_generation
+        if self.health_timer is not None:
+            self.health_timer()
+            self.health_timer = None
+        self.health_status = health["status"]
+        self.health_until = monotonic() + health["cooldownRemainingMs"] / 1000
+        if self.health_status == "command_degraded":
+            self._cancel_timer()
+            self.pause_requested = True
+            self.entity.client.pause_light_correction(self.entity._sn)
+            if self.task is not None and self.task is not asyncio.current_task():
+                self.task.cancel()
+
+            @callback
+            def recover(_: Any) -> None:
+                if generation != self.health_generation or self.entity._removed:
+                    return
+                self.health_timer = None
+                self.health({"status": "healthy", "cooldownRemainingMs": 0})
+
+            self.health_timer = async_call_later(
+                self.entity.hass, health["cooldownRemainingMs"] / 1000, recover
+            )
+        elif self.grace_due is not None:
+            self._schedule_grace(
+                max(self.grace_started, self.last_motion or self.grace_started)
+            )
+        else:
+            self._schedule()
+        self.entity.async_write_ha_state()
 
     def observe(self, event: dict) -> None:
         """Accept only ordered, fresh RTC observations received in this lifecycle."""
@@ -222,6 +263,9 @@ class LightCorrection:
         self.grace_until = (
             datetime.now(UTC) + timedelta(seconds=self.grace_due - monotonic())
         ).isoformat()
+        if self.health_status == "command_degraded":
+            self.entity.async_write_ha_state()
+            return
         generation = self.generation
         timer_generation = self.timer_generation
 
@@ -376,6 +420,24 @@ class LightCorrection:
         self, receipt: CommandReceipt | None, *, correction: bool = False
     ) -> None:
         """Map a fresh bounded receipt without renewing the lineage or budget."""
+        if isinstance(receipt, CommandReceipt) and receipt.command_health is not None:
+            self.health(receipt.command_health)
+        degraded_receipt = (
+            isinstance(receipt, CommandReceipt)
+            and receipt.command_health is not None
+            and receipt.command_health["status"] == "command_degraded"
+            and not receipt.superseded
+        )
+        if degraded_receipt:
+            if type(receipt.intent) is int and receipt.intent > 0:
+                self.intent = receipt.intent
+            if not correction and not self.uncommanded_cycle:
+                self.ha_intent = self.desired
+            self.transition = False
+            events, self.early = self.early, []
+            for event, received_at in events:
+                self.event(event, received_at=received_at)
+            return
         paused_correction = (
             correction
             and self.pause_requested
@@ -530,7 +592,11 @@ class LightCorrection:
     def _automatic_allowed(self) -> bool:
         """Only OFF intent grants optional automatic correction authority."""
         return (
-            self.desired is False and self.enabled and not self.paused and self._live()
+            self.desired is False
+            and self.enabled
+            and not self.paused
+            and self._live()
+            and self.health_status != "command_degraded"
         )
 
     def _cancel_timer(self) -> None:
@@ -795,6 +861,7 @@ class LightCorrection:
     def _failure(self) -> None:
         if (
             self.desired is not False
+            or self.health_status == "command_degraded"
             or self.failed
             or not self._live()
             or self.observed is self.desired
@@ -827,7 +894,11 @@ class LightCorrection:
         self, reason: str, *, receipt: CommandReceipt | None = None
     ) -> None:
         """Report lost verification without inventing a confirmed opposite state."""
-        if self.desired is not False or self.failed:
+        if (
+            self.desired is not False
+            or self.failed
+            or self.health_status == "command_degraded"
+        ):
             return
         self.failed = True
         self.failure_reason = reason
@@ -895,6 +966,10 @@ class LightCorrection:
         self.grace_started = self.grace_due = None
         self.grace_until = None
         if state == "closed":
+            self.health_generation += 1
+            if self.health_timer is not None:
+                self.health_timer()
+                self.health_timer = None
             self.live_observed = None
             self.last_motion = None
             self.observation_stamp = time()
@@ -919,7 +994,11 @@ class LightCorrection:
             "light_correction_enabled": self.enabled,
             "light_correction_state": self.state,
             "light_correction_suppression_reason": (
-                "on_observation_only" if self.desired is True else None
+                "command_degraded"
+                if self.health_status == "command_degraded"
+                else "on_observation_only"
+                if self.desired is True
+                else None
             ),
             "light_correction_attempts": self.attempts,
             "light_correction_desired_value": self.desired,
@@ -931,6 +1010,11 @@ class LightCorrection:
             "correction_window_until": self.window_until,
             "light_correction_grace_until": self.grace_until,
         }
+        if self.health_status is not None:
+            attributes["command_health"] = self.health_status
+            attributes["command_health_cooldown_remaining_ms"] = max(
+                0, (self.health_until - monotonic()) * 1000
+            )
         if self.last_event is not None:
             attributes.update(
                 {

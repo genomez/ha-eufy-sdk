@@ -96,6 +96,15 @@ travels with each correction and bounds queued transport sends. Ordinary SDK
 recovery must settle before a fresh read and correction; correction-origin writes
 cannot create an additional SDK recovery child.
 
+SDK `commandHealth` receipts, events, and device snapshots share one per-light
+command gate. `command_degraded` cancels pending automatic corrections while
+retaining passive observation. Explicit HA commands still receive one normal SDK
+attempt; the SDK suppresses automatic retry while degraded. A healthy receipt,
+health event, or bounded cooldown expiry allows eligible OFF work to resume within
+its original window and remaining budget. `command_health` describes the command
+path, not device availability or confirmed physical light state. The switch also
+exposes bounded rejection code and correlated send-to-response latency when given.
+
 Temporary unqualified, failed, or busy confirmation reads retry after 20 seconds
 within the original window. The SDK has eight automatic detection reads and sixteen
 separate explicit confirmation reads, reserving capacity for corrections and the

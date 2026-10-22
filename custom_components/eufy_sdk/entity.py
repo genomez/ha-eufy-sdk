@@ -17,7 +17,13 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import CommandReceipt, EufySdkApiClientError, late_contrary_event
+from .api import (
+    CommandReceipt,
+    EufySdkApiClientError,
+    command_health,
+    command_health_event,
+    late_contrary_event,
+)
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 from .light_correction import LightCorrection
@@ -345,6 +351,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._command_profile: str | None = None
         self._write_tasks: set[asyncio.Task] = set()
         self._light_correction: LightCorrection | None = None
+        self._command_health_snapshot: dict | None = None
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to valued reports for this property in this lifecycle."""
@@ -363,6 +370,20 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             EVENT_TYPE, handle_report, event_filter=self._property_event_filter
         )
         self.async_on_remove(self._remove_property_listener)
+        self._sync_command_health()
+
+    @callback
+    def _sync_command_health(self) -> None:
+        """Adopt each new snapshot projection once without extending cooldowns."""
+        if self._prop != "light" or self._removed:
+            return
+        health = (self.coordinator.data or {}).get(self._sn, {}).get("commandHealth")
+        if health is self._command_health_snapshot or command_health(health) is None:
+            return
+        self._command_health_snapshot = health
+        if self._light_correction is None:
+            self._light_correction = LightCorrection(self)
+        self._light_correction.health(health)
 
     @callback
     def _remove_property_listener(self) -> None:
@@ -375,6 +396,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     def _property_event_filter(self, data: dict[str, Any]) -> bool:
         """Match the HA event data dictionary using the cache scalar contract."""
         if self._prop == "light" and not self._removed:
+            if data.get("sn") == self._sn and command_health_event(data) is not None:
+                return True
             if data.get("event") in {"bridgeDisconnected", "ready"}:
                 return True
             if data.get("deviceSn") == self._sn and (
@@ -406,6 +429,11 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
     def _handle_property_changed(self, event: Event) -> None:  # noqa: PLR0911, PLR0912
         """Keep bounded light settling; release other holds on reports."""
         if not self._property_event_filter(event.data):
+            return
+        if event.data.get("event") == "commandHealth":
+            if self._light_correction is None:
+                self._light_correction = LightCorrection(self)
+            self._light_correction.health(event.data)
             return
         if event.data.get("event") == "bridgeDisconnected":
             if self._light_correction is not None:
@@ -759,6 +787,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             return
         self._release_reconciled_hold()
         if self._prop == "light":
+            self._sync_command_health()
             if self._light_correction is not None:
                 self._light_correction.check_policy()
             self._update_light_candidate()
