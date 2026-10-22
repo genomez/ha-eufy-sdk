@@ -527,6 +527,12 @@ class LightCorrection:
             and self.entity.client.late_contrary_effects_supported is True
         )
 
+    def _automatic_allowed(self) -> bool:
+        """Only OFF intent grants optional automatic correction authority."""
+        return (
+            self.desired is False and self.enabled and not self.paused and self._live()
+        )
+
     def _cancel_timer(self) -> None:
         self.timer_generation += 1
         if self.timer is not None:
@@ -541,6 +547,8 @@ class LightCorrection:
             return
         if self.paused:
             self.state = "paused"
+            return
+        if not self._automatic_allowed():
             return
         if self.recovery_busy and not self.retry_due:
             self.state = "recovery_busy"
@@ -568,7 +576,7 @@ class LightCorrection:
             self.timer = None
             if (
                 generation == self.generation
-                and self._live()
+                and self._automatic_allowed()
                 and (self.task is None or self.task.done())
             ):
                 self.timer_generation += 1
@@ -637,9 +645,7 @@ class LightCorrection:
         """Mark transport dispatch before its first await, after the final guard."""
         allowed = (
             generation == self.generation
-            and self._live()
-            and self.enabled
-            and not self.paused
+            and self._automatic_allowed()
             and not self.recovery_busy
             and self.state not in {"matched", "suspended"}
         )
@@ -651,13 +657,13 @@ class LightCorrection:
         previous_correction = self.last_correction
         attempt_started = False
         try:
-            if not self.enabled or self.paused or not self._live():
+            if generation != self.generation or not self._automatic_allowed():
                 return
             result = await self._read(generation)
             if (
                 result is None
-                or self.paused
-                or not self.enabled
+                or generation != self.generation
+                or not self._automatic_allowed()
                 or self.state == "matched"
             ):
                 return
@@ -787,7 +793,12 @@ class LightCorrection:
                 self.entity.async_write_ha_state()
 
     def _failure(self) -> None:
-        if self.failed or not self._live() or self.observed is self.desired:
+        if (
+            self.desired is not False
+            or self.failed
+            or not self._live()
+            or self.observed is self.desired
+        ):
             return
         self.failed = True
         self.failure_reason = "confirmed_opposite"
@@ -816,7 +827,7 @@ class LightCorrection:
         self, reason: str, *, receipt: CommandReceipt | None = None
     ) -> None:
         """Report lost verification without inventing a confirmed opposite state."""
-        if self.failed:
+        if self.desired is not False or self.failed:
             return
         self.failed = True
         self.failure_reason = reason
@@ -907,6 +918,9 @@ class LightCorrection:
         attributes = {
             "light_correction_enabled": self.enabled,
             "light_correction_state": self.state,
+            "light_correction_suppression_reason": (
+                "on_observation_only" if self.desired is True else None
+            ),
             "light_correction_attempts": self.attempts,
             "light_correction_desired_value": self.desired,
             "light_correction_observed_value": self.observed,

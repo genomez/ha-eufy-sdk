@@ -154,13 +154,13 @@
           "poll_interval_minutes": "Cloud poll interval (minutes)",
           "soc_refresh_seconds": "Solarbank SOC-limit refresh (seconds)",
           "legacy_doorbell_pressed": "Use legacy doorbell pressed event",
-          "light_correction_enabled": "Correct confirmed contrary light states",
+          "light_correction_enabled": "Correct confirmed contrary lights to OFF only",
           "light_correction_pause_entity": "Pause light corrections helper (optional)"
         },
         "data_description": {
           "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank.",
           "legacy_doorbell_pressed": "Off: one ring event per press. On: one pressed event instead, for existing automations. Never sends both.",
-          "light_correction_enabled": "Default off. For supported floodlights, correct either direction at most three times within ten minutes of the latest HA command. This can override app or motion lighting. Contrary observations remain available while off.",
+          "light_correction_enabled": "Default off. For supported floodlights, correct only OFF intent at most three times within ten minutes of the latest HA command. ON recovery uses the original command and existing bounded SDK retry only. OFF correction can override app or motion lighting. Contrary observations remain available while disabled.",
           "light_correction_pause_entity": "Select an input boolean or switch. Corrections pause while it is on or unavailable, then resume while the original window and attempt budget remain. Leave empty for no pause helper."
         }
       }

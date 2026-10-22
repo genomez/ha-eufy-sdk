@@ -71,7 +71,7 @@ Target contributions at `s1-experimental`. The existing default branch belongs t
 
 ## Optional contrary light correction
 
-The integration options include **Correct confirmed contrary light states**
+The integration options include **Correct confirmed contrary lights to OFF only**
 (`light_correction_enabled`, default off) and an optional **Pause light corrections
 helper** (`light_correction_pause_entity`, no helper by default). The pause selector
 accepts an `input_boolean` or `switch`. A selected helper pauses corrections while
@@ -82,7 +82,9 @@ This requires a bridge advertising `lateContraryEffects` version 1, a 600000 ms
 watch, confirmation support, and bounded state writes. An older bridge keeps its
 existing write behavior. Only a new explicit HA light command establishes correction
 authority, including commands issued by HA automations. A newer command immediately
-replaces the previous lineage. Either requested direction is supported.
+replaces the previous lineage. Automatic correction supports OFF intent only.
+ON recovery uses the original command and existing bounded SDK retry; ON
+observations remain available with an `on_observation_only` suppression reason.
 
 The latest explicit command owns one monotonic ten-minute window. A fresh SDK
 confirmation of contrary state schedules corrections at 15, 60, and 300 seconds from

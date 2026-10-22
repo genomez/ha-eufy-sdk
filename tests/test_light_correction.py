@@ -203,7 +203,7 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(entity._command_receipt, original_receipt)
         self.assertEqual(entity._light_correction.born, 0)
 
-    async def test_both_directions_and_reported_state_stays_honest(self):
+    async def test_off_only_and_reported_state_stays_honest(self):
         for desired in (False, True):
             with self.subTest(desired=desired):
                 entity, _, _, _ = self.setup_light(desired=desired)
@@ -216,6 +216,7 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
                 await self.advance(47)
                 self.assertIs(entity.is_on, not desired)
                 self.assertIs(self.commands[-1][1], desired)
+                self.assertEqual(len(self.commands), 1 if desired else 2)
                 self.assertEqual(
                     entity.extra_state_attributes["command_status"], "acknowledged"
                 )
@@ -914,6 +915,11 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
                 self.emit()
                 await self.advance(15)
                 controller = entity._light_correction
+                if desired:
+                    self.assertEqual(controller.attempts, 0)
+                    self.assertEqual(client.set_property.await_count, 1)
+                    self.notification.assert_not_called()
+                    continue
                 self.assertEqual(controller.state, "verification_exhausted")
                 self.assertEqual(controller.failure_reason, "protection_lost")
                 self.assertEqual(controller.attempts, 1)

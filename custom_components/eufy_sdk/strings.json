@@ -1,0 +1,203 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "streaming": {
+        "name": "Streaming"
+      },
+      "connectivity": {
+        "name": "Connectivity"
+      },
+      "package": {
+        "name": "Package"
+      }
+    },
+    "button": {
+      "reboot": {
+        "name": "Reboot"
+      },
+      "refresh_last_event": {
+        "name": "Refresh Last Event"
+      },
+      "tilt_up": {
+        "name": "Tilt up"
+      },
+      "tilt_down": {
+        "name": "Tilt down"
+      },
+      "pan_left": {
+        "name": "Pan left"
+      },
+      "pan_right": {
+        "name": "Pan right"
+      }
+    },
+    "event": {
+      "doorbell": {
+        "name": "Doorbell"
+      },
+      "detection": {
+        "name": "Detection"
+      }
+    },
+    "image": {
+      "last_event": {
+        "name": "Last event"
+      }
+    },
+    "select": {
+      "snapshot_policy": {
+        "name": "Snapshot policy",
+        "state": {
+          "default": "Default",
+          "auto": "Automatic",
+          "stored": "Stored",
+          "live": "Live"
+        }
+      },
+      "preset": {
+        "name": "Preset"
+      }
+    },
+    "sensor": {
+      "info": {
+        "name": "Info"
+      },
+      "last_person": {
+        "name": "Last person"
+      },
+      "stream_url": {
+        "name": "Stream URL"
+      },
+      "light_effect": {
+        "name": "Light Effect"
+      },
+      "current_mode": {
+        "name": "Current mode"
+      }
+    },
+    "switch": {
+      "detect_human": {
+        "name": "Detect human"
+      },
+      "detect_vehicle": {
+        "name": "Detect vehicle"
+      },
+      "detect_pet": {
+        "name": "Detect pet"
+      },
+      "face_recognition": {
+        "name": "Face recognition"
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the eufy bridge",
+        "description": "Enter the host and port of your ha-eufy-sdk bridge (the WebSocket).",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      },
+      "twofa": {
+        "title": "Two-factor authentication",
+        "description": "A verification code was sent to your eufy account. Enter it below (tick Resend to request a new one).",
+        "data": {
+          "code": "Verification code",
+          "resend": "Resend code"
+        }
+      },
+      "captcha": {
+        "title": "Captcha",
+        "description": "Enter the characters from the image below (tick Refresh for a new one).\n\n{image}",
+        "data": {
+          "answer": "Captcha",
+          "refresh": "Refresh image"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate the eufy bridge",
+        "description": "The bridge at {host} needs to log in again (its session expired, so eufy is asking for 2FA/captcha). Make sure the bridge is running and reachable, then submit to continue."
+      },
+      "reconfigure": {
+        "title": "Change bridge endpoint",
+        "description": "Enter the new host and port for this existing bridge entry. Confirm it serves the same account and devices before changing it. The original endpoint remains until connection and authentication succeed.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the bridge at that host/port.",
+      "invalid_2fa": "That verification code was not accepted.",
+      "invalid_captcha": "That captcha was not accepted.",
+      "invalid_host": "Enter a bridge host."
+    },
+    "abort": {
+      "already_configured": "This bridge is already configured.",
+      "cannot_connect": "Could not reach the bridge.",
+      "reauth_successful": "The bridge is authenticated again.",
+      "auth_pending": "The bridge is still signing in. Wait for it to finish, then retry setup or reauthentication. No new login was requested.",
+      "auth_not_ready": "The bridge is not authenticated. Check its authentication status before retrying setup or reauthentication. No new login was requested.",
+      "auth_blocked": "Bridge sign-in is paused after an authentication refusal. Resolve the account issue before retrying. No new login was requested.",
+      "auth_cooldown": "Bridge sign-in is cooling down after a temporary failure. Wait for its retry window before retrying setup. No new login was requested."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "eufy bridge options",
+        "description": "How often the bridge polls the eufy cloud for device state. Lower is fresher but adds cloud traffic; the cloud itself only updates every few minutes.",
+        "data": {
+          "poll_interval_minutes": "Cloud poll interval (minutes)",
+          "soc_refresh_seconds": "Solarbank SOC-limit refresh (seconds)",
+          "legacy_doorbell_pressed": "Use legacy doorbell pressed event",
+          "light_correction_enabled": "Correct confirmed contrary lights to OFF only",
+          "light_correction_pause_entity": "Pause light corrections helper (optional)"
+        },
+        "data_description": {
+          "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank.",
+          "legacy_doorbell_pressed": "Off: one ring event per press. On: one pressed event instead, for existing automations. Never sends both.",
+          "light_correction_enabled": "Default off. For supported floodlights, correct only OFF intent at most three times within ten minutes of the latest HA command. ON recovery uses the original command and existing bounded SDK retry only. OFF correction can override app or motion lighting. Contrary observations remain available while disabled.",
+          "light_correction_pause_entity": "Select an input boolean or switch. Corrections pause while it is on or unavailable, then resume while the original window and attempt budget remain. Leave empty for no pause helper."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "preset_empty": {
+      "message": "Preset {slot} has no stored position. Save one there from the eufy app first."
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "ringing": "Doorbell ringing",
+      "motion": "Motion detected",
+      "person": "Person detected",
+      "pet": "Pet detected",
+      "dog": "Dog detected",
+      "vehicle": "Vehicle detected",
+      "stranger": "Stranger detected",
+      "sound": "Sound detected",
+      "crying": "Crying detected",
+      "package_delivered": "Package delivered",
+      "package_taken": "Package taken",
+      "package_stranded": "Package left out"
+    }
+  },
+  "issues": {
+    "preload_battery_camera": {
+      "title": "Stream preloading drains {camera}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Turn off stream preloading for {camera}",
+            "description": "{camera} runs on battery, and \"Preload camera stream\" is on for it. Home Assistant then keeps its stream running permanently and reconnects whenever it ends, which wakes the camera over and over and drains its battery.\n\nSubmit to turn preloading off for this camera. Live view still works; it just starts when you open it."
+          }
+        }
+      }
+    }
+  }
+}

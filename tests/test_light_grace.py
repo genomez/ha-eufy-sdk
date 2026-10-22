@@ -643,14 +643,19 @@ class WindowMotionGraceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(self.commands), 1)
                 self.notification.assert_not_called()
 
-    async def test_desired_on_with_motion_keeps_normal_correction(self):
+    async def test_desired_on_with_motion_remains_observation_only(self):
         entity, _, _, _ = await self.window(desired=True)
         await self.advance(110)
         self.motion()
         await self.advance(115)
         self.assertIsNone(entity._light_correction.grace_due)
-        self.assertEqual(self.commands[-1][:2], (115, True))
-        self.assertTrue(self.commands[-1][2]["correction"])
+        self.assertEqual(self.commands[-1][:2], (0, True))
+        self.assertEqual(len(self.commands), 1)
+        self.assertEqual(
+            entity.extra_state_attributes["light_correction_suppression_reason"],
+            "on_observation_only",
+        )
+        self.notification.assert_not_called()
 
     async def test_motion_after_completed_write_keeps_cycle_and_limits(self):
         entity, _, _, _ = await self.window(motion_at=None)
