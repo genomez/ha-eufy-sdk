@@ -153,7 +153,13 @@ class LightCorrection:
             self._cancel_timer()
             self.pause_requested = True
             self.entity.client.pause_light_correction(self.entity._sn)
-            if self.task is not None and self.task is not asyncio.current_task():
+            # A dispatched write's bounded receipt may transfer the passive
+            # watch. Cancel preparation reads, but keep that RPC and its intent.
+            if (
+                not self.write_dispatched
+                and self.task is not None
+                and self.task is not asyncio.current_task()
+            ):
                 self.task.cancel()
         else:
             self._resume_health()
