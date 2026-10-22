@@ -152,7 +152,9 @@ class LightCorrection:
         if self.health_status == "command_degraded":
             self._cancel_timer()
             self.pause_requested = True
-            self.entity.client.pause_light_correction(self.entity._sn)
+            self.entity.client.pause_light_correction(
+                self.entity._sn, keep_observation=True
+            )
             # A dispatched write's bounded receipt may transfer the passive
             # watch. Cancel preparation reads, but keep that RPC and its intent.
             if (
@@ -800,6 +802,7 @@ class LightCorrection:
                 self.desired,
                 bounded=True,
                 correction=not bootstrap,
+                automatic=True,
                 **(
                     {}
                     if bootstrap

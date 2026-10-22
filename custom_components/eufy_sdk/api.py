@@ -435,11 +435,14 @@ class EufySdkApiClient:
         self._cancel_tasks.add(task)
         task.add_done_callback(self._cancel_tasks.discard)
 
-    def pause_light_correction(self, sn: str) -> None:
-        """Cancel automatic work; only correction origins retain observations."""
+    def pause_light_correction(
+        self, sn: str, *, keep_observation: bool = False
+    ) -> None:
+        """Cancel automatic work, preserving a watch explicitly during degradation."""
         request = self._correction_requests.get((sn, "light"))
         if request is not None:
-            mid, transport, keep_observation = request
+            mid, transport, correction_observation = request
+            keep_observation = keep_observation or correction_observation
             if keep_observation:
                 self._observation_preserving_aborts.add(mid)
             self._schedule_command_cancel(
@@ -961,6 +964,7 @@ class EufySdkApiClient:
         *,
         bounded: bool = False,
         correction: bool = False,
+        automatic: bool = False,
         correction_expires_at: float | None = None,
         correction_expires_at_ms: float | None = None,
         _send_guard: Callable[[], bool] | None = None,
@@ -976,7 +980,8 @@ class EufySdkApiClient:
         ):
             message = "light_correction_invalid_deadline"
             raise EufySdkApiClientCommunicationError(message)
-        if correction and (
+        automatic = automatic or correction
+        if automatic and (
             not bounded
             or name != "light"
             or type(value) is not bool
@@ -1093,7 +1098,7 @@ class EufySdkApiClient:
                             "_correction_key": key,
                             "_correction_keep_observation": correction,
                         }
-                        if correction or _send_guard is not None
+                        if automatic or _send_guard is not None
                         else {}
                     ),
                     sn=sn,
@@ -1107,6 +1112,7 @@ class EufySdkApiClient:
                         "clockToken": clock["clockToken"],
                         "callerReceivedAtMs": received_ms,
                         "clockUncertaintyMs": uncertainty_ms,
+                        **({"automatic": True} if automatic else {}),
                         **({"correction": True} if correction else {}),
                         **(
                             {"correctionExpiresAtMs": correction_expires_at_ms}

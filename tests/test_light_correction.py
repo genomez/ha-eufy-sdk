@@ -193,6 +193,7 @@ class LightCorrectionTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "bounded": True,
                     "correction": True,
+                    "automatic": True,
                     "correction_expires_at": 600,
                     "correction_expires_at_ms": (
                         entity._light_correction.expires_wall_ms
