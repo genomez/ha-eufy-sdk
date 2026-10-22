@@ -7,6 +7,7 @@ import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import test_bounded_state_writes as bounded
 import test_light_correction as fixtures
@@ -33,12 +34,16 @@ class AutomaticWireTests(unittest.IsolatedAsyncioTestCase):
     observation = grace.LightGraceTests.observation
     arm = grace.LightGraceTests.arm
 
-    async def check_grace_wire(self, *, degraded=False, health_before=False):
+    async def check_grace_wire(self, *, degraded=False, health_before=False):  # noqa: PLR0915
         entity, _, client, _ = await self.arm()
         protocol = bounded.BoundedProtocolTests.client(self)
         protocol._set_late_contrary_capability(fixtures.CAPABILITY)
         send = protocol._ws.send_json.side_effect
         loop = asyncio.get_running_loop()
+        # Controller and API deadlines must share the synthetic monotonic clock.
+        clock = patch.object(loop, "time", side_effect=lambda: self.now)
+        clock.start()
+        self.addCleanup(clock.stop)
         protocol._on_event = lambda event: loop.call_soon(
             entity._handle_property_changed, SimpleNamespace(data=event)
         )

@@ -806,14 +806,8 @@ class LightCorrection:
                 bounded=True,
                 correction=not bootstrap,
                 automatic=True,
-                **(
-                    {}
-                    if bootstrap
-                    else {
-                        "correction_expires_at": self.born + WINDOW_SECONDS,
-                        "correction_expires_at_ms": self.expires_wall_ms,
-                    }
-                ),
+                correction_expires_at=self.born + WINDOW_SECONDS,
+                correction_expires_at_ms=self.expires_wall_ms,
                 _send_guard=lambda: self._admit_write(generation),
             )
             if generation != self.generation or not (
@@ -826,7 +820,14 @@ class LightCorrection:
             # Completion is a conservative spacing anchor after any queue and
             # ACK wait. Admission time alone cannot bound the physical send gap.
             self.last_correction = monotonic()
-            self.bootstrap = False
+            # An unsent bootstrap has no SDK watch to confirm or transfer.
+            # Retry its original admission without renewing any authority.
+            self.bootstrap = (
+                bootstrap
+                and isinstance(receipt, CommandReceipt)
+                and receipt.status == "cancelled_before_send"
+                and not receipt.send_attempted
+            )
             self.receipt(receipt, correction=True)
             if generation != self.generation:
                 return

@@ -970,10 +970,12 @@ class EufySdkApiClient:
         _send_guard: Callable[[], bool] | None = None,
     ) -> CommandReceipt | None:
         """Opt eligible scalar writes into one frozen caller lifetime."""
+        # Automatic bootstrap callers share the original authority deadline,
+        # but only corrections can inherit an existing SDK observation watch.
         if (correction_expires_at is None) != (correction_expires_at_ms is None) or (
             correction_expires_at is not None
             and (
-                not correction
+                not (automatic or correction)
                 or not _finite_number(correction_expires_at)
                 or not _finite_number(correction_expires_at_ms)
             )
@@ -1116,7 +1118,7 @@ class EufySdkApiClient:
                         **({"correction": True} if correction else {}),
                         **(
                             {"correctionExpiresAtMs": correction_expires_at_ms}
-                            if correction_expires_at_ms is not None
+                            if correction and correction_expires_at_ms is not None
                             else {}
                         ),
                     },
