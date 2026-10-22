@@ -477,8 +477,11 @@ class LightCorrection:
                 self.ha_intent = self.desired
             self.transition = False
             events, self.early = self.early, []
+            self.replaying = True
             for event, received_at in events:
                 self.event(event, received_at=received_at)
+            self.replaying = False
+            self._motion_handoff()
             return
         paused_correction = (
             correction

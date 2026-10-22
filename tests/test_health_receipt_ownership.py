@@ -22,7 +22,7 @@ class HealthReceiptOwnershipTests(unittest.IsolatedAsyncioTestCase):
     emit = fixtures.LightCorrectionTests.emit
 
     async def check_health_before_receipt(  # noqa: PLR0915
-        self, *, sent, early_match=False
+        self, *, sent, early_match=False, early_motion=False
     ):
         entity, _, client, _ = self.setup_light()
         protocol = bounded.BoundedProtocolTests.client(self)
@@ -60,6 +60,9 @@ class HealthReceiptOwnershipTests(unittest.IsolatedAsyncioTestCase):
             future = protocol._pending[payload["id"]]
 
             def terminal():
+                if early_motion:
+                    entity._light_correction.motion()
+                    self.emit("contrary", intent=2)
                 if early_match:
                     self.emit("matched", intent=2)
                 if not future.done():
@@ -110,6 +113,8 @@ class HealthReceiptOwnershipTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0)
             self.assertEqual(controller.health_status, "command_degraded")
             self.assertEqual(delivered, [True], "bounded terminal RPC must survive")
+            if early_motion:
+                self.assertEqual(controller.state, "matched")
             self.assertEqual(controller.intent, 2, "receipt transfers watch ownership")
             self.assertEqual(controller.attempts, int(sent))
             self.assertEqual(controller.write_sent, sent)
@@ -133,6 +138,15 @@ class HealthReceiptOwnershipTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(protocol._pending)
             self.assertFalse(protocol._bounded_requests)
             self.notification.assert_not_called()
+            if early_motion:
+                await self.advance(616)
+                self.assertEqual(
+                    len(
+                        [frame for frame in self.frames if frame["cmd"] == "device.set"]
+                    ),
+                    1,
+                    "buffered match must prevent a new grace OFF after cooldown",
+                )
             controller.stop("closed")
 
     async def test_sent_health_before_receipt_preserves_passive_match(self):
@@ -143,3 +157,8 @@ class HealthReceiptOwnershipTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_match_before_terminal_receipt_is_replayed_after_health(self):
         await self.check_health_before_receipt(sent=True, early_match=True)
+
+    async def test_degraded_receipt_replays_match_before_motion_handoff(self):
+        await self.check_health_before_receipt(
+            sent=False, early_match=True, early_motion=True
+        )
