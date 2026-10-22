@@ -14,7 +14,12 @@ from homeassistant.components import persistent_notification
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 
-from .api import CommandReceipt, EufySdkApiClientError, command_health
+from .api import (
+    CommandReceipt,
+    EufySdkApiClientError,
+    command_health,
+    command_health_is_current,
+)
 from .const import CONF_LIGHT_CORRECTION, CONF_LIGHT_CORRECTION_PAUSE
 from .property_sync import MAX_OBSERVATION_AGE_SECONDS
 
@@ -87,42 +92,71 @@ class LightCorrection:
         self.health_until = 0.0
         self.health_timer = None
         self.health_generation = 0
+        self.health_projection: dict | None = None
 
-    def health(self, value: Any) -> None:
-        """Mirror SDK gate changes; retain passive lineage and its fixed expiry."""
-        health = command_health(value)
-        if health is None or self.entity._removed:
-            return
+    def _resume_health(self) -> None:
+        if self.grace_due is not None:
+            self._schedule_grace(
+                max(self.grace_started, self.last_motion or self.grace_started)
+            )
+        else:
+            self._schedule()
+        self.entity.async_write_ha_state()
+
+    def _arm_health_timer(self) -> None:
         self.health_generation += 1
         generation = self.health_generation
         if self.health_timer is not None:
             self.health_timer()
             self.health_timer = None
+        if self.health_status != "command_degraded" or self.entity._removed:
+            return
+
+        @callback
+        def recover(_: Any) -> None:
+            if generation != self.health_generation or self.entity._removed:
+                return
+            self.health_timer = None
+            self.health_status = "healthy"
+            self._resume_health()
+
+        self.health_timer = async_call_later(
+            self.entity.hass, max(0, self.health_until - monotonic()), recover
+        )
+
+    def reset_health(self) -> None:
+        """Reset runtime ordering while preserving the original bounded cooldown."""
+        self.health_projection = None
+        self._arm_health_timer()
+
+    def health(self, value: Any) -> None:
+        """Mirror ordered SDK health without letting stale receipts reopen sends."""
+        health = command_health(value)
+        if (
+            health is None
+            or self.entity._removed
+            or not command_health_is_current(health, self.health_projection)
+        ):
+            return
+        until = monotonic() + health["cooldownRemainingMs"] / 1000
+        if (
+            self.health_projection is not None
+            and "revision" in health
+            and health["revision"] == self.health_projection.get("revision")
+        ):
+            until = min(until, self.health_until)
+        self.health_projection = health
         self.health_status = health["status"]
-        self.health_until = monotonic() + health["cooldownRemainingMs"] / 1000
+        self.health_until = until
+        self._arm_health_timer()
         if self.health_status == "command_degraded":
             self._cancel_timer()
             self.pause_requested = True
             self.entity.client.pause_light_correction(self.entity._sn)
             if self.task is not None and self.task is not asyncio.current_task():
                 self.task.cancel()
-
-            @callback
-            def recover(_: Any) -> None:
-                if generation != self.health_generation or self.entity._removed:
-                    return
-                self.health_timer = None
-                self.health({"status": "healthy", "cooldownRemainingMs": 0})
-
-            self.health_timer = async_call_later(
-                self.entity.hass, health["cooldownRemainingMs"] / 1000, recover
-            )
-        elif self.grace_due is not None:
-            self._schedule_grace(
-                max(self.grace_started, self.last_motion or self.grace_started)
-            )
         else:
-            self._schedule()
+            self._resume_health()
         self.entity.async_write_ha_state()
 
     def observe(self, event: dict) -> None:
@@ -966,10 +1000,7 @@ class LightCorrection:
         self.grace_started = self.grace_due = None
         self.grace_until = None
         if state == "closed":
-            self.health_generation += 1
-            if self.health_timer is not None:
-                self.health_timer()
-                self.health_timer = None
+            self.reset_health()
             self.live_observed = None
             self.last_motion = None
             self.observation_stamp = time()

@@ -49,6 +49,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             completed_snapshot_generation=0,
             property_observations=None,
             record_state_event=Mock(),
+            apply_command_health_event=Mock(),
             async_add_listener=Mock(return_value=Mock()),
             _clear_fast_retry=Mock(),
         )

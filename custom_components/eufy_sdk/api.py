@@ -58,6 +58,7 @@ BOUNDED_CLOCK_MAX_MS = 1000
 CLOCK_TOKEN_MAX_LENGTH = 128
 DEVICE_SN_MAX_LENGTH = 128
 LATE_CONTRARY_WINDOW_MS = 600000
+MAX_COMMAND_HEALTH_TARGETS = 1024
 LATE_CONTRARY_STATES = frozenset(
     {
         "contrary",
@@ -124,9 +125,34 @@ def command_health(value: Any) -> dict[str, Any] | None:
         or value["status"] not in {"command_degraded", "healthy"}
         or not _finite_number(value.get("cooldownRemainingMs"))
         or not 0 <= value["cooldownRemainingMs"] <= LATE_CONTRARY_WINDOW_MS
+        or (
+            "revision" in value
+            and (
+                type(value["revision"]) is not int
+                or not 0 <= value["revision"] <= 2**53 - 1
+            )
+        )
     ):
         return None
-    return {key: value[key] for key in ("status", "cooldownRemainingMs")}
+    return {
+        key: value[key]
+        for key in ("status", "cooldownRemainingMs", "revision")
+        if key in value
+    }
+
+
+def command_health_is_current(health: dict, previous: dict | None) -> bool:
+    """Refuse older versions and conflicting or lengthened same-version state."""
+    if previous is None or "revision" not in previous:
+        return True
+    revision = health.get("revision")
+    previous_revision = previous["revision"]
+    if revision is None or revision < previous_revision:
+        return False
+    return revision != previous_revision or (
+        health["status"] == previous["status"]
+        and health["cooldownRemainingMs"] <= previous["cooldownRemainingMs"]
+    )
 
 
 def command_health_event(value: Any) -> dict[str, Any] | None:
@@ -316,6 +342,8 @@ class EufySdkApiClient:
         self._reconnect_task: asyncio.Task | None = None
         self._connect_lock = asyncio.Lock()
         self._closing = False
+        self._connection_generation = 0
+        self._command_health_projections: dict[str, dict] = {}
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self._webrtc_callbacks: dict[str, Callable[[dict[str, Any]], None]] = {}
@@ -458,9 +486,35 @@ class EufySdkApiClient:
         """Whether the WebSocket is open."""
         return self._ws is not None and not self._ws.closed
 
+    def _reset_command_health(self) -> None:
+        """Retire health watermarks and pending reply ownership for a runtime."""
+        self._connection_generation += 1
+        self._command_health_projections.clear()
+
+    def _project_command_health(self, sn: str, health: Any) -> dict | None:
+        """Keep one ordered effective projection independently of raw receipts."""
+        health = command_health(health)
+        previous = self._command_health_projections.get(sn)
+        if health is not None and command_health_is_current(health, previous):
+            if (
+                previous is None
+                and len(self._command_health_projections) >= MAX_COMMAND_HEALTH_TARGETS
+            ):
+                return None
+            self._command_health_projections[sn] = health
+            return health
+        return previous
+
+    def _require_connection(self, transport: Any, generation: int) -> None:
+        """Reject replies from a retired connection even if already resolved."""
+        if self._ws is not transport or generation != self._connection_generation:
+            message = "bridge_connection_changed"
+            raise EufySdkApiClientCommunicationError(message)
+
     async def reset_connection(self) -> None:
         """Retire a wedged bridge socket while preserving reconnect behavior."""
         async with self._connect_lock:
+            self._reset_command_health()
             self._bounded_capability = False
             self._invalidate_webrtc_sessions()
             ws, task = self._ws, self._recv_task
@@ -495,11 +549,13 @@ class EufySdkApiClient:
             except (aiohttp.ClientError, TimeoutError, OSError):
                 msg = "bridge_unreachable"
                 raise EufySdkApiClientCommunicationError(msg) from None
+            self._reset_command_health()
             self._recv_task = asyncio.ensure_future(self._receive_loop())
 
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
         had_late_contrary = self._late_contrary_capability
+        self._reset_command_health()
         self._closing = True
         self._bounded_capability = False
         self._late_contrary_capability = False
@@ -526,6 +582,27 @@ class EufySdkApiClient:
                     EufySdkApiClientCommunicationError("connection closed")
                 )
         self._pending.clear()
+
+    def _dispatch_event(self, data: dict) -> None:
+        """Order health and lifecycle events before notifying integration consumers."""
+        if data["event"] == "lateContraryEffect":
+            data = late_contrary_event(data)
+            if data is None or not self.late_contrary_effects_supported:
+                return
+        elif data["event"] == "commandHealth":
+            data = command_health_event(data)
+            if data is None:
+                return
+            health = command_health(data)
+            previous = self._command_health_projections.get(data["sn"])
+            if not command_health_is_current(health, previous):
+                return
+            if self._project_command_health(data["sn"], health) is None:
+                return
+        elif data["event"] == "ready":
+            self._reset_command_health()
+        if self._on_event:
+            self._on_event(data)
 
     async def _receive_loop(self) -> None:  # noqa: PLR0912
         """Read frames: resolve pending requests by id, dispatch events."""
@@ -556,16 +633,8 @@ class EufySdkApiClient:
                     handler = self._webrtc_callbacks.get(data.get("sessionId"))
                     if handler is not None:
                         handler(data)
-                elif data.get("event") and self._on_event:
-                    if data["event"] == "lateContraryEffect":
-                        data = late_contrary_event(data)
-                        if data is None or not self.late_contrary_effects_supported:
-                            continue
-                    elif data["event"] == "commandHealth":
-                        data = command_health_event(data)
-                        if data is None:
-                            continue
-                    self._on_event(data)
+                elif data.get("event"):
+                    self._dispatch_event(data)
         except (aiohttp.ClientError, asyncio.CancelledError):
             pass
         finally:
@@ -573,6 +642,7 @@ class EufySdkApiClient:
             # and (unless deliberately closing) reconnect so events resume promptly, not
             # only on the next poll.
             had_late_contrary = self._late_contrary_capability
+            self._reset_command_health()
             self._ws = None
             self._bounded_capability = False
             self._late_contrary_capability = False
@@ -636,6 +706,7 @@ class EufySdkApiClient:
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
         self._pending[mid] = fut
         transport = self._ws
+        generation = self._connection_generation
         if _cancel_on_abort:
             self._bounded_requests[mid] = transport
         if _correction_key is not None:
@@ -678,6 +749,7 @@ class EufySdkApiClient:
                 _correction_key
             ) == (mid, transport, _correction_keep_observation):
                 self._correction_requests.pop(_correction_key, None)
+        self._require_connection(transport, generation)
         if not reply.get("ok"):
             code = reply.get("code")
             msg = (
@@ -714,21 +786,23 @@ class EufySdkApiClient:
     # ── devices ──
     async def list_devices(self) -> list[dict[str, Any]]:
         """Every device the bridge exposes (sn/name/model/codec/capabilities/state)."""
-        return [
-            {
-                **{
-                    key: value
-                    for key, value in normalize_snapshot(device).items()
-                    if key != "commandHealth"
-                },
-                **(
-                    {"commandHealth": health}
-                    if (health := command_health(device.get("commandHealth")))
-                    else {}
-                ),
+        transport, generation = self._ws, self._connection_generation
+        reply = await self.rpc("devices.list")
+        self._require_connection(transport, generation)
+        devices = []
+        for device in reply["devices"]:
+            projected = {
+                key: value
+                for key, value in normalize_snapshot(device).items()
+                if key != "commandHealth"
             }
-            for device in (await self.rpc("devices.list"))["devices"]
-        ]
+            health = self._project_command_health(
+                device.get("sn"), device.get("commandHealth")
+            )
+            if health is not None:
+                projected["commandHealth"] = health
+            devices.append(projected)
+        return devices
 
     async def refresh_event_image(self, sn: str) -> bool:
         """Force a 'Last event' image refresh; returns True if a newer image landed."""
@@ -946,6 +1020,7 @@ class EufySdkApiClient:
         invocation = _BoundedPropertyInvocation()
         self._bounded_invocations[key] = invocation
         transport = self._ws
+        generation = self._connection_generation
         clock_guard: asyncio.Task | None = None
         clock_changed = False
         caller = asyncio.current_task()
@@ -968,6 +1043,7 @@ class EufySdkApiClient:
                     callerSentAtMs=born_wall_ms,
                     _transport=transport,
                 )
+                self._require_connection(transport, generation)
                 if invocation.superseded:
                     return CommandReceipt(
                         "superseded_before_send",
@@ -1039,14 +1115,21 @@ class EufySdkApiClient:
                         ),
                     },
                 )
+                self._require_connection(transport, generation)
                 receipt = _command_receipt(reply.get("receipt"))
-                if receipt.command_health is not None and self._on_event:
+                previous = self._command_health_projections.get(sn)
+                health = receipt.command_health
+                if health is not None and command_health_is_current(health, previous):
+                    health = self._project_command_health(sn, health)
+                else:
+                    health = None
+                if health is not None and self._on_event:
                     self._on_event(
                         {
                             "event": "commandHealth",
                             "sn": sn,
                             "property": "light",
-                            **receipt.command_health,
+                            **health,
                         }
                     )
                 return receipt

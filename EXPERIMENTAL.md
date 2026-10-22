@@ -102,7 +102,14 @@ retaining passive observation. Explicit HA commands still receive one normal SDK
 attempt; the SDK suppresses automatic retry while degraded. A healthy receipt,
 health event, or bounded cooldown expiry allows eligible OFF work to resume within
 its original window and remaining budget. `command_health` describes the command
-path, not device availability or confirmed physical light state. The switch also
+path, not device availability or confirmed physical light state. Optional SDK health
+revisions order receipts, events, and snapshots; older or subsequently unversioned
+projections cannot clear a newer gate. Equal revisions cannot extend cooldown.
+Disconnect/ready resets ordering for a replacement SDK runtime while retaining only
+the remaining local cooldown, and unload cancels that timer. Effective API/coordinator
+health caches preserve at most 1024 target histories until the runtime resets; at
+capacity new target projections are omitted rather than evicting active history.
+The coordinator admits health events only for its current inventory. The switch also
 exposes bounded rejection code and correlated send-to-response latency when given.
 
 Temporary unqualified, failed, or busy confirmation reads retry after 20 seconds

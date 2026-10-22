@@ -10,10 +10,13 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
+    MAX_COMMAND_HEALTH_TARGETS,
     EufySdkApiClientAuthenticationError,
     EufySdkApiClientCommunicationError,
     EufySdkApiClientError,
+    command_health,
     command_health_event,
+    command_health_is_current,
 )
 
 if TYPE_CHECKING:
@@ -36,6 +39,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     # A queued refresh request is not a completed snapshot. Keep receipt order
     # separately so entities can reconcile without bypassing HA's debouncer.
+    _command_health_generation: int = 0
     snapshot_generation: int = 0
     completed_snapshot_generation: int = 0
 
@@ -72,17 +76,43 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         if pending is not None:
             pending.setdefault(serial, {}).update(values)
 
+    def reset_command_health(self) -> None:
+        """Allow a replacement SDK runtime to restart its health revisions."""
+        self._command_health_generation += 1
+        self._command_health_projections: dict[str, dict] = {}
+        if getattr(self, "_pending_command_health", None) is not None:
+            self._pending_command_health.clear()
+        for device in (self.data or {}).values():
+            device.pop("commandHealth", None)
+
+    def _project_command_health(self, serial: str, health: dict | None) -> dict | None:
+        """Keep the newest revision across events, receipts, and snapshots."""
+        cache = getattr(self, "_command_health_projections", None)
+        if cache is None:
+            self._command_health_projections = cache = {}
+        previous = cache.get(serial)
+        health = command_health(health)
+        if health is not None and command_health_is_current(health, previous):
+            if previous is None and len(cache) >= MAX_COMMAND_HEALTH_TARGETS:
+                return None
+            cache[serial] = health
+            return health
+        return previous
+
     def apply_command_health_event(self, event: dict) -> None:
         """Validate SDK health before updating the cache or pending snapshot."""
+        if event.get("event") in {"bridgeDisconnected", "ready"}:
+            self.reset_command_health()
+            return
         event = command_health_event(event)
-        if event is not None:
-            self.record_command_health(
-                event["sn"],
-                {key: event[key] for key in ("status", "cooldownRemainingMs")},
-            )
+        if event is not None and event["sn"] in (self.data or {}):
+            self.record_command_health(event["sn"], command_health(event))
 
     def record_command_health(self, serial: str, health: dict) -> None:
-        """Retain health events that race an in-progress device snapshot."""
+        """Retain ordered health events that race an in-progress snapshot."""
+        health = self._project_command_health(serial, health)
+        if health is None:
+            return
         pending = getattr(self, "_pending_command_health", None)
         if pending is not None:
             pending[serial] = health
@@ -90,14 +120,27 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             self.data[serial]["commandHealth"] = health
             self.async_update_listeners()
 
+    def _project_snapshot_health(self, snapshot: dict, generation: int) -> None:
+        """Apply health ordering separately from ordinary snapshot state."""
+        for serial, device in snapshot.items():
+            raw_health = device.pop("commandHealth", None)
+            health = self._project_command_health(
+                serial,
+                raw_health if generation == self._command_health_generation else None,
+            )
+            if health is not None:
+                device["commandHealth"] = health
+
     async def _async_update_data(self) -> dict[str, dict]:
         """Journal concurrent events until the replacement snapshot is ready."""
         self.snapshot_generation += 1
         generation = self.snapshot_generation
+        health_generation = self._command_health_generation
         self._pending_state_events: dict[str, dict] | None = {}
         self._pending_command_health: dict[str, dict] | None = {}
         try:
             snapshot = await self._read_snapshot()
+            self._project_snapshot_health(snapshot, health_generation)
             # Alarm lifecycle state belongs to this loaded entry and its bounded
             # stop/auto-clear timers. An ordinary list omitting it is not a stop.
             for serial, device in snapshot.items():
@@ -111,7 +154,9 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                     snapshot[serial].setdefault("state", {}).update(values)
             for serial, health in self._pending_command_health.items():
                 if serial in snapshot:
-                    snapshot[serial]["commandHealth"] = health
+                    snapshot[serial]["commandHealth"] = self._project_command_health(
+                        serial, health
+                    )
         except ConfigEntryAuthFailed:
             self._clear_fast_retry()
             raise

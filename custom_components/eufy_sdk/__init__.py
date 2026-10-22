@@ -143,6 +143,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
                 if len(doorbell_event_ids) > MAX_DOORBELL_EVENT_IDS:
                     doorbell_event_ids.pop(next(iter(doorbell_event_ids)))
             # Identity-less pulses may be genuine repeats; never time-filter them.
+        coordinator.apply_command_health_event(evt)
         hass.bus.async_fire(EVENT_TYPE, evt)
         event = evt.get("event")
         # Pushes can arrive before the first device snapshot. Keep forwarding
@@ -153,9 +154,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
             "alarm",
         ):
             return
-        if event == "commandHealth":
-            coordinator.apply_command_health_event(evt)
-        elif event == "contactState":
+        if event == "contactState":
             sn = evt.get("deviceSn") or evt.get("sn")
             if sn and sn in coordinator.data and "open" in evt:
                 coordinator.data[sn].setdefault("state", {})["contact"] = bool(

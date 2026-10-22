@@ -436,12 +436,15 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             self._light_correction.health(event.data)
             return
         if event.data.get("event") == "bridgeDisconnected":
+            self._command_health_snapshot = None
             if self._light_correction is not None:
                 self._light_correction.stop("closed")
                 self.async_write_ha_state()
             return
         if event.data.get("event") == "ready":
+            self._command_health_snapshot = None
             if self._light_correction is not None:
+                self._light_correction.reset_health()
                 self._light_correction.reset_observations()
             return
         if event.data.get("event") == "lateContraryEffect":

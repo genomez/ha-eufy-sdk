@@ -191,7 +191,7 @@ class ManifestReadTests(unittest.TestCase):
 
 class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_actual_api_boundary_normalizes_without_extra_rpc(self):
-        client = object.__new__(EufySdkApiClient)
+        client = EufySdkApiClient("synthetic-bridge", 3000, Mock())
         client.rpc = AsyncMock(return_value={"devices": [snapshot()]})
         result = await client.list_devices()
         self.assertEqual(result[0]["state"]["recordingQuality"], 0)
@@ -208,7 +208,7 @@ class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
         client.rpc.assert_awaited_once_with("device.properties", sn="synthetic-camera")
 
     async def test_realtime_during_raw_snapshot_wins_after_normalization(self):
-        client = object.__new__(EufySdkApiClient)
+        client = EufySdkApiClient("synthetic-bridge", 3000, Mock())
         client._ws = SimpleNamespace(closed=False)
         client.auth_status = AsyncMock(return_value={"state": "ok"})
         client.list_solix_devices = AsyncMock(return_value=[])
