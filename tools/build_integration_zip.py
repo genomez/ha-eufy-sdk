@@ -14,10 +14,10 @@ DOCUMENTS = {'README.md', 'INSTALL.md', 'CORE_COMPATIBILITY.md', 'EXPERIMENTAL.m
 def build(output_dir):
     """Verify the allowlist and write deterministic ZIP/hash/content receipts."""
     metadata = json.loads((ROOT / 'INTEGRATION_PACKAGE.json').read_text(encoding='utf-8'))
-    assert metadata['version'] == '0.3.1-s1.experimental.6'
+    assert metadata['version'] == '0.3.1-s1.experimental.7'
     assert metadata['domain'] == 'eufy_sdk'
     assert metadata['owner'] == 'genomez'
-    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1-s1.experimental.6.zip'
+    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1-s1.experimental.7.zip'
     expected = {item['path']: item['sha256'] for item in metadata['files']}
     assert len(expected) == len(metadata['files']), 'Duplicate allowlist member'
     for rel in expected:
@@ -59,14 +59,14 @@ def build(output_dir):
         assert archive.namelist() == sorted(expected)
         assert {rel: hashlib.sha256(archive.read(rel)).hexdigest() for rel in archive.namelist()} == expected
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    (destination / (artifact.name + '.sha256')).write_text(digest + '  ' + artifact.name + '\n', encoding='utf-8')
+    (destination / (artifact.name + '.sha256')).write_text(digest + '  ' + artifact.name + '\n', encoding='utf-8', newline='\n')
     receipt = {'filename': artifact.name, 'version': metadata['version'], 'sha256': digest,
                'sizeBytes': artifact.stat().st_size, 'files': metadata['files'],
                'zipTimestamp': '1980-01-01T00:00:00', 'compression': 'stored',
                'permissions': 'regular file 0644', 'runtimeDomainCount': 1,
                'frontendIncluded': False, 'coreOverlaysIncluded': False,
                'gitMetadataIncluded': False, 'privateRecoveryIncluded': False}
-    (destination / 'ZIP_CONTENTS.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+    (destination / 'ZIP_CONTENTS.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8', newline='\n')
     print(json.dumps({k: receipt[k] for k in ['filename', 'sha256', 'sizeBytes', 'runtimeDomainCount']}))
 
 

@@ -1,5 +1,18 @@
 # Integration license and modifications
 
+## Local experimental.7 package refresh, 2026-10-22
+
+Current version `0.3.1-s1.experimental.7` uses integration input `689ee3c33b995734085e99089f5fb1ce7605c176`, a descendant of experimental.6 `071c55bf4a9f606eea7603ff3946a52965b2e774`. Implementation, translations and tests are retained byte-for-byte from that input. Only release documentation, the component version, deterministic builder version and current package/source/publication inventories are refreshed.
+
+Changes since experimental.6 include app-aligned preset selection and removal of separate Go buttons; bounded light writes and reported-state presentation; the optional OFF-only integration-owned corrector, command-health suppression, original-authority cooldown recovery, confirmation/resume and motion-aware grace; and the input's existing configurable single doorbell event and native offer wait. The approved doorbell follow-up advertises ring in legacy pressed mode while still sending only pressed, for Home Assistant 2027.4; default ring mode is unchanged. Paired SDK changes are outside this package.
+
+Original MIT licenses, copyright and upstream attribution are preserved byte-for-byte. The historical source-preview manifest remains unchanged. The current inventory compares every tracked path except itself with the exact published experimental.6 baseline, including new implementation and test files. Earlier inventories and review descriptions remain historical provenance, not current-byte claims.
+
+This preparation is local and unpublished, with no runtime/add-on packaging or live acceptance.
+
+## Historical notices retained from experimental.6 and earlier
+
+
 The integration is distributed under the MIT License in `LICENSE` and `custom_components/eufy_sdk/LICENSE`. Original copyright and license text are preserved without replacement. Derived work credits remain in README.md.
 
 Historical baseline `0.3.1.dev1` is maintained by `genomez`, independently of upstream. Changes from the public S1 source preview are fork/install metadata, installation/compatibility/rollback documentation, reproducible packaging, and a narrow explicit endpoint reconfigure flow with translated UI and synthetic native-framework tests. The reconfigure flow preserves the existing entry and registry identities, validates connection/authentication before endpoint changes, rejects other-entry endpoint collisions and closes removed/failed validation connections.
