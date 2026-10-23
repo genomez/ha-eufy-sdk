@@ -1,3 +1,9 @@
+# Experimental.7 published delivery
+
+Integration release: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.7. Runtime release: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.7. HACS installation remains unverified. Reproduce the official ZIP from release tag `0.3.1-s1.experimental.7`, commit `b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f`.
+
+## Historical preparation record
+
 # Integration installation, migration and rollback
 
 **Experimental integration `0.3.1-s1.experimental.7` requires a separate installation decision.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate ZIP and hashes. This local experimental.7 candidate is unpublished; release and HACS availability are not established. These instructions do not authorize installation, authentication or HA restart. The earlier source preview alone is not this artifact. Display name: **Eufy SDK S1 Experimental (genomez)**; domain: `eufy_sdk`; owner: `@genomez`; repository: `https://github.com/genomez/ha-eufy-sdk`.

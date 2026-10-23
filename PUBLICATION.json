@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
-  "state": "local unpublished integration candidate; not installed",
+  "state": "published-source-and-release-delivery; installation unverified",
   "candidateVersion": "0.3.1-s1.experimental.7",
   "candidateSourceManifest": "SOURCE_MANIFEST.json",
   "preparedRuntimeVersion": null,
   "intendedCompanionRuntimeVersion": "0.4.1-s1.experimental.7",
-  "matchingRuntimeAvailabilityVerified": false,
-  "releaseAvailabilityVerified": false,
+  "matchingRuntimeAvailabilityVerified": true,
+  "releaseAvailabilityVerified": true,
   "hacsAvailabilityVerified": false,
   "releasePreparation": {
     "date": "2026-10-22",
@@ -151,6 +151,29 @@
       "published": false,
       "installed": false,
       "packagesInstalled": false
+    }
+  },
+  "published": true,
+  "runtimeSourceRelease": "https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.7",
+  "integrationRelease": "https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.7",
+  "releaseArchiveSourceCommit": "b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f",
+  "releasePreparationRecordHistorical": true,
+  "publicationDocumentationOverrides": {
+    "README.md": {
+      "preparedSha256": "59b9302d8e00b2ae19577653d2889069de0090a1ad3216a91cf1f03df0580574",
+      "publicationSha256": "a9dd450c1aa2be52f76151d1cf1f272b7e0af218aa9b4f713fddbacfdc19023f"
+    },
+    "INSTALL.md": {
+      "preparedSha256": "36cc94f6908b8429b2e24219f49cc1f9e02a831d69dc0a59845a6e5f09256f34",
+      "publicationSha256": "81a3b71cbb4185e64deefad3e7765fba57acde9cea4889365d39e62ec485eb0b"
+    },
+    "EXPERIMENTAL.md": {
+      "preparedSha256": "1d9a3dbe67471a8aaeaf2d4c9d5594a14135bdeb3848a7fc3196a2ef7e2ec9bc",
+      "publicationSha256": "163d860639b8f80d7f1b8e29b4690350a8b73ff2f87f8078aff768a7b13d27ac"
+    },
+    "INTEGRATION_NOTICES.md": {
+      "preparedSha256": "f6599c06d4dc7060b86e55fdf5ea9a516b187d8bc4cedbff7803423c465e52cf",
+      "publicationSha256": "fa0668c0d0d1eadee738f6802061227f58ad93a12a8ed53c5f7075da6545934c"
     }
   }
 }

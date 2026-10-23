@@ -1,3 +1,9 @@
+# Experimental.7 published delivery
+
+Integration release: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.7. Runtime release: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.7. HACS installation remains unverified. Reproduce the official ZIP from release tag `0.3.1-s1.experimental.7`, commit `b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f`.
+
+## Historical preparation record
+
 # Integration license and modifications
 
 ## Local experimental.7 package refresh, 2026-10-22

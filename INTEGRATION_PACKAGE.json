@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "1d9a3dbe67471a8aaeaf2d4c9d5594a14135bdeb3848a7fc3196a2ef7e2ec9bc"
+      "sha256": "163d860639b8f80d7f1b8e29b4690350a8b73ff2f87f8078aff768a7b13d27ac"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "36cc94f6908b8429b2e24219f49cc1f9e02a831d69dc0a59845a6e5f09256f34"
+      "sha256": "81a3b71cbb4185e64deefad3e7765fba57acde9cea4889365d39e62ec485eb0b"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "f6599c06d4dc7060b86e55fdf5ea9a516b187d8bc4cedbff7803423c465e52cf"
+      "sha256": "fa0668c0d0d1eadee738f6802061227f58ad93a12a8ed53c5f7075da6545934c"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "59b9302d8e00b2ae19577653d2889069de0090a1ad3216a91cf1f03df0580574"
+      "sha256": "a9dd450c1aa2be52f76151d1cf1f272b7e0af218aa9b4f713fddbacfdc19023f"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -244,5 +244,7 @@
       "sha256": "c4d0e21694252723e0cc09172620ad95a705af5df8be6da62f7701f4f4cd8a1c"
     }
   ],
-  "qualificationScope": "Local unpublished integration 0.3.1-s1.experimental.7, exact input 689ee3c33b995734085e99089f5fb1ce7605c176. Fresh offline tests at the unmodified input: 684 passed, 0 failures, 450 passed subtests; HA 2026.7.0, Python 3.14.4. Preparation changes documentation, version and inventories only. No installation, device, media, HACS or runtime acceptance is established."
+  "qualificationScope": "Local unpublished integration 0.3.1-s1.experimental.7, exact input 689ee3c33b995734085e99089f5fb1ce7605c176. Fresh offline tests at the unmodified input: 684 passed, 0 failures, 450 passed subtests; HA 2026.7.0, Python 3.14.4. Preparation changes documentation, version and inventories only. No installation, device, media, HACS or runtime acceptance is established.",
+  "officialReleaseArchiveSourceCommit": "b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f",
+  "currentBranchDocumentationMayDifferFromReleasedArchive": true
 }
