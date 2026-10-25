@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "0.3.1-s1.experimental.8",
-  "status": "prepared-locally-unpublished",
+  "status": "published-source-delivery",
   "publicBaselineCommit": "e59fbe2eaaae39ceae9418b6f422494048329dc7",
   "exactInputCommit": "9dd9c7fb035926000340d14f8134712e215fb32e",
   "files": {
@@ -22,20 +22,20 @@
       "sha256": "77a3457e1dd2a7b2389fcd670ab6cb2a3d79368b2e7bf4037ad78aa77731fb9e"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 41601,
-      "sha256": "a9f186100ee3f6b19351b7b78d91d1c025f63ed09893751bd017a83cf8c40f7b"
+      "bytes": 42600,
+      "sha256": "a6de72b4f3e62a208a3779cc6baa8e125dd4605e30c30aaaf2879644d39dbde1"
     },
     "INSTALL.md": {
-      "bytes": 30054,
-      "sha256": "05f350cc078d398edd619f52ed861a78f509c2d6e04a8e9596d99afc40458a14"
+      "bytes": 31053,
+      "sha256": "2211679a962240d5976444410c8817ed26269b7d8daaa814f5f351864f3d787d"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 17404,
-      "sha256": "5f415bd928e22fd5318e9b0192d723b9fbe1d2debd4c1406474f0793aece0841"
+      "bytes": 18403,
+      "sha256": "53da79c970c7c06b06465a7cfe6a7db4a16092d974920b6efa91872482f9a86e"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 9683,
-      "sha256": "bb891d7583cd33f0ee4413e3cec38d74b977a8972ff52a8dbbd00d03c0a4a32f"
+      "bytes": 9785,
+      "sha256": "dc1329847d29108d76c9893478ab352e6f1f47662d3466adab9a5f8fc450725d"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -46,12 +46,12 @@
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 8716,
-      "sha256": "05e2cbbcb71e5a95e8689062c38537c712ccb5a061b87f2b185cf50ba614dcde"
+      "bytes": 9675,
+      "sha256": "bbdea9a6f70c9c5c5d27d7d8cf3f2b8998463068a3ff219a128f3758b8eb453c"
     },
     "README.md": {
-      "bytes": 15726,
-      "sha256": "039322f89c1ceb61761e9fe6a422691333d2d57d8b33f79d4b73bdb8a37a90ef"
+      "bytes": 16725,
+      "sha256": "d5c45a81d645b41082b9b18854d129cc126f48a50accd38d0a0788b4eacbd564"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
@@ -589,5 +589,6 @@
       "bytes": 3936,
       "sha256": "24a70a03bf667254199d2eb182e287f26f64e6f0fac641b41cdf932c8ef5d04c"
     }
-  }
+  },
+  "preparationRecordsHistorical": true
 }

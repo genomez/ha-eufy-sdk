@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "a9f186100ee3f6b19351b7b78d91d1c025f63ed09893751bd017a83cf8c40f7b"
+      "sha256": "a6de72b4f3e62a208a3779cc6baa8e125dd4605e30c30aaaf2879644d39dbde1"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "05f350cc078d398edd619f52ed861a78f509c2d6e04a8e9596d99afc40458a14"
+      "sha256": "2211679a962240d5976444410c8817ed26269b7d8daaa814f5f351864f3d787d"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "5f415bd928e22fd5318e9b0192d723b9fbe1d2debd4c1406474f0793aece0841"
+      "sha256": "53da79c970c7c06b06465a7cfe6a7db4a16092d974920b6efa91872482f9a86e"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "039322f89c1ceb61761e9fe6a422691333d2d57d8b33f79d4b73bdb8a37a90ef"
+      "sha256": "d5c45a81d645b41082b9b18854d129cc126f48a50accd38d0a0788b4eacbd564"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -249,6 +249,7 @@
     }
   ],
   "qualificationScope": "Local unpublished exact review.20 runtime; fresh offline qualification recorded externally.",
-  "officialReleaseArchiveSourceCommit": "b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f",
-  "currentBranchDocumentationMayDifferFromReleasedArchive": true
+  "officialReleaseArchiveSourceCommit": "6bb1365de39615d9e094b44b7665118451326e8d",
+  "currentBranchDocumentationMayDifferFromReleasedArchive": true,
+  "officialReleaseArchiveSha256": "c6402a686c65691ad950b40e50d14a35d22afedd96c1441c2a4e7e538a97df7c"
 }
