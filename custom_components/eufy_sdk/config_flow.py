@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from copy import deepcopy
 from typing import Any
 
 import voluptuous as vol
@@ -20,6 +22,8 @@ from .const import (
     CONF_LEGACY_DOORBELL_PRESSED,
     CONF_LIGHT_CORRECTION,
     CONF_LIGHT_CORRECTION_PAUSE,
+    CONF_LIGHT_SAFETY_INTENT_ENTITIES,
+    CONF_LIGHT_SAFETY_NOTIFY_SERVICE,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_SOC_REFRESH,
@@ -29,6 +33,7 @@ from .const import (
     DOMAIN,
     LOGGER,
 )
+from .native_webrtc import is_s1_camera
 
 
 class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -390,21 +395,70 @@ class EufySdkFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class EufySdkOptionsFlow(config_entries.OptionsFlow):
-    """Configure polling and doorbell event compatibility."""
+    """Configure polling, doorbell events and floodlight safety."""
+
+    def __init__(self) -> None:
+        """Keep per-light choices private until the options flow completes."""
+        self._options: dict[str, Any] = {}
+        self._lights: list[tuple[str, str]] = []
+        self._light_index = 0
+
+    def _intent_lights(self) -> list[tuple[str, str]]:
+        """Find supported floodlights using only the loaded device snapshot."""
+        runtime = getattr(self.config_entry, "runtime_data", None)
+        coordinator = getattr(runtime, "coordinator", None)
+        devices = getattr(coordinator, "data", None)
+        if not isinstance(devices, dict):
+            return []
+        lights = []
+        for sn, device in devices.items():
+            model = device.get("model")
+            if (
+                not isinstance(model, str)
+                or not model.upper().startswith(("T8425", "T8426"))
+                or not is_s1_camera(coordinator, sn)
+            ):
+                continue
+            name = device.get("name")
+            if (
+                not isinstance(name, str)
+                or not name.strip()
+                or sn in name
+                or device["stationSn"] in name
+            ):
+                name = f"Floodlight {len(lights) + 1}"
+            lights.append((sn, name))
+        return lights
 
     async def async_step_init(
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Show and save polling and doorbell event options."""
+        """Show entry-wide options before the optional per-light bindings."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-        current = self.config_entry.options.get(
-            CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL_MIN
-        )
-        soc_current = self.config_entry.options.get(
-            CONF_SOC_REFRESH, DEFAULT_SOC_REFRESH_SEC
-        )
+            notify_service = user_input.get(
+                CONF_LIGHT_SAFETY_NOTIFY_SERVICE, ""
+            ).strip()
+            if notify_service and not re.fullmatch(
+                r"notify\.[a-z0-9_]+", notify_service
+            ):
+                errors[CONF_LIGHT_SAFETY_NOTIFY_SERVICE] = "invalid_notify_service"
+            else:
+                self._options = deepcopy(dict(self.config_entry.options))
+                self._options.update(user_input)
+                if not user_input.get(CONF_LIGHT_CORRECTION_PAUSE):
+                    self._options.pop(CONF_LIGHT_CORRECTION_PAUSE, None)
+                if notify_service:
+                    self._options[CONF_LIGHT_SAFETY_NOTIFY_SERVICE] = notify_service
+                else:
+                    self._options.pop(CONF_LIGHT_SAFETY_NOTIFY_SERVICE, None)
+                self._lights = self._intent_lights()
+                self._light_index = 0
+                return await self.async_step_light_safety_intent()
+        options = self.config_entry.options if user_input is None else user_input
+        current = options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL_MIN)
+        soc_current = options.get(CONF_SOC_REFRESH, DEFAULT_SOC_REFRESH_SEC)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -433,28 +487,60 @@ class EufySdkOptionsFlow(config_entries.OptionsFlow):
                     ),
                     vol.Required(
                         CONF_LEGACY_DOORBELL_PRESSED,
-                        default=self.config_entry.options.get(
-                            CONF_LEGACY_DOORBELL_PRESSED, False
-                        ),
+                        default=options.get(CONF_LEGACY_DOORBELL_PRESSED, False),
                     ): selector.BooleanSelector(),
                     vol.Required(
                         CONF_LIGHT_CORRECTION,
-                        default=self.config_entry.options.get(
-                            CONF_LIGHT_CORRECTION, False
-                        ),
+                        default=options.get(CONF_LIGHT_CORRECTION, False),
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_LIGHT_CORRECTION_PAUSE,
                         description={
-                            "suggested_value": self.config_entry.options.get(
-                                CONF_LIGHT_CORRECTION_PAUSE
-                            )
+                            "suggested_value": options.get(CONF_LIGHT_CORRECTION_PAUSE)
                         },
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
                             domain=["input_boolean", "switch"]
                         )
                     ),
+                    vol.Optional(
+                        CONF_LIGHT_SAFETY_NOTIFY_SERVICE,
+                        description={
+                            "suggested_value": options.get(
+                                CONF_LIGHT_SAFETY_NOTIFY_SERVICE
+                            )
+                        },
+                    ): selector.TextSelector(),
                 },
             ),
+            errors=errors,
+        )
+
+    async def async_step_light_safety_intent(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Choose one intent entity per floodlight without displaying device ids."""
+        if user_input is not None:
+            sn, _name = self._lights[self._light_index]
+            bindings = self._options.setdefault(CONF_LIGHT_SAFETY_INTENT_ENTITIES, {})
+            if entity_id := user_input.get("intent_entity"):
+                bindings[sn] = entity_id
+            else:
+                bindings.pop(sn, None)
+            self._light_index += 1
+        if self._light_index == len(self._lights):
+            return self.async_create_entry(title="", data=self._options)
+        sn, name = self._lights[self._light_index]
+        bindings = self._options.get(CONF_LIGHT_SAFETY_INTENT_ENTITIES, {})
+        return self.async_show_form(
+            step_id="light_safety_intent",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        "intent_entity",
+                        description={"suggested_value": bindings.get(sn)},
+                    ): selector.EntitySelector(),
+                }
+            ),
+            description_placeholders={"light_name": name},
         )

@@ -62,7 +62,7 @@ class SlotTests(unittest.TestCase):
         slots = presets.fallback_slots()
         self.assertEqual(len(slots), 4)
         self.assertTrue(all(s.occupied is None for s in slots))
-        self.assertTrue(all("unverified" in s.label for s in slots))
+        self.assertEqual([s.label for s in slots], ["1", "2", "3", "4"])
         self.assertEqual(presets.from_dicts(presets.as_dicts(slots)), [])
 
     def test_observed_slots_round_trip_and_legacy_choice_stays_unverified(self):
@@ -174,15 +174,15 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         runtime.client.preset_slots.assert_not_awaited()
         entity.hass.async_create_task.assert_not_called()
         self.assertEqual(runtime.preset_slots["synthetic"], saved)
-        self.assertEqual(runtime.selected_preset["synthetic"], 4)
-        self.assertEqual(entity.current_option, "5 · empty")
+        self.assertEqual(runtime.selected_preset["synthetic"], 2)
+        self.assertEqual(entity.current_option, "3")
 
     async def test_supported_startup_reads_once_and_publishes_device_slots(self):
         entity, runtime = self.entity(True)
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await entity.async_added_to_hass()
         runtime.client.preset_slots.assert_awaited_once_with("synthetic")
-        self.assertEqual(entity.options, ["3 · default", "5 · empty"])
+        self.assertEqual(entity.options, ["3"])
 
     async def test_supported_stream_refresh_and_failed_read_preserve_selection(self):
         entity, runtime = self.entity(True)
@@ -212,7 +212,7 @@ class SelectTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await entity.async_added_to_hass()
         self.assertEqual(runtime.selected_preset["synthetic"], 0)
-        self.assertEqual(entity.current_option, "1 · default · unverified")
+        self.assertEqual(entity.current_option, "1")
         runtime.client.preset_slots.assert_not_awaited()
 
     async def test_unknown_occupancy_does_not_disable_existing_preset_movement(self):

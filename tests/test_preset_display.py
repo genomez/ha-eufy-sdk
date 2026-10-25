@@ -60,18 +60,13 @@ class DisplayTests(unittest.TestCase):
         self.assertEqual([slot.index for slot in slots], [0, 1, 2, 3])
         self.assertEqual(
             [slot.label for slot in slots],
-            [
-                "1 · default · unverified",
-                "2 · unverified",
-                "3 · unverified",
-                "4 · unverified",
-            ],
+            ["1", "2", "3", "4"],
         )
         self.assertTrue(all(slot.occupied is None for slot in slots))
 
     def test_reported_slots_without_occupancy_are_confirmed_choices(self):
         slots = presets.parse_slots([{"id": 3}, {"id": 0}])
-        self.assertEqual([slot.label for slot in slots], ["1 · default", "4"])
+        self.assertEqual([slot.label for slot in slots], ["1", "4"])
         self.assertTrue(all(slot.occupied is None for slot in slots))
         self.assertEqual(presets.from_dicts(presets.as_dicts(slots)), slots)
 
@@ -135,6 +130,49 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
             await entity.async_select_option(entity.options[0])
         runtime.client.action.assert_not_awaited()
 
+    async def test_options_omit_empty_slots_but_attributes_keep_all_details(self):
+        entity, runtime = make_entity()
+        slots = presets.parse_slots(
+            [
+                {"id": 0, "raw": {"enable": 0, "isdefault": 1}},
+                {"id": 2, "raw": {"enable": 1}},
+                {"id": 6},
+            ]
+        )
+        entity._apply(slots)
+        self.assertEqual(entity.options, ["3", "7"])
+        self.assertEqual(entity.current_option, "3")
+        self.assertEqual(
+            entity.extra_state_attributes[ATTR_SLOTS], presets.as_dicts(slots)
+        )
+        self.assertEqual(
+            entity.extra_state_attributes[ATTR_SLOTS][0],
+            {
+                "index": 0,
+                "occupied": False,
+                "default": True,
+                "observed": True,
+                "reported": True,
+            },
+        )
+        with self.assertRaises(HomeAssistantError):
+            await entity.async_select_option("1")
+        runtime.client.action.assert_not_awaited()
+
+    async def test_all_empty_slots_keep_their_numbers_but_refuse_movement(self):
+        entity, runtime = make_entity()
+        entity._apply(
+            presets.parse_slots(
+                [{"id": 2, "raw": {"enable": 0}}, {"id": 6, "raw": {"enable": 0}}]
+            )
+        )
+        self.assertEqual(entity.options, ["3", "7"])
+        self.assertEqual(entity.current_option, "3")
+        for option in entity.options:
+            with self.assertRaises(HomeAssistantError):
+                await entity.async_select_option(option)
+        runtime.client.action.assert_not_awaited()
+
     async def test_arbitrary_reported_indices_are_not_renumbered_on_wire(self):
         entity, runtime = make_entity()
         entity._apply(presets.parse_slots([{"id": 9}, {"id": 2}, {"id": 6}]))
@@ -146,7 +184,7 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
         entity, runtime = make_entity()
         await entity.async_select_option(entity.options[1])
         runtime.client.action.assert_awaited_once()
-        self.assertIn("unverified", entity.current_option)
+        self.assertEqual(entity.current_option, "2")
         self.assertIsNone(entity.extra_state_attributes[ATTR_SLOTS][1]["occupied"])
 
     async def test_refresh_relabels_selection_without_a_move(self):
@@ -155,7 +193,7 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
         runtime.client.action.reset_mock()
         runtime.client.preset_slots.return_value = [{"id": 0}, {"id": 2}]
         await entity._reread()
-        self.assertEqual(entity.options, ["1 · default", "3"])
+        self.assertEqual(entity.options, ["1", "3"])
         self.assertEqual(entity.current_option, "3")
         runtime.client.action.assert_not_awaited()
 
@@ -171,7 +209,7 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([slot.index for slot in entity._slots], [0, 1, 2, 3])
         runtime.client.action.assert_not_awaited()
 
-    async def test_restore_legacy_choice_uses_zero_based_index_without_moving(self):
+    async def test_restore_labeled_choice_keeps_displayed_number_without_moving(self):
         entity, runtime = make_entity()
         entity.device["decodedProperties"]["details"][0]["undescribedActions"] = [
             "preset.preview"
@@ -182,7 +220,8 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await entity.async_added_to_hass()
-        self.assertEqual(entity.current_option, "3 · unverified")
+        self.assertEqual(entity.current_option, "2")
+        self.assertEqual(runtime.selected_preset["synthetic"], 1)
         runtime.client.action.assert_not_awaited()
 
     async def test_new_choice_restores_using_explicit_index_without_moving(self):
@@ -198,9 +237,51 @@ class InteractionTests(unittest.IsolatedAsyncioTestCase):
         restored.async_get_last_state.return_value = state
         with patch.object(EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()):
             await restored.async_added_to_hass()
-        self.assertEqual(restored.current_option, "3 · unverified")
+        self.assertEqual(restored.current_option, "3")
         self.assertEqual(restored_runtime.selected_preset["synthetic"], 2)
         restored_runtime.client.action.assert_not_awaited()
+
+    async def test_old_labeled_states_restore_only_valid_numbered_options(self):
+        for state, index, expected in [
+            ("3 · default · unverified", 2, "3"),
+            ("7 · default", 6, "7"),
+            ("7 · default", None, "7"),
+            ("1 · default · empty", 0, "3"),
+            ("1 · default · empty", None, "3"),
+            ("0 · HOME", None, "3"),
+            ("99 · unverified", 98, "3"),
+            ("unknown", None, "3"),
+        ]:
+            with self.subTest(state=state):
+                entity, runtime = make_entity()
+                entity.device["decodedProperties"]["details"][0][
+                    "undescribedActions"
+                ] = ["preset.preview"]
+                entity.async_get_last_state.return_value = SimpleNamespace(
+                    state=state,
+                    attributes={
+                        "selected_index": index,
+                        ATTR_SLOTS: presets.as_dicts(
+                            presets.parse_slots(
+                                [
+                                    {"id": 0, "raw": {"enable": 0}},
+                                    {"id": 2, "raw": {"enable": 1}},
+                                    {"id": 6, "raw": {"enable": 1}},
+                                ]
+                            )
+                        ),
+                    },
+                )
+                with patch.object(
+                    EufySdkDeviceEntity, "async_added_to_hass", new=AsyncMock()
+                ):
+                    await entity.async_added_to_hass()
+                self.assertEqual(entity.current_option, expected)
+                self.assertIn(entity.current_option, entity.options)
+                self.assertEqual(
+                    runtime.selected_preset["synthetic"], int(expected) - 1
+                )
+                runtime.client.action.assert_not_awaited()
 
     async def test_ptz_setup_preserves_87_104_88_directions_without_go_buttons(self):
         for device_type, model, has_presets in [

@@ -35,6 +35,16 @@ DEFAULT_SOC_REFRESH_SEC = 60
 CONF_LEGACY_DOORBELL_PRESSED = "legacy_doorbell_pressed"
 CONF_LIGHT_CORRECTION = "light_correction_enabled"
 CONF_LIGHT_CORRECTION_PAUSE = "light_correction_pause_entity"
+CONF_LIGHT_SAFETY_INTENT_ENTITIES = "light_safety_intent_entities"
+CONF_LIGHT_SAFETY_NOTIFY_SERVICE = "light_safety_notify_service"
+LIGHT_SAFETY_OPTIONS = frozenset(
+    {
+        CONF_LIGHT_CORRECTION,
+        CONF_LIGHT_CORRECTION_PAUSE,
+        CONF_LIGHT_SAFETY_INTENT_ENTITIES,
+        CONF_LIGHT_SAFETY_NOTIFY_SERVICE,
+    }
+)
 MAX_DOORBELL_EVENT_IDS = 256
 
 # Schema version this integration targets (the bridge sends its own in `hello`/`ready`).

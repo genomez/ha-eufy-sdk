@@ -33,3 +33,6 @@ class EufySdkData:
     preset_slots: dict[str, list[Any]] = field(default_factory=dict)
     # Local snapshot choice per camera; restored by the select platform.
     snapshot_policy: dict[str, str] = field(default_factory=dict)
+    # Full entry snapshots distinguish live safety changes from reload options.
+    options_snapshot: dict[str, Any] = field(default_factory=dict)
+    entry_data_snapshot: dict[str, Any] = field(default_factory=dict)

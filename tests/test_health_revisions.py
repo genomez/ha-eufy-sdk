@@ -23,15 +23,8 @@ def projection(status="command_degraded", remaining=120000, revision=1):
     return {"status": status, "cooldownRemainingMs": remaining, "revision": revision}
 
 
-class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
+class HealthRevisionTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCase):
     """Exercise current gate state independently from historical receipt evidence."""
-
-    _entity = fixtures.LightCorrectionTests._entity
-    _report = fixtures.LightCorrectionTests._report
-    setup_light = fixtures.LightCorrectionTests.setup_light
-    emit = fixtures.LightCorrectionTests.emit
-    advance = fixtures.LightCorrectionTests.advance
-    dispatch = fixtures.LightCorrectionTests.dispatch
 
     def event(self, health):
         self.entity._handle_property_changed(
@@ -46,7 +39,7 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_older_healthy_receipt_cannot_clear_newer_degraded_event(self):
-        entity, _, _, _ = self.setup_light()
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
         self.emit()
         self.event(projection())
@@ -61,7 +54,7 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         entity._light_correction.receipt(receipt)
-        await self.advance(15)
+        await self.advance(119)
         self.assertEqual(
             entity.extra_state_attributes["command_health"], "command_degraded"
         )
@@ -69,7 +62,7 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(receipt.command_health, projection("healthy", 0, 0))
 
     async def test_older_event_snapshot_and_unversioned_health_cannot_clear_gate(self):
-        entity, coordinator, _, _ = self.setup_light()
+        entity, coordinator, _, _ = await self.activate()
         await entity.write(False)
         self.emit()
         self.event(projection())
@@ -81,14 +74,14 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
             self.event(health)
             coordinator.data["fixture-device"]["commandHealth"] = health
             entity._handle_coordinator_update()
-        await self.advance(15)
+        await self.advance(119)
         self.assertEqual(
             entity.extra_state_attributes["command_health"], "command_degraded"
         )
         self.assertEqual(len(self.commands), 1)
 
     async def test_same_revision_cannot_extend_original_cooldown(self):
-        entity, _, _, _ = self.setup_light()
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
         self.emit()
         self.event(projection())
@@ -99,7 +92,7 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.commands[-1][:2], (120, False))
 
     async def test_disconnect_ready_rearms_original_expiry_without_projection(self):
-        entity, _, _, _ = self.setup_light()
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
         self.event(projection())
         await self.advance(10)
@@ -110,15 +103,17 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         entity._handle_property_changed(SimpleNamespace(data={"event": "ready"}))
         await entity.write(False)
         self.emit()
+        await self.advance(119)
+        self.assertEqual(len(self.commands), 2)
         await self.advance(120)
-        self.assertEqual(entity.extra_state_attributes["command_health"], "healthy")
+        self.assertNotIn("command_health", entity.extra_state_attributes)
         self.assertEqual(self.commands[-1][:2], (120, False))
         entity._removed = True
         entity._light_correction.stop("closed")
-        self.assertIsNone(entity._light_correction.health_timer)
+        self.assertIsNone(entity._light_correction.timer)
 
     async def test_new_ready_accepts_new_runtime_revision_zero(self):
-        entity, _, _, _ = self.setup_light()
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
         self.event(projection(revision=8))
         entity._handle_property_changed(
@@ -148,7 +143,7 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["station"]["commandHealth"], projection())
 
     async def test_newer_recovery_revision_wins_over_stale_and_conflicting_events(self):
-        entity, _, _, _ = self.setup_light()
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
         self.emit()
         self.event(projection())
@@ -156,9 +151,11 @@ class HealthRevisionTests(unittest.IsolatedAsyncioTestCase):
         self.event(projection("healthy", 0, 2))
         self.event(projection(revision=1))
         self.event(projection(revision=2))
-        await self.advance(15)
+        await self.advance(59)
         self.assertEqual(entity.extra_state_attributes["command_health"], "healthy")
-        self.assertEqual(len(self.commands), 2)
+        self.assertEqual(len(self.commands), 1)
+        await self.advance(65)
+        self.assertEqual(self.commands[-1][:2], (65, False))
 
     async def test_coordinator_runtime_reset_drops_inflight_old_snapshot_health(self):
         coordinator = aligned.coordinator_for(Mock())

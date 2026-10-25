@@ -1,0 +1,62 @@
+{
+  "event": "cameraHealth",
+  "sn": "synthetic-camera",
+  "version": 1,
+  "incarnation": "synthetic-instance",
+  "revision": 7,
+  "connectivity": "suspect",
+  "basis": "hub_reported_offline",
+  "evidence": "hub_reported",
+  "sinceMs": 1792680000000,
+  "lastContactMs": null,
+  "lastHubOfflineMs": 1792680000000,
+  "lastHubReportMs": null,
+  "lastCloudParamMs": null,
+  "lastContactSource": null,
+  "hubOfflineCount": 1,
+  "rssi": {
+    "value": null,
+    "valid": false,
+    "lastValidMs": null
+  },
+  "rawStatus": {
+    "p1131": null,
+    "p1182": null,
+    "observedMs": null
+  },
+  "parentTransport": "connected",
+  "enforcement": "observe_only",
+  "commandsBlocked": false,
+  "outcomes": {
+    "online": {
+      "acknowledged": 0,
+      "rejected": 1,
+      "timeout": 0,
+      "other": 0
+    },
+    "suspect": {
+      "acknowledged": 0,
+      "rejected": 0,
+      "timeout": 0,
+      "other": 0
+    },
+    "offline": {
+      "acknowledged": 0,
+      "rejected": 0,
+      "timeout": 0,
+      "other": 0
+    },
+    "unknown": {
+      "acknowledged": 0,
+      "rejected": 0,
+      "timeout": 0,
+      "other": 0
+    }
+  },
+  "lastOutcome": {
+    "atMs": 1792680000000,
+    "connectivity": "online",
+    "status": "rejected",
+    "code": -109
+  }
+}

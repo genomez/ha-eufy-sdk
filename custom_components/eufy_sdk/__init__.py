@@ -6,6 +6,7 @@ https://github.com/mega-yfue/ha-eufy-sdk
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -22,11 +23,15 @@ from .arming_sync import apply_arming_mode_event
 from .const import (
     ALARM_AUTO_CLEAR_SECONDS,
     CONF_HOST,
+    CONF_LEGACY_DOORBELL_PRESSED,
     CONF_POLL_INTERVAL,
     CONF_PORT,
+    CONF_SOC_REFRESH,
     DEFAULT_POLL_INTERVAL_MIN,
+    DEFAULT_SOC_REFRESH_SEC,
     DOMAIN,
     EVENT_TYPE,
+    LIGHT_SAFETY_OPTIONS,
     LOGGER,
     MAX_DOORBELL_EVENT_IDS,
 )
@@ -102,7 +107,7 @@ def _alarm_lifecycle(
     return on_alarm
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> bool:  # noqa: PLR0915
+async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> bool:  # noqa: C901, PLR0915 - independent platform event handlers
     """Set up eufy_sdk from a config entry."""
     poll_min = entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL_MIN)
     coordinator = EufySdkDataUpdateCoordinator(
@@ -113,6 +118,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         update_interval=timedelta(minutes=poll_min),
         config_entry=entry,
     )
+    coordinator._light_safety_controllers = set()  # noqa: SLF001
 
     # Forward every bridge event onto the HA event bus for automations — and recover
     # fast when the bridge comes back. A bridge restart drops the WS and fails one
@@ -123,7 +129,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     def _refresh_now() -> None:
         hass.async_create_task(coordinator.async_request_refresh())
 
-    entry.async_on_unload(coordinator._clear_fast_retry)  # noqa: SLF001
+    def _stop_recovery() -> None:
+        coordinator._clear_fast_retry(stop=True)  # noqa: SLF001
+
+    entry.async_on_unload(_stop_recovery)
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
     doorbell_event_ids: dict[tuple[str, str], None] = {}
 
@@ -144,6 +153,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
                     doorbell_event_ids.pop(next(iter(doorbell_event_ids)))
             # Identity-less pulses may be genuine repeats; never time-filter them.
         coordinator.apply_command_health_event(evt)
+        if evt.get("event") == "cameraHealth":
+            coordinator.apply_camera_health_event(evt)
         hass.bus.async_fire(EVENT_TYPE, evt)
         event = evt.get("event")
         # Pushes can arrive before the first device snapshot. Keep forwarding
@@ -172,7 +183,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
                     "arming mode refresh",
                 )
         elif event == "propertiesObserved":
-            apply_observation_event(coordinator, evt)
+            if apply_observation_event(coordinator, evt):
+                coordinator.request_recovery_refresh()
         elif event == "propertyChanged":
             if "value" in evt:
                 apply_property_event(coordinator, evt)
@@ -193,19 +205,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         elif event == "alarm":
             on_alarm(evt)
         elif event == "ready":
+            coordinator.reset_camera_health()
             _refresh_now()
+
+    def _on_reconnect() -> None:
+        """Drop camera evidence from the retired transport before refreshing."""
+        coordinator.reset_camera_health()
+        _refresh_now()
 
     client = EufySdkApiClient(
         host=entry.data[CONF_HOST],
         port=entry.data[CONF_PORT],
         session=async_get_clientsession(hass),
         on_event=_on_event,
-        on_reconnect=_refresh_now,
+        on_reconnect=_on_reconnect,
     )
     entry.runtime_data = EufySdkData(
         client=client,
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
+        options_snapshot=deepcopy(dict(entry.options)),
+        entry_data_snapshot=deepcopy(dict(entry.data)),
     )
 
     try:
@@ -213,7 +233,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     except BaseException:
         # A failed or cancelled setup will not reach async_unload_entry. Retire
         # this attempt's client and timer before HA creates another coordinator.
-        coordinator._clear_fast_retry()  # noqa: SLF001
+        coordinator._clear_fast_retry(stop=True)  # noqa: SLF001
         await client.close()
         raise
 
@@ -223,7 +243,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     except Exception:  # noqa: BLE001 - a failed config push shouldn't block setup
         LOGGER.warning("could not set bridge poll interval [poll_config_failed]")
 
-    # Reload when the options change, so a new poll interval is applied.
+    # Safety options apply live; other options still reload the entry.
     entry.async_on_unload(entry.add_update_listener(_async_reload_on_update))
 
     # Fetch initial manifests so the platforms can build property entities.
@@ -255,5 +275,35 @@ async def async_unload_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> 
 async def _async_reload_on_update(
     hass: HomeAssistant, entry: EufySdkConfigEntry
 ) -> None:
-    """Reload the entry when its options change (e.g. a new poll interval)."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Apply safety options live and reload for other entry changes."""
+    runtime = entry.runtime_data
+    previous = runtime.options_snapshot
+    current = deepcopy(dict(entry.options))
+    data = deepcopy(dict(entry.data))
+    data_changed = runtime.entry_data_snapshot != data
+    runtime.options_snapshot = current
+    runtime.entry_data_snapshot = data
+    # The first options form also saves unchanged polling/doorbell defaults.
+    defaults = {
+        CONF_POLL_INTERVAL: DEFAULT_POLL_INTERVAL_MIN,
+        CONF_SOC_REFRESH: DEFAULT_SOC_REFRESH_SEC,
+        CONF_LEGACY_DOORBELL_PRESSED: False,
+    }
+    previous_reload = defaults | {
+        key: value for key, value in previous.items() if key not in LIGHT_SAFETY_OPTIONS
+    }
+    current_reload = defaults | {
+        key: value for key, value in current.items() if key not in LIGHT_SAFETY_OPTIONS
+    }
+    if data_changed or previous_reload != current_reload:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
+    if previous == current:
+        return
+    for controller in tuple(runtime.coordinator._light_safety_controllers):  # noqa: SLF001
+        try:
+            controller.options_updated()
+        except Exception:  # noqa: BLE001 - update the remaining lights too
+            LOGGER.error(
+                "could not update floodlight safety options [safety_options_failed]"
+            )

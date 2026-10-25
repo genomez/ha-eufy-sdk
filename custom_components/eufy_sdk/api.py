@@ -10,14 +10,18 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 import time
+from collections import deque
 from contextlib import suppress
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
+from .const import LOGGER
 from .manifest_reads import normalize_properties, normalize_snapshot
 
 if TYPE_CHECKING:
@@ -26,6 +30,20 @@ if TYPE_CHECKING:
 
 class EufySdkApiClientError(HomeAssistantError):
     """A general bridge error."""
+
+    failure: RpcFailure | None = None
+
+
+@dataclass(frozen=True)
+class RpcFailure:
+    """Request-local evidence with no arguments, payloads or exception text."""
+
+    method: str
+    category: str
+    elapsed_ms: int
+
+
+SLOW_RPC_MS = 5000
 
 
 COMMAND_ERROR_CODES = frozenset(
@@ -54,11 +72,34 @@ COMMAND_ERROR_CODES = frozenset(
 
 BOUNDED_PROFILE = "bounded-state-v1"
 BOUNDED_CALLER_SECONDS = 80
+GUARD_MODE_TIMEOUT_SECONDS = 60
 BOUNDED_CLOCK_MAX_MS = 1000
 CLOCK_TOKEN_MAX_LENGTH = 128
 DEVICE_SN_MAX_LENGTH = 128
 LATE_CONTRARY_WINDOW_MS = 600000
 MAX_COMMAND_HEALTH_TARGETS = 1024
+MAX_CAMERA_HEALTH_TARGETS = 1024
+AUTOMATIC_LIGHT_CANCEL_SECONDS = 45
+MAX_AUTOMATIC_LIGHT_REQUESTS = 1024
+CAMERA_CONNECTIVITY = ("online", "suspect", "offline", "unknown")
+CAMERA_OUTCOMES = ("acknowledged", "rejected", "timeout", "other")
+CAMERA_HEALTH_BASES = (
+    "startup",
+    "child_contact",
+    "media",
+    "hub_reported_offline",
+    "vendor_status",
+    "contact_expired",
+    "suspect_expired",
+    "parent_unassessable",
+)
+CAMERA_HEALTH_TIMES = (
+    "sinceMs",
+    "lastContactMs",
+    "lastHubOfflineMs",
+    "lastHubReportMs",
+    "lastCloudParamMs",
+)
 LATE_CONTRARY_STATES = frozenset(
     {
         "contrary",
@@ -115,6 +156,133 @@ def late_contrary_event(value: Any) -> dict[str, Any] | None:
         )
         if key in value
     }
+
+
+def _safe_ordinal(value: Any) -> bool:
+    """Accept nonnegative JavaScript-safe integers, excluding booleans."""
+    return type(value) is int and 0 <= value <= 2**53 - 1
+
+
+def camera_health(value: Any) -> dict[str, Any] | None:
+    """Validate the complete observe-only contract and detach its finite fields."""
+    if not isinstance(value, dict):
+        return None
+    ceiling = int(time.time() * 1000) + 600000
+
+    def timestamp(item: Any) -> bool:
+        return item is None or (_safe_ordinal(item) and item <= ceiling)
+
+    enums = {
+        "connectivity": CAMERA_CONNECTIVITY,
+        "basis": CAMERA_HEALTH_BASES,
+        "evidence": ("vendor_verified", "hub_reported", "unqualified", "none"),
+        "lastContactSource": ("push", "media", None),
+        "parentTransport": ("connected", "disconnected", "unknown"),
+        "enforcement": ("observe_only",),
+    }
+    if (
+        type(value.get("version")) is not int
+        or value["version"] != 1
+        or not isinstance(value.get("incarnation"), str)
+        or re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value["incarnation"]) is None
+        or not _safe_ordinal(value.get("revision"))
+        or not _safe_ordinal(value.get("hubOfflineCount"))
+        or value.get("commandsBlocked") is not False
+        or "lastOutcome" not in value
+        or any(
+            key not in value or value[key] not in options
+            for key, options in enums.items()
+        )
+        or any(
+            key not in value or not timestamp(value[key]) for key in CAMERA_HEALTH_TIMES
+        )
+    ):
+        return None
+    rssi, raw = value.get("rssi"), value.get("rawStatus")
+    if (
+        not isinstance(rssi, dict)
+        or not {"value", "valid", "lastValidMs"} <= rssi.keys()
+        or (rssi["value"] is not None and type(rssi["value"]) is not int)
+        or type(rssi["valid"]) is not bool
+        or not timestamp(rssi["lastValidMs"])
+        or not isinstance(raw, dict)
+        or not {"p1131", "p1182", "observedMs"} <= raw.keys()
+        or not timestamp(raw["observedMs"])
+        or any(
+            raw[key] is not None
+            and type(raw[key]) is not bool
+            and not _finite_number(raw[key])
+            for key in ("p1131", "p1182")
+        )
+    ):
+        return None
+    outcomes = value.get("outcomes")
+    if not isinstance(outcomes, dict) or any(
+        not isinstance(outcomes.get(state), dict)
+        or any(not _safe_ordinal(outcomes[state].get(key)) for key in CAMERA_OUTCOMES)
+        for state in CAMERA_CONNECTIVITY
+    ):
+        return None
+    outcome = value["lastOutcome"]
+    if outcome is not None and (
+        not isinstance(outcome, dict)
+        or not {"atMs", "connectivity", "status", "code"} <= outcome.keys()
+        or outcome["atMs"] is None
+        or not timestamp(outcome["atMs"])
+        or outcome["connectivity"] not in CAMERA_CONNECTIVITY
+        or outcome["status"] not in CAMERA_OUTCOMES
+        or (outcome["code"] is not None and type(outcome["code"]) is not int)
+    ):
+        return None
+    return deepcopy(
+        {
+            **{
+                key: value[key]
+                for key in (
+                    "version",
+                    "incarnation",
+                    "revision",
+                    "hubOfflineCount",
+                    "commandsBlocked",
+                    *enums,
+                    *CAMERA_HEALTH_TIMES,
+                )
+            },
+            "rssi": {key: rssi[key] for key in ("value", "valid", "lastValidMs")},
+            "rawStatus": {key: raw[key] for key in ("p1131", "p1182", "observedMs")},
+            "outcomes": {
+                state: {key: outcomes[state][key] for key in CAMERA_OUTCOMES}
+                for state in CAMERA_CONNECTIVITY
+            },
+            "lastOutcome": None
+            if outcome is None
+            else {
+                key: outcome[key] for key in ("atMs", "connectivity", "status", "code")
+            },
+        }
+    )
+
+
+def camera_health_is_current(health: dict, previous: dict | None) -> bool:
+    """Accept only a changed incarnation or a strictly higher revision."""
+    return (
+        previous is None
+        or health["incarnation"] != previous["incarnation"]
+        or health["revision"] > previous["revision"]
+    )
+
+
+def camera_health_event(value: Any) -> dict[str, Any] | None:
+    """Validate a camera-scoped event and strip unrelated wire fields."""
+    if (
+        not isinstance(value, dict)
+        or value.get("event") != "cameraHealth"
+        or not isinstance(value.get("sn"), str)
+        or not 1 <= len(value["sn"]) <= DEVICE_SN_MAX_LENGTH
+    ):
+        return None
+    health = camera_health(value)
+    return {"event": "cameraHealth", "sn": value["sn"], **health} if health else None
 
 
 def command_health(value: Any) -> dict[str, Any] | None:
@@ -311,6 +479,21 @@ WEBRTC_ERROR_CODES = frozenset(
 class EufySdkApiClientCommunicationError(EufySdkApiClientError):
     """The bridge could not be reached / spoke unexpectedly."""
 
+    category = "other"
+
+    def __init__(self, message: str, *, category: str = "other") -> None:
+        """Keep the public message separate from a fixed transport category."""
+        super().__init__(message)
+        self.category = category
+
+
+class EufySdkApiClientReplyTimeoutError(EufySdkApiClientCommunicationError):
+    """The request was sent but its reply deadline expired."""
+
+    def __init__(self) -> None:
+        """Keep the existing public error compatible with HA service handling."""
+        super().__init__("bridge_request_timeout", category="reply_timeout")
+
 
 class EufySdkApiClientAuthenticationError(EufySdkApiClientError):
     """The bridge is not authenticated (needs 2FA/captcha) or rejected a command."""
@@ -337,6 +520,7 @@ class EufySdkApiClient:
         # restart), so the coordinator can refresh at once instead of leaving entities
         # unavailable until the next poll.
         self._on_reconnect = on_reconnect
+        self._disconnect_listeners: list[Callable[[], None]] = []
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
         self._reconnect_task: asyncio.Task | None = None
@@ -344,8 +528,10 @@ class EufySdkApiClient:
         self._closing = False
         self._connection_generation = 0
         self._command_health_projections: dict[str, dict] = {}
+        self._camera_health_projections: dict[str, dict] = {}
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self.slow_successful_rpcs: deque[dict] = deque(maxlen=20)
         self._webrtc_callbacks: dict[str, Callable[[dict[str, Any]], None]] = {}
         self._webrtc_relay_enabled = False
         self._webrtc_relay_listener: Callable[[bool], None] | None = None
@@ -358,8 +544,13 @@ class EufySdkApiClient:
         ] = {}
         self._cancel_tasks: set[asyncio.Task] = set()
         self._correction_requests: dict[
-            tuple[str, str], tuple[int, aiohttp.ClientWebSocketResponse, bool]
+            int, tuple[tuple[str, str], aiohttp.ClientWebSocketResponse, bool]
         ] = {}
+        self._retained_automatic_light_requests: dict[
+            int, tuple[tuple[str, str], aiohttp.ClientWebSocketResponse, float]
+        ] = {}
+        self._cancelled_correction_requests: set[int] = set()
+        self._safety_cancel_inflight: set[int] = set()
 
     @property
     def late_contrary_effects_supported(self) -> bool:
@@ -411,43 +602,132 @@ class EufySdkApiClient:
         )
 
     def _schedule_command_cancel(
-        self, mid: int, transport: Any, *, keep_observation: bool = False
-    ) -> None:
+        self,
+        mid: int,
+        transport: Any,
+        *,
+        keep_observation: bool = False,
+        retry_until: float | None = None,
+        on_sent: Callable[[], None] | None = None,
+    ) -> asyncio.Task | None:
         """Send only to the owning socket, without renewing a caller's lifetime."""
         if transport.closed:
-            return
+            return None
+        generation = self._connection_generation
 
         async def send() -> None:
-            with suppress(aiohttp.ClientError, OSError, TimeoutError):
-                async with asyncio.timeout(0.25):
-                    self._next_id += 1
-                    await transport.send_json(
-                        {
-                            "id": self._next_id,
-                            "cmd": "boundedStateCancel",
-                            "version": 1,
-                            "requestId": mid,
-                            **({"keepObservation": True} if keep_observation else {}),
-                        }
-                    )
+            while True:
+                if retry_until is not None and (
+                    self._closing
+                    or generation != self._connection_generation
+                    or transport is not self._ws
+                    or transport.closed
+                ):
+                    return
+                try:
+                    async with asyncio.timeout(0.25):
+                        self._next_id += 1
+                        await transport.send_json(
+                            {
+                                "id": self._next_id,
+                                "cmd": "boundedStateCancel",
+                                "version": 1,
+                                "requestId": mid,
+                                **(
+                                    {"keepObservation": True}
+                                    if keep_observation
+                                    else {}
+                                ),
+                            }
+                        )
+                except (aiohttp.ClientError, OSError, TimeoutError):
+                    if retry_until is None or time.monotonic() >= retry_until:
+                        return
+                    await asyncio.sleep(min(1, retry_until - time.monotonic()))
+                else:
+                    if on_sent is not None:
+                        on_sent()
+                    return
 
         task = asyncio.create_task(send())
         self._cancel_tasks.add(task)
         task.add_done_callback(self._cancel_tasks.discard)
+        return task
 
     def pause_light_correction(
         self, sn: str, *, keep_observation: bool = False
     ) -> None:
         """Cancel automatic work, preserving a watch explicitly during degradation."""
-        request = self._correction_requests.get((sn, "light"))
-        if request is not None:
-            mid, transport, correction_observation = request
-            keep_observation = keep_observation or correction_observation
-            if keep_observation:
+        self._prune_automatic_light_requests()
+        key = (sn, "light")
+        requests = {
+            mid: (transport, False)
+            for mid, (
+                target,
+                transport,
+                _,
+            ) in self._retained_automatic_light_requests.items()
+            if target == key
+        }
+        requests.update(
+            (mid, (transport, observation))
+            for mid, (
+                target,
+                transport,
+                observation,
+            ) in self._correction_requests.items()
+            if target == key
+        )
+        for mid, (transport, correction_observation) in requests.items():
+            if (
+                mid in self._safety_cancel_inflight
+                or transport is not self._ws
+                or transport.closed
+            ):
+                continue
+            preserve = keep_observation or correction_observation
+            if mid in self._bounded_requests:
+                self._cancelled_correction_requests.add(mid)
+            if preserve and mid in self._bounded_requests:
                 self._observation_preserving_aborts.add(mid)
-            self._schedule_command_cancel(
-                mid, transport, keep_observation=keep_observation
+            retained = self._retained_automatic_light_requests.get(mid)
+            deadline = (
+                retained[2]
+                if retained
+                else time.monotonic()
+                + BOUNDED_CALLER_SECONDS
+                + AUTOMATIC_LIGHT_CANCEL_SECONDS
             )
+
+            def delivered(request_id: int = mid) -> None:
+                self._retained_automatic_light_requests.pop(request_id, None)
+                self._correction_requests.pop(request_id, None)
+
+            self._safety_cancel_inflight.add(mid)
+            task = self._schedule_command_cancel(
+                mid,
+                transport,
+                keep_observation=preserve,
+                retry_until=deadline,
+                on_sent=delivered,
+            )
+            if task is not None:
+                task.add_done_callback(
+                    lambda _, request_id=mid: self._safety_cancel_inflight.discard(
+                        request_id
+                    )
+                )
+            else:
+                self._safety_cancel_inflight.discard(mid)
+
+    def _prune_automatic_light_requests(self) -> None:
+        """Retain cancellation authority only for the owning socket's child window."""
+        now = time.monotonic()
+        for mid, (_, transport, expires) in tuple(
+            self._retained_automatic_light_requests.items()
+        ):
+            if expires <= now or transport is not self._ws or transport.closed:
+                self._retained_automatic_light_requests.pop(mid, None)
 
     @property
     def webrtc_relay_enabled(self) -> bool:
@@ -489,10 +769,31 @@ class EufySdkApiClient:
         """Whether the WebSocket is open."""
         return self._ws is not None and not self._ws.closed
 
+    @property
+    def connection_generation(self) -> int:
+        """Identify a transport lifetime, including disconnects and replacements."""
+        return self._connection_generation
+
     def _reset_command_health(self) -> None:
         """Retire health watermarks and pending reply ownership for a runtime."""
         self._connection_generation += 1
         self._command_health_projections.clear()
+        self._camera_health_projections.clear()
+        self._retained_automatic_light_requests.clear()
+
+    def _project_camera_health(self, sn: str, health: Any) -> dict | None:
+        """Keep a bounded camera projection independently of command health."""
+        health = camera_health(health)
+        previous = self._camera_health_projections.get(sn)
+        if health is not None and camera_health_is_current(health, previous):
+            if (
+                previous is None
+                and len(self._camera_health_projections) >= MAX_CAMERA_HEALTH_TARGETS
+            ):
+                return None
+            self._camera_health_projections[sn] = health
+            return health
+        return previous
 
     def _project_command_health(self, sn: str, health: Any) -> dict | None:
         """Keep one ordered effective projection independently of raw receipts."""
@@ -512,36 +813,75 @@ class EufySdkApiClient:
         """Reject replies from a retired connection even if already resolved."""
         if self._ws is not transport or generation != self._connection_generation:
             message = "bridge_connection_changed"
-            raise EufySdkApiClientCommunicationError(message)
+            raise EufySdkApiClientCommunicationError(
+                message, category="connection_reset"
+            )
 
-    async def reset_connection(self) -> None:
+    def add_disconnect_listener(
+        self, listener: Callable[[], None]
+    ) -> Callable[[], None]:
+        """Subscribe diagnostics to socket loss without publishing operational state."""
+        self._disconnect_listeners.append(listener)
+        return lambda: self._disconnect_listeners.remove(listener)
+
+    def _notify_disconnected(self) -> None:
+        """Publish socket unavailability independently of negotiated capabilities."""
+        for listener in tuple(self._disconnect_listeners):
+            try:
+                listener()
+            except Exception:  # noqa: BLE001 - a diagnostic must not interrupt socket teardown
+                LOGGER.exception("Camera diagnostic disconnect publication failed")
+
+    async def reset_connection(self, *, expected_generation: int | None = None) -> bool:
         """Retire a wedged bridge socket while preserving reconnect behavior."""
         async with self._connect_lock:
+            if (
+                expected_generation is not None
+                and self.connection_generation != expected_generation
+            ):
+                return False
             self._reset_command_health()
             self._bounded_capability = False
             self._invalidate_webrtc_sessions()
             ws, task = self._ws, self._recv_task
             self._ws = None
             self._recv_task = None
+            self._notify_disconnected()
+            # Resolve explicit-reset failures before the receiver's teardown can
+            # otherwise classify the same requests as an unsolicited socket loss.
+            for fut in self._pending.values():
+                if not fut.done():
+                    fut.set_exception(
+                        EufySdkApiClientCommunicationError(
+                            "connection reset", category="connection_reset"
+                        )
+                    )
+            self._pending.clear()
             if task is not None:
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
-            for fut in self._pending.values():
-                if not fut.done():
-                    fut.set_exception(
-                        EufySdkApiClientCommunicationError("connection reset")
-                    )
-            self._pending.clear()
             if ws is not None:
                 with suppress(aiohttp.ClientError, OSError, TimeoutError):
                     async with asyncio.timeout(5):
                         await ws.close()
             if not self._closing:
                 self._schedule_reconnect()
+            return True
 
     async def connect(self) -> None:
         """Open the WebSocket + receive loop (serialized against reconnect)."""
+        started = time.monotonic()
+        try:
+            await self._connect()
+        except EufySdkApiClientCommunicationError as error:
+            error.failure = RpcFailure(
+                "connect", "not_connected", int((time.monotonic() - started) * 1000)
+            )
+            raise
+
+    async def _connect(self) -> None:
+        """Serialize opening the transport against the reconnect supervisor."""
         self._closing = False
         async with self._connect_lock:
             if self.connected:
@@ -576,13 +916,16 @@ class EufySdkApiClient:
         if self._recv_task:
             self._recv_task.cancel()
             self._recv_task = None
-        if self._ws:
-            await self._ws.close()
-            self._ws = None
+        ws, self._ws = self._ws, None
+        self._notify_disconnected()
+        if ws:
+            await ws.close()
         for fut in self._pending.values():
             if not fut.done():
                 fut.set_exception(
-                    EufySdkApiClientCommunicationError("connection closed")
+                    EufySdkApiClientCommunicationError(
+                        "connection closed", category="connection_closed"
+                    )
                 )
         self._pending.clear()
 
@@ -601,6 +944,18 @@ class EufySdkApiClient:
             if not command_health_is_current(health, previous):
                 return
             if self._project_command_health(data["sn"], health) is None:
+                return
+        elif data["event"] == "cameraHealth":
+            data = camera_health_event(data)
+            if data is None:
+                return
+            health = camera_health(data)
+            if (
+                not camera_health_is_current(
+                    health, self._camera_health_projections.get(data["sn"])
+                )
+                or self._project_camera_health(data["sn"], health) is None
+            ):
                 return
         elif data["event"] == "ready":
             self._reset_command_health()
@@ -647,6 +1002,7 @@ class EufySdkApiClient:
             had_late_contrary = self._late_contrary_capability
             self._reset_command_health()
             self._ws = None
+            self._notify_disconnected()
             self._bounded_capability = False
             self._late_contrary_capability = False
             if had_late_contrary and self._on_event:
@@ -655,7 +1011,9 @@ class EufySdkApiClient:
             for fut in self._pending.values():
                 if not fut.done():
                     fut.set_exception(
-                        EufySdkApiClientCommunicationError("connection lost")
+                        EufySdkApiClientCommunicationError(
+                            "connection lost", category="connection_closed"
+                        )
                     )
             self._pending.clear()
             if not self._closing:
@@ -686,6 +1044,49 @@ class EufySdkApiClient:
     async def rpc(
         self,
         cmd: str,
+        timeout: float = 15,  # noqa: ASYNC109 - deliberate per-call timeout API
+        _transport: aiohttp.ClientWebSocketResponse | None = None,
+        **args: Any,
+    ) -> dict[str, Any]:
+        """Attach sanitized, request-local timing without mixing concurrent calls."""
+        started = time.monotonic()
+        try:
+            reply = await self._rpc(cmd, timeout, _transport, **args)
+        except EufySdkApiClientError as error:
+            category = (
+                error.category
+                if isinstance(error, EufySdkApiClientCommunicationError)
+                else "bridge_error"
+            )
+            error.failure = RpcFailure(
+                cmd, category, max(0, int((time.monotonic() - started) * 1000))
+            )
+            raise
+        elapsed_ms = max(0, int((time.monotonic() - started) * 1000))
+        if elapsed_ms > SLOW_RPC_MS:
+            self.slow_successful_rpcs.append(
+                {
+                    "method": cmd,
+                    "elapsed_ms": elapsed_ms,
+                    "timestamp_ms": int(time.time() * 1000),
+                }
+            )
+        return reply
+
+    @staticmethod
+    async def _send_rpc(transport: Any, payload: dict) -> None:
+        """Distinguish a send timeout from expiry of the reply deadline."""
+        try:
+            await transport.send_json(payload)
+        except (aiohttp.ClientError, OSError, TimeoutError):
+            message = "bridge_send_failed"
+            raise EufySdkApiClientCommunicationError(
+                message, category="send_failed"
+            ) from None
+
+    async def _rpc(
+        self,
+        cmd: str,
         timeout: float = 15,  # noqa: ASYNC109 — deliberate per-call timeout API
         _transport: aiohttp.ClientWebSocketResponse | None = None,
         *,
@@ -693,6 +1094,7 @@ class EufySdkApiClient:
         _send_guard: Callable[[], bool] | None = None,
         _correction_key: tuple[str, str] | None = None,
         _correction_keep_observation: bool = True,
+        _retain_automatic_light: bool = False,
         **args: Any,
     ) -> dict[str, Any]:
         """Send a command and await its reply. Raises on `ok: false`."""
@@ -700,7 +1102,7 @@ class EufySdkApiClient:
             _transport is not None and self._ws is not _transport
         ):
             msg = "not connected"
-            raise EufySdkApiClientCommunicationError(msg)
+            raise EufySdkApiClientCommunicationError(msg, category="not_connected")
         if _send_guard is not None and not _send_guard():
             message = "light_correction_paused_before_send"
             raise EufySdkApiClientCommunicationError(message)
@@ -713,45 +1115,72 @@ class EufySdkApiClient:
         if _cancel_on_abort:
             self._bounded_requests[mid] = transport
         if _correction_key is not None:
-            self._correction_requests[_correction_key] = (
-                mid,
+            self._prune_automatic_light_requests()
+            self._correction_requests[mid] = (
+                _correction_key,
                 transport,
                 _correction_keep_observation,
             )
         try:
-            await self._ws.send_json({"id": mid, "cmd": cmd, **args})  # type: ignore[union-attr]
+            await self._send_rpc(transport, {"id": mid, "cmd": cmd, **args})
             async with asyncio.timeout(timeout):
                 reply = await fut
         except TimeoutError:
-            if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
+            if (
+                _cancel_on_abort
+                and mid not in self._cancelled_correction_requests
+                and not (fut.done() and not fut.cancelled())
+            ):
                 self._schedule_command_cancel(
                     mid,
                     transport,
                     keep_observation=mid in self._observation_preserving_aborts,
                 )
             self._pending.pop(mid, None)
-            msg = "bridge_request_timeout"
-            raise EufySdkApiClientCommunicationError(msg) from None
+            raise EufySdkApiClientReplyTimeoutError from None
         except asyncio.CancelledError:
-            if _cancel_on_abort and not (fut.done() and not fut.cancelled()):
+            if (
+                _cancel_on_abort
+                and mid not in self._cancelled_correction_requests
+                and not (fut.done() and not fut.cancelled())
+            ):
                 self._schedule_command_cancel(
                     mid,
                     transport,
                     keep_observation=mid in self._observation_preserving_aborts,
                 )
             raise
-        except (aiohttp.ClientError, OSError):
-            self._pending.pop(mid, None)
-            msg = "bridge_send_failed"
-            raise EufySdkApiClientCommunicationError(msg) from None
         finally:
+            if (
+                _retain_automatic_light
+                and _correction_key is not None
+                and mid not in self._cancelled_correction_requests
+                and transport is self._ws
+                and generation == self._connection_generation
+                and not transport.closed
+                and fut.done()
+                and not fut.cancelled()
+                and fut.exception() is None
+                and fut.result().get("ok")
+            ):
+                self._prune_automatic_light_requests()
+                if (
+                    len(self._retained_automatic_light_requests)
+                    >= MAX_AUTOMATIC_LIGHT_REQUESTS
+                ):
+                    self._retained_automatic_light_requests.pop(
+                        next(iter(self._retained_automatic_light_requests))
+                    )
+                self._retained_automatic_light_requests[mid] = (
+                    _correction_key,
+                    transport,
+                    time.monotonic() + AUTOMATIC_LIGHT_CANCEL_SECONDS,
+                )
             self._pending.pop(mid, None)
             self._bounded_requests.pop(mid, None)
             self._observation_preserving_aborts.discard(mid)
-            if _correction_key is not None and self._correction_requests.get(
-                _correction_key
-            ) == (mid, transport, _correction_keep_observation):
-                self._correction_requests.pop(_correction_key, None)
+            self._cancelled_correction_requests.discard(mid)
+            self._correction_requests.pop(mid, None)
         self._require_connection(transport, generation)
         if not reply.get("ok"):
             code = reply.get("code")
@@ -797,13 +1226,18 @@ class EufySdkApiClient:
             projected = {
                 key: value
                 for key, value in normalize_snapshot(device).items()
-                if key != "commandHealth"
+                if key not in {"commandHealth", "cameraHealth"}
             }
             health = self._project_command_health(
                 device.get("sn"), device.get("commandHealth")
             )
             if health is not None:
                 projected["commandHealth"] = health
+            camera = self._project_camera_health(
+                device.get("sn"), device.get("cameraHealth")
+            )
+            if camera is not None:
+                projected["cameraHealth"] = camera
             devices.append(projected)
         return devices
 
@@ -982,6 +1416,7 @@ class EufySdkApiClient:
         ):
             message = "light_correction_invalid_deadline"
             raise EufySdkApiClientCommunicationError(message)
+        retain_automatic_light = automatic
         automatic = automatic or correction
         if automatic and (
             not bounded
@@ -997,7 +1432,18 @@ class EufySdkApiClient:
             or type(value) is not bool
             or not self.bounded_state_writes_supported
         ):
-            await self.rpc("device.set", sn=sn, name=name, value=value)
+            if name == "armingMode":
+                # Guard mode is exposed as armingMode. Allow preparation time
+                # before the SDK's per-command RTC/P2P waits begin.
+                await self.rpc(
+                    "device.set",
+                    timeout=GUARD_MODE_TIMEOUT_SECONDS,
+                    sn=sn,
+                    name=name,
+                    value=value,
+                )
+            else:
+                await self.rpc("device.set", sn=sn, name=name, value=value)
             return None
         loop = asyncio.get_running_loop()
         born = loop.time()
@@ -1099,6 +1545,7 @@ class EufySdkApiClient:
                             "_send_guard": _send_guard,
                             "_correction_key": key,
                             "_correction_keep_observation": correction,
+                            "_retain_automatic_light": retain_automatic_light,
                         }
                         if automatic or _send_guard is not None
                         else {}

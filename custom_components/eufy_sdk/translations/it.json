@@ -139,12 +139,31 @@
         "description": "Ogni quanto il bridge interroga il cloud eufy per conoscere lo stato dei dispositivi. Un intervallo breve dà dati più aggiornati ma aumenta il traffico verso il cloud, che comunque si aggiorna solo ogni pochi minuti.",
         "data": {
           "poll_interval_minutes": "Intervallo di interrogazione del cloud (minuti)",
-          "legacy_doorbell_pressed": "Usa l'evento pressed precedente del campanello"
+          "legacy_doorbell_pressed": "Usa l'evento pressed precedente del campanello",
+          "light_correction_enabled": "Sicurezza dei faretti",
+          "light_correction_pause_entity": "Entità per sospendere la sicurezza dei faretti (facoltativa)",
+          "light_safety_notify_service": "Servizio di notifica della sicurezza dei faretti (facoltativo)"
         },
         "data_description": {
-          "legacy_doorbell_pressed": "Disattivato: un evento ring per pressione. Attivato: un solo evento pressed al suo posto, per le automazioni esistenti. Non invia mai entrambi."
+          "legacy_doorbell_pressed": "Disattivato: un evento ring per pressione. Attivato: un solo evento pressed al suo posto, per le automazioni esistenti. Non invia mai entrambi.",
+          "light_correction_enabled": "Disattivata per impostazione predefinita. Per i faretti supportati, controlla le accensioni prolungate e riprova i comandi HA non confermati finché lo stato desiderato lo consente. Le modifiche alla sicurezza si applicano subito, senza rendere indisponibili le entità. Nelle schermate successive puoi associare lo stato desiderato di ogni faretto.",
+          "light_correction_pause_entity": "Seleziona un input boolean o uno switch. La sicurezza dei faretti non interviene su alcuna luce mentre questa entità è on, mancante o indisponibile. Lascia vuoto per non usare un’entità di sospensione.",
+          "light_safety_notify_service": "Servizio notify facoltativo, per esempio notify.mobile_app_phone. Le notifiche persistenti rimangono disponibili anche senza questo servizio. Lascia vuoto per disattivare l’invio facoltativo."
+        }
+      },
+      "light_safety_intent": {
+        "title": "Sicurezza dei faretti: {light_name}",
+        "description": "Scegli un’entità facoltativa per lo stato desiderato di {light_name}. I suoi stati on/off hanno priorità anche sui comandi della dashboard. Qualsiasi altro stato lascia stare questa luce; paused indica una pausa intenzionale. Lascia vuoto per usare l’ultimo comando HA.",
+        "data": {
+          "intent_entity": "Entità dello stato desiderato (facoltativa)"
+        },
+        "data_description": {
+          "intent_entity": "Seleziona un’entità che pubblichi on, off o paused. Uno stato unknown, unavailable o mancante sospende la sicurezza di questa luce e può segnalare una lacuna nella protezione."
         }
       }
+    },
+    "error": {
+      "invalid_notify_service": "Inserisci un servizio notify, per esempio notify.mobile_app_phone, oppure lascia vuoto."
     }
   },
   "device_automation": {

@@ -45,21 +45,8 @@ class PresetSlot:
 
     @property
     def label(self) -> str:
-        """
-        Render how the slot reads in the select.
-
-        App numbering is one-based; wire indices are unchanged. Reported slots
-        are confirmed choices even if the reply omits occupancy. Empty reported
-        slots remain visible, but the select refuses to move to them.
-        """
-        label = str(self.index + 1)
-        if self.index == 0 or self.is_default:
-            label += " · default"
-        if self.occupied is False:
-            label += " · empty"
-        elif self.occupied is None and not self.reported:
-            label += " · unverified"
-        return label
+        """Render the plain one-based app number, leaving wire indices unchanged."""
+        return str(self.index + 1)
 
 
 def fallback_slots() -> list[PresetSlot]:

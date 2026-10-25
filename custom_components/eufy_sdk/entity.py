@@ -27,7 +27,7 @@ from .api import (
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 from .light_correction import LightCorrection
-from .pushmap import MOTION_EVENTS
+from .pushmap import DETECTION_EVENTS
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -123,6 +123,9 @@ class EufySolixEntity(Entity):
         self._watch = tuple(watch)
         values = self.solix_record.get("values") or {}
         self._solix_values: dict[str, Any] = {k: values.get(k) for k in self._watch}
+        self._solix_snapshot_generation = getattr(
+            coordinator, "solix_snapshot_generation", None
+        )
         self._attr_unique_id = f"solix_{sn}_{unique_key}"
         self._attr_device_info = solix_device_info(coordinator, sn)
 
@@ -169,6 +172,11 @@ class EufySolixEntity(Entity):
     @callback
     def _handle_solix_snapshot(self) -> None:
         """Apply the coordinator's polled snapshot of this device."""
+        generation = getattr(self._coordinator, "solix_snapshot_generation", None)
+        if isinstance(generation, int):
+            if generation == self._solix_snapshot_generation:
+                return
+            self._solix_snapshot_generation = generation
         if self._solix_update(self.solix_record.get("values") or {}, snapshot=True):
             self.async_write_ha_state()
 
@@ -233,6 +241,13 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
     def available(self) -> bool:
         """Available while the bridge still reports this device."""
         return super().available and self._sn in self.coordinator.data
+
+    @callback
+    def _async_write_ha_state(self) -> None:
+        """Keep shutdown transport failures out of the final restore-state dump."""
+        if self.hass.is_stopping:
+            return
+        super()._async_write_ha_state()
 
 
 FIRMWARE_VERSION_MAX_LENGTH = 64
@@ -350,7 +365,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._command_receipt: CommandReceipt | None = None
         self._command_profile: str | None = None
         self._write_tasks: set[asyncio.Task] = set()
-        self._light_correction: LightCorrection | None = None
+        self._light_correction = (
+            LightCorrection(self) if self._prop == "light" else None
+        )
         self._command_health_snapshot: dict | None = None
 
     async def async_added_to_hass(self) -> None:
@@ -371,6 +388,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         )
         self.async_on_remove(self._remove_property_listener)
         self._sync_command_health()
+        if self._light_correction is not None:
+            await self._light_correction.async_added()
 
     @callback
     def _sync_command_health(self) -> None:
@@ -401,7 +420,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             if data.get("event") in {"bridgeDisconnected", "ready"}:
                 return True
             if data.get("deviceSn") == self._sn and (
-                data.get("event") in MOTION_EVENTS
+                data.get("event") in DETECTION_EVENTS
                 or data.get("event") == "propertiesObserved"
             ):
                 return True
@@ -438,12 +457,13 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         if event.data.get("event") == "bridgeDisconnected":
             self._command_health_snapshot = None
             if self._light_correction is not None:
-                self._light_correction.stop("closed")
+                self._light_correction.reset_observations()
                 self.async_write_ha_state()
             return
         if event.data.get("event") == "ready":
             self._command_health_snapshot = None
             if self._light_correction is not None:
+                self._light_correction.new_runtime()
                 self._light_correction.reset_health()
                 self._light_correction.reset_observations()
             return
@@ -461,7 +481,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             if self._light_correction is not None:
                 self._light_correction.observe(event.data)
             return
-        if event.data.get("event") in MOTION_EVENTS:
+        if event.data.get("event") in DETECTION_EVENTS:
             if (
                 self._light_correction is None
                 and getattr(self.client, "late_contrary_effects_supported", False)
@@ -503,23 +523,31 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         """Whether this property accepts writes without reporting its value."""
         return bool(self._spec.get("writeOnly"))
 
-    async def write(self, value: Any) -> None:  # noqa: PLR0912, PLR0915
+    async def write(self, value: Any) -> None:
+        """Record explicit intent without delaying the existing command path."""
+        controller = self._light_correction
+        tracked = controller is not None and controller.enabled and not self._removed
+        if tracked:
+            controller.start(value)
+        try:
+            await self._write(value)
+        finally:
+            if tracked:
+                controller.explicit_finished()
+
+    async def _write(self, value: Any) -> None:  # noqa: C901, PLR0912, PLR0915
         """Keep successful optimistic state owned by the latest write/lifecycle."""
         if self._removed:
             return
-        if self._prop == "light":
-            if (
-                self._light_correction is None
-                and getattr(self.client, "late_contrary_effects_supported", False)
-                is True
-            ):
-                self._light_correction = LightCorrection(self)
-            if self._light_correction is not None:
-                self._light_correction.start(value)
         self._write_generation += 1
         owner = self._write_generation
         report_generation = self._report_generation
         lifecycle = self._lifecycle_generation
+        safety_runtime = (
+            self._light_correction.runtime_generation
+            if self._light_correction is not None
+            else None
+        )
         light_marker = self._light_state_marker() if self._prop == "light" else None
         refresh_eligibility = (
             self._prop == "light"
@@ -548,19 +576,53 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                     for spec in specs
                 )
                 self._spec["boundedStateWrites"] = bounded
-            if bounded:
-                receipt = await self.client.set_property(
-                    self._sn, self._prop, value, bounded=True
-                )
-            else:
-                receipt = await self.client.set_property(self._sn, self._prop, value)
+            admitted = False
+
+            def explicit_guard() -> bool:
+                nonlocal admitted
+                admitted = True
+                return True
+
+            try:
+                if bounded:
+                    receipt = await self.client.set_property(
+                        self._sn,
+                        self._prop,
+                        value,
+                        bounded=True,
+                        **(
+                            {"_send_guard": explicit_guard}
+                            if self._light_correction is not None
+                            and self._light_correction.enabled
+                            else {}
+                        ),
+                    )
+                else:
+                    receipt = await self.client.set_property(
+                        self._sn, self._prop, value
+                    )
+            except BaseException:
+                if (
+                    admitted
+                    and self._light_correction is not None
+                    and safety_runtime == self._light_correction.runtime_generation
+                ):
+                    self._light_correction.uncertain_outcome()
+                raise
         finally:
             self._write_tasks.discard(task)
 
         if self._removed or lifecycle != self._lifecycle_generation:
             return
+        if (
+            self._light_correction is not None
+            and safety_runtime != self._light_correction.runtime_generation
+        ):
+            return
         if owner == self._write_generation and self._light_correction is not None:
             self._light_correction.receipt(receipt)
+        elif self._light_correction is not None:
+            self._light_correction.track_recovery(receipt)
         if isinstance(receipt, CommandReceipt) and not receipt.accepted:
             if owner == self._write_generation:
                 self._command_receipt = receipt

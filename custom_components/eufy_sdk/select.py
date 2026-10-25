@@ -107,6 +107,12 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
         super().__init__(coordinator, sn, spec)
         # enumValues is {raw: label}; JSON object keys arrive as strings.
         self._label_by_raw = {str(k): str(v) for k, v in spec["enumValues"].items()}
+        if spec["name"] == "nightVision" and "2" in self._label_by_raw:
+            self._label_by_raw["2"] = "Spotlights"
+            if self._label_by_raw.keys() == {"0", "1", "2"}:
+                self._label_by_raw = {
+                    raw: self._label_by_raw[raw] for raw in ("1", "2", "0")
+                }
         self._raw_by_label = {v: k for k, v in self._label_by_raw.items()}
         self._attr_options = list(self._label_by_raw.values())
 
@@ -265,8 +271,8 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
             if restored := presets.from_dicts(last.attributes.get(ATTR_SLOTS)):
                 presets.remember(entry, self._sn, restored)
                 self._apply(restored)
-            # New states carry the wire index explicitly. Legacy labels used
-            # zero-based numbers, so parse those only when the new field is absent.
+            # Prefer the saved wire index; labeled options otherwise retain
+            # their displayed one-based number.
             chosen = last.attributes.get("selected_index")
             self._select_slot(chosen if type(chosen) is int else _slot_in(last.state))
         self._publish()
@@ -324,13 +330,16 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
         """Rebuild the options from the slots, keeping the chosen one if it survives."""
         self._slots = slots
         chosen = self._selected_index
-        self._attr_options = [s.label for s in slots]
+        self._attr_options = [s.label for s in slots if s.occupied is not False] or [
+            s.label for s in slots
+        ]
         self._select_slot(chosen)
 
     def _select_slot(self, slot: int | None) -> None:
         """Select the option for a slot number, falling back to the first one."""
-        match = next((s for s in self._slots if s.index == slot), None)
-        chosen = match or (self._slots[0] if self._slots else None)
+        choices = [s for s in self._slots if s.label in self._attr_options]
+        match = next((s for s in choices if s.index == slot), None)
+        chosen = match or (choices[0] if choices else None)
         self._selected_index = chosen.index if chosen else None
         self._attr_current_option = chosen.label if chosen else None
 
@@ -342,8 +351,8 @@ class EufySdkPresetSelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):
 
 
 def _slot_in(label: str | None) -> int | None:
-    """Read a wire index from a legacy zero-based label ('0 · HOME' -> 0)."""
+    """Read a wire index from a numbered option, including old labeled options."""
     if not label:
         return None
     head = label.split(" ", 1)[0]
-    return int(head) if head.isdigit() else None
+    return int(head) - 1 if head.isdigit() and int(head) > 0 else None

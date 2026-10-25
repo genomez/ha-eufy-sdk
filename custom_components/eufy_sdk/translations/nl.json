@@ -140,13 +140,32 @@
         "data": {
           "poll_interval_minutes": "Cloud-pollinterval (minuten)",
           "soc_refresh_seconds": "Vernieuwingsinterval Solarbank SOC-limiet (seconden)",
-          "legacy_doorbell_pressed": "Oude pressed-gebeurtenis voor de deurbel gebruiken"
+          "legacy_doorbell_pressed": "Oude pressed-gebeurtenis voor de deurbel gebruiken",
+          "light_correction_enabled": "Veiligheid schijnwerpers",
+          "light_correction_pause_entity": "Hulpentiteit om schijnwerperveiligheid te pauzeren (optioneel)",
+          "light_safety_notify_service": "Meldingsdienst voor schijnwerperveiligheid (optioneel)"
         },
         "data_description": {
           "soc_refresh_seconds": "Hoe vaak HA de laad-/ontlaadlimieten van een Solarbank opnieuw uitleest uit de cloud, zodat een wijziging via de app zichtbaar wordt op de schuifregelaars. Geldt alleen als je een Solarbank hebt.",
-          "legacy_doorbell_pressed": "Uit: één ring-gebeurtenis per druk. Aan: in plaats daarvan één pressed-gebeurtenis voor bestaande automatiseringen. Verstuurt nooit beide."
+          "legacy_doorbell_pressed": "Uit: één ring-gebeurtenis per druk. Aan: in plaats daarvan één pressed-gebeurtenis voor bestaande automatiseringen. Verstuurt nooit beide.",
+          "light_correction_enabled": "Standaard uit. Controleert bij ondersteunde schijnwerpers langdurig branden en probeert onbevestigde HA-opdrachten opnieuw zolang de gewenste toestand dit toestaat. Veiligheidswijzigingen gelden direct zonder entiteiten onbeschikbaar te maken. Op de volgende schermen kun je de gewenste toestand per schijnwerper koppelen.",
+          "light_correction_pause_entity": "Selecteer een input boolean of switch. De schijnwerperveiligheid laat alle lampen met rust zolang deze hulpentiteit on, ontbrekend of onbeschikbaar is. Laat leeg om geen pauzehulp te gebruiken.",
+          "light_safety_notify_service": "Optionele notify-dienst, bijvoorbeeld notify.mobile_app_phone. Blijvende meldingen blijven beschikbaar zonder notify-dienst. Laat leeg om de optionele bezorging uit te schakelen."
+        }
+      },
+      "light_safety_intent": {
+        "title": "Veiligheid schijnwerper: {light_name}",
+        "description": "Kies een optionele entiteit voor de gewenste toestand van {light_name}. De toestanden on/off hebben voorrang, ook op dashboardopdrachten. Elke andere toestand laat deze lamp met rust; paused is een bewuste pauze. Laat leeg om de laatste HA-opdracht te gebruiken.",
+        "data": {
+          "intent_entity": "Entiteit voor gewenste toestand (optioneel)"
+        },
+        "data_description": {
+          "intent_entity": "Selecteer een entiteit die on, off of paused publiceert. Een toestand unknown, unavailable of ontbrekende toestand pauzeert de veiligheid voor deze lamp en kan een beschermingshiaat melden."
         }
       }
+    },
+    "error": {
+      "invalid_notify_service": "Voer een notify-dienst in, bijvoorbeeld notify.mobile_app_phone, of laat leeg."
     }
   },
   "exceptions": {

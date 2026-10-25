@@ -14,6 +14,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .camera_health import EufyCameraHealthEntity, camera_health_serials
 from .const import EVENT_TYPE
 from .coordinator import EufySdkDataUpdateCoordinator
 from .entity import (
@@ -117,7 +118,28 @@ async def async_setup_entry(
         for sn, dev in solix.items()
         if "connectivity" in dev.get("capabilities", [])
     )
+    entities.extend(
+        EufyCameraConnectivityBinarySensor(coordinator, sn)
+        for sn in camera_health_serials(coordinator)
+    )
     async_add_entities(entities)
+
+
+class EufyCameraConnectivityBinarySensor(EufyCameraHealthEntity, BinarySensorEntity):
+    """Expose only qualified online/offline, leaving uncertainty unknown."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_translation_key = "connectivity"
+
+    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
+        """Build a stable connectivity diagnostic identity."""
+        super().__init__(coordinator, sn, "connectivity")
+
+    @property
+    def is_on(self) -> bool | None:
+        """Map suspect and unknown to HA unknown without guessing reachability."""
+        state = (self.camera_health or {}).get("connectivity")
+        return {"online": True, "offline": False}.get(state)
 
 
 class EufySdkBinarySensor(EufySdkPropertyEntity, BinarySensorEntity):

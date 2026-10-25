@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.components.event import (
     DoorbellEventType,
     EventDeviceClass,
     EventEntity,
+    EventExtraStoredData,
 )
-from homeassistant.core import callback
+from homeassistant.core import State, callback
+from homeassistant.util import dt as dt_util
 
 from .const import CONF_LEGACY_DOORBELL_PRESSED, EVENT_TYPE
 from .entity import EufySdkDeviceEntity
@@ -53,8 +56,42 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+@dataclass
+class _EufySdkEventExtraStoredData(EventExtraStoredData):
+    """Keep the occurrence time even when HA saves an unavailable state."""
+
+    last_event_timestamp: str | None
+
+
 class _EufySdkBusEvent(EufySdkDeviceEntity, EventEntity):
     """Base: fire this event entity from matching `<DOMAIN>_event` bus messages."""
+
+    @property
+    def extra_restore_state_data(self) -> EventExtraStoredData:
+        """Save the timestamp alongside HA's event type and attributes."""
+        data = super().extra_restore_state_data
+        return _EufySdkEventExtraStoredData(
+            data.last_event_type, data.last_event_attributes, self.state
+        )
+
+    async def async_get_last_state(self) -> State | None:
+        """Supply a saved occurrence time to HA's native event restoration."""
+        state = await super().async_get_last_state()
+        if state is None or dt_util.parse_datetime(state.state) is not None:
+            return state
+        extra = await self.async_get_last_extra_data()
+        if extra is None:
+            return state
+        timestamp = extra.as_dict().get("last_event_timestamp")
+        if not isinstance(timestamp, str):
+            return state
+        try:
+            parsed = dt_util.parse_datetime(timestamp)
+        except (ValueError, OverflowError):
+            return state
+        if parsed is None or parsed.tzinfo is None or parsed.utcoffset() is None:
+            return state
+        return State(state.entity_id, timestamp, state.attributes)
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to bridge device events while registered."""
@@ -64,6 +101,8 @@ class _EufySdkBusEvent(EufySdkDeviceEntity, EventEntity):
     @callback
     def _handle_event(self, event: Event) -> None:
         """Translate a bus event for this device into an entity fire."""
+        if self.hass is not None and self.hass.is_stopping:
+            return
         data = event.data
         if data.get("deviceSn") != self._sn:
             return

@@ -59,6 +59,15 @@
       }
     },
     "sensor": {
+      "connectivity_status": {
+        "name": "Connectivity status",
+        "state": {
+          "online": "Online",
+          "suspect": "Suspect",
+          "offline": "Offline",
+          "unknown": "Unknown"
+        }
+      },
       "info": {
         "name": "Info"
       },
@@ -154,16 +163,31 @@
           "poll_interval_minutes": "Cloud poll interval (minutes)",
           "soc_refresh_seconds": "Solarbank SOC-limit refresh (seconds)",
           "legacy_doorbell_pressed": "Use legacy doorbell pressed event",
-          "light_correction_enabled": "Correct confirmed contrary lights to OFF only",
-          "light_correction_pause_entity": "Pause light corrections helper (optional)"
+          "light_correction_enabled": "Floodlight safety",
+          "light_correction_pause_entity": "Pause floodlight safety helper (optional)",
+          "light_safety_notify_service": "Floodlight safety notify service (optional)"
         },
         "data_description": {
           "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank.",
           "legacy_doorbell_pressed": "Off: one ring event per press. On: one pressed event instead, for existing automations. Never sends both.",
-          "light_correction_enabled": "Default off. For supported floodlights, correct only OFF intent at most three times within ten minutes of the latest HA command. ON recovery uses the original command and existing bounded SDK retry only. OFF correction can override app or motion lighting. Contrary observations remain available while disabled.",
-          "light_correction_pause_entity": "Select an input boolean or switch. Corrections pause while it is on or unavailable, then resume while the original window and attempt budget remain. Leave empty for no pause helper."
+          "light_correction_enabled": "Default off. For supported floodlights, watch for long-on episodes and retry unconfirmed HA commands while intent permits. Safety changes apply immediately without making entities unavailable. Per-light intent bindings follow on the next screens.",
+          "light_correction_pause_entity": "Select an input boolean or switch. Floodlight safety leaves all lights alone while this helper is on, missing or unavailable. Leave empty for no pause helper.",
+          "light_safety_notify_service": "Optional notify service, for example notify.mobile_app_phone. Persistent notifications remain available without a notify service. Leave empty to disable optional delivery."
+        }
+      },
+      "light_safety_intent": {
+        "title": "Floodlight safety: {light_name}",
+        "description": "Choose an optional intent entity for {light_name}. Its on/off state is authoritative, including over dashboard commands. Any other state leaves this light alone; paused is deliberate. Leave empty to use the last HA command instead.",
+        "data": {
+          "intent_entity": "Intent entity (optional)"
+        },
+        "data_description": {
+          "intent_entity": "Select an entity that publishes on, off or paused. Unknown, unavailable or missing intent pauses safety for this light and can report a protection gap."
         }
       }
+    },
+    "error": {
+      "invalid_notify_service": "Enter a notify service such as notify.mobile_app_phone, or leave empty."
     }
   },
   "exceptions": {

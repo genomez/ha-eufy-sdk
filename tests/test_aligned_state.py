@@ -135,7 +135,7 @@ class SnapshotOrderTests(unittest.IsolatedAsyncioTestCase):
             {"armingMode": 0},
         )
 
-    async def test_failure_drops_journal_and_schedules_only_one_quick_retry(self):
+    async def test_failure_drops_journal_and_keeps_one_pending_recovery_retry(self):
         client = Mock(connected=True)
         client.auth_status = AsyncMock(return_value={"state": "pending"})
         coordinator = coordinator_for(client)
@@ -145,15 +145,17 @@ class SnapshotOrderTests(unittest.IsolatedAsyncioTestCase):
             return_value=cancel,
         ) as later:
             for _ in range(2):
+                coordinator._last_refresh_started = None
                 with self.assertRaises(UpdateFailed):
                     await coordinator._async_update_data()
             later.assert_called_once()
             self.assertIsNone(coordinator._pending_state_events)
             coordinator._clear_fast_retry()
             cancel.assert_called_once()
+            coordinator._last_refresh_started = None
             with self.assertRaises(UpdateFailed):
                 await coordinator._async_update_data()
-            later.assert_called_once()
+            self.assertEqual(later.call_count, 2)
 
     async def test_alarm_lifecycle_survives_omitted_snapshot_until_stop_or_clear(self):
         client = Mock(connected=True)
@@ -193,7 +195,7 @@ class SnapshotOrderTests(unittest.IsolatedAsyncioTestCase):
         client.list_devices = AsyncMock(return_value=[])
         self.assertEqual(await coordinator._async_update_data(), {})
 
-    async def test_retry_fires_once_and_failed_retry_does_not_rearm(self):
+    async def test_failed_retry_rearms_with_next_delay(self):
         client = Mock(connected=True)
         client.auth_status = AsyncMock(return_value={"state": "pending"})
         coordinator = coordinator_for(client)
@@ -209,7 +211,7 @@ class SnapshotOrderTests(unittest.IsolatedAsyncioTestCase):
             coordinator.async_request_refresh.assert_awaited_once()
             with self.assertRaises(UpdateFailed):
                 await coordinator._async_update_data()
-            later.assert_called_once()
+            self.assertEqual([call.args[1] for call in later.call_args_list], [45, 90])
 
     async def test_auth_challenge_cancels_retry_without_reset_or_login(self):
         client = Mock(connected=True)
@@ -222,28 +224,32 @@ class SnapshotOrderTests(unittest.IsolatedAsyncioTestCase):
         client.reset_connection.assert_not_called()
         client.retrigger_auth.assert_not_called()
 
-    async def test_good_poll_cancels_timer_and_reopens_one_retry_budget(self):
+    async def test_good_poll_cancels_timer_and_resets_recovery_schedule(self):
         client = Mock(connected=True)
         client.auth_status = AsyncMock(return_value={"state": "ok"})
         client.list_devices = AsyncMock(return_value=[])
         client.list_solix_devices = AsyncMock(return_value=[])
         coordinator = coordinator_for(client)
         cancel = coordinator._fast_retry_cancel = Mock()
-        coordinator._fast_retry_used = True
+        coordinator._recovery_step = 3
         await coordinator._async_update_data()
         cancel.assert_called_once()
-        self.assertFalse(coordinator._fast_retry_used)
+        self.assertEqual(coordinator._recovery_step, 0)
 
     async def test_transport_failure_resets_socket_with_fixed_error(self):
         client = Mock(connected=True)
         client.auth_status = AsyncMock(
             side_effect=EufySdkApiClientCommunicationError("synthetic-private")
         )
-        client.reset_connection = AsyncMock()
+        client.reset_connection = AsyncMock(return_value=True)
         coordinator = coordinator_for(client)
         with (
             patch("custom_components.eufy_sdk.coordinator.async_call_later"),
-            self.assertRaisesRegex(UpdateFailed, "^bridge_update_failed$"),
+            self.assertRaisesRegex(
+                UpdateFailed,
+                r"^bridge_update_failed: phase=auth_status method=auth.status "
+                r"reason=other elapsed_ms=\d+ reset=true$",
+            ),
         ):
             await coordinator._async_update_data()
         client.reset_connection.assert_awaited_once()

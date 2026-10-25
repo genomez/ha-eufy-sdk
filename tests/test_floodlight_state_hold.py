@@ -52,6 +52,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             apply_command_health_event=Mock(),
             async_add_listener=Mock(return_value=Mock()),
             _clear_fast_retry=Mock(),
+            request_recovery_refresh=Mock(),
         )
         entity = EufySdkSwitch(
             coordinator, "fixture-device", {"name": prop, "type": "bool"}

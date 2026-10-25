@@ -15,7 +15,9 @@ from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
+from .api import CAMERA_CONNECTIVITY
 from .bespoke import BITFIELD_SWITCHES
+from .camera_health import EufyCameraHealthEntity, camera_health_serials
 from .const import CONF_HOST, DOMAIN, EVENT_TYPE, LOGGER, SOLIX_READING_EVENT
 from .entity import (
     EufySdkDeviceEntity,
@@ -334,6 +336,10 @@ async def async_setup_entry(
     ]
     entities.extend(storage_sensors(coordinator))
     entities.extend(
+        EufyCameraConnectivityStatusSensor(coordinator, sn)
+        for sn in camera_health_serials(coordinator)
+    )
+    entities.extend(
         EufySdkPropertySensor(coordinator, sn, spec)
         for sn in coordinator.data
         for spec in entry.runtime_data.properties.get(sn, [])
@@ -453,6 +459,28 @@ async def async_setup_entry(
     entry.async_on_unload(hass.bus.async_listen(EVENT_TYPE, _on_solix_reading))
 
 
+class EufyCameraConnectivityStatusSensor(EufyCameraHealthEntity, SensorEntity):
+    """Expose camera evidence and receipt outcomes without enforcing policy."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_translation_key = "connectivity_status"
+    _attr_options: ClassVar[list[str]] = list(CAMERA_CONNECTIVITY)
+
+    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
+        """Build the status diagnostic with the existing camera identity."""
+        super().__init__(coordinator, sn, "connectivity_status")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the SDK assessment, never infer it from telemetry."""
+        return (self.camera_health or {}).get("connectivity")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return stable receipt-time attributes from the current projection."""
+        return self.health_attributes()
+
+
 class EufySdkInfoSensor(EufySdkDeviceEntity, SensorEntity):
     """A diagnostic sensor: value = the device codec, attributes = its capabilities."""
 
@@ -527,7 +555,7 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
-        """Current value; enums use labels or raw codes, structured values are dropped."""
+        """Return enum labels or raw scalar values, dropping structured values."""
         v = self.prop_value
         if v is None or self._spec.get("raw") is True:
             return None

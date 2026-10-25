@@ -1,6 +1,6 @@
-"""Regression coverage for OFF-only correction and SDK-owned command health."""
+"""Exercise command-health waits without treating optimistic state as evidence."""
 
-# ruff: noqa: ANN001, ANN002, ANN201, ANN202, D102, FBT003, INP001, PT009, PT027, SLF001
+# ruff: noqa: ANN001, ANN201, ANN202, D102, FBT003, INP001, PT009, PT027, SLF001
 import asyncio
 import unittest
 from types import SimpleNamespace
@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import test_aligned_state as aligned
 import test_light_correction as fixtures
-import test_light_grace as grace
 from aiohttp import WSMsgType
 
 from custom_components.eufy_sdk.api import (
@@ -16,191 +15,80 @@ from custom_components.eufy_sdk.api import (
     command_health,
     command_health_event,
 )
-from custom_components.eufy_sdk.const import CONF_LIGHT_CORRECTION_PAUSE
 
 
-class CommandSafetyTests(unittest.IsolatedAsyncioTestCase):
-    """Drive real entity callbacks and controller timers with synthetic evidence."""
+class CommandSafetyTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCase):
+    """Keep health admission separate from explicit commands and retry attempts."""
 
-    _entity = fixtures.LightCorrectionTests._entity
-    _report = fixtures.LightCorrectionTests._report
-    setup_light = fixtures.LightCorrectionTests.setup_light
-    emit = fixtures.LightCorrectionTests.emit
-    advance = fixtures.LightCorrectionTests.advance
-    dispatch = fixtures.LightCorrectionTests.dispatch
-
-    def health(self, status="command_degraded", remaining=600000):
-        self.entity._handle_property_changed(
-            SimpleNamespace(
-                data={
-                    "event": "commandHealth",
-                    "sn": "fixture-device",
-                    "property": "light",
-                    "status": status,
-                    "cooldownRemainingMs": remaining,
-                }
-            )
-        )
-
-    async def test_degraded_event_cancels_timer_keeps_watch_and_resumes_off(self):
-        entity, _, client, _ = self.setup_light()
+    async def test_degraded_health_waits_without_spending_retry_attempts(self):
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
-        self.emit()
         self.health(remaining=120000)
-        self.assertIsNone(entity._light_correction.timer)
-        self.assertEqual(
-            entity.extra_state_attributes["command_health"], "command_degraded"
-        )
         await self.advance(119)
-        self.assertEqual(len(self.commands), 1)
-        client.confirm_light.assert_not_awaited()
-        self.emit("matched")
-        self.emit()
-        self.health("healthy", 0)
+        self.assertEqual([at for at, _, _ in self.commands], [0])
+        self.assertEqual(entity._light_correction.attempts, 1)
         await self.advance(120)
-        self.assertEqual(len(self.commands), 2)
-        self.assertEqual(entity._light_correction.born, 0)
+        self.assertEqual([at for at, _, _ in self.commands], [0, 120])
 
-    async def test_degraded_during_read_cancels_task_before_dispatch(self):
-        entity, _, client, _ = self.setup_light()
+    async def test_offline_camera_waits_then_retries_when_back(self):
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
-        blocker = asyncio.get_running_loop().create_future()
+        entity.device["cameraHealth"] = {"connectivity": "offline"}
+        await self.advance(300)
+        self.assertEqual([at for at, _, _ in self.commands], [0])
+        entity.device["cameraHealth"] = {"connectivity": "online"}
+        entity._light_correction.check_policy()
+        await self.drain()
+        self.assertEqual([at for at, _, _ in self.commands], [0, 300])
 
-        async def read(*_):
-            await blocker
-
-        client.confirm_light.side_effect = read
-        self.emit()
-        await self.advance(15)
-        task = entity._light_correction.task
-        self.assertIsNotNone(task)
+    async def test_explicit_request_bypasses_degraded_automatic_wait(self):
+        entity, _, _, _ = await self.activate()
         self.health()
-        await asyncio.sleep(0)
-        self.assertTrue(task.cancelled())
+        await entity.write(True)
+        self.assertEqual([value for _, value, _ in self.commands], [True])
+        self.assertEqual(entity._light_correction.explicit_busy, 0)
+        await self.advance(120)
         self.assertEqual(len(self.commands), 1)
-        self.assertIsNotNone(entity._light_correction.expiry)
 
-    async def test_degraded_receipt_preserves_passive_lineage_no_false_failure(self):
-        entity, _, _, _ = self.setup_light()
-        await entity.write(False)
-        receipt = _command_receipt(
-            {
-                "status": "cancelled_before_send",
-                "sendAttempted": False,
-                "effect": "unconfirmed",
-                "intent": 1,
-                "commandHealth": {
-                    "status": "command_degraded",
-                    "cooldownRemainingMs": 600000,
-                },
-                "rejectionCode": -108,
-                "responseLatencyMs": 89,
-            }
+    async def test_healthy_event_cannot_override_pause_or_new_on_intent(self):
+        entity, coordinator, _, _ = await self.activate()
+        coordinator.config_entry.options[fixtures.CONF_LIGHT_CORRECTION_PAUSE] = (
+            "switch.pause"
         )
-        entity._light_correction.receipt(receipt, correction=True)
-        self.emit()
-        await self.advance(600)
-        self.assertEqual(len(self.commands), 1)
-        self.notification.assert_not_called()
-        self.assertEqual(entity.extra_state_attributes["command_health"], "healthy")
-
-    async def test_explicit_command_is_allowed_during_degraded_cooldown(self):
-        entity, _, _, _ = self.setup_light()
         await entity.write(False)
         self.health()
-        await entity.async_turn_on()
-        self.assertEqual([value for _, value, _ in self.commands], [False, True])
-        self.assertEqual(
-            entity.extra_state_attributes["command_health"], "command_degraded"
-        )
-        self.emit()
-        await self.advance(600)
-        self.assertEqual(len(self.commands), 2)
-        self.notification.assert_not_called()
-
-    async def test_cooldown_expiry_resumes_only_remaining_off_budget(self):
-        entity, _, _, _ = self.setup_light()
-        await entity.write(False)
-        self.emit()
-        self.health(remaining=120000)
-        await self.advance(600)
-        self.assertEqual([at for at, _, _ in self.commands], [0, 120, 165, 300])
-        self.assertEqual(entity._light_correction.born, 0)
-        self.assertEqual(entity._light_correction.attempts, 3)
-
-    async def test_healthy_receipt_precedes_event_and_does_not_claim_state(self):
-        entity, _, _, _ = self.setup_light()
-        await entity.write(False)
-        self.health()
-        self.emit()
-        entity._light_correction.receipt(
-            _command_receipt(
-                {
-                    "status": "acknowledged",
-                    "sendAttempted": True,
-                    "effect": "unconfirmed",
-                    "intent": 1,
-                    "commandHealth": {"status": "healthy", "cooldownRemainingMs": 0},
-                }
-            )
-        )
-        self.assertEqual(entity.extra_state_attributes["command_health"], "healthy")
-        self.assertEqual(entity.extra_state_attributes["command_effect"], "unconfirmed")
-        self.assertIs(entity._light_correction.observed, True)
-        self.emit()
-        await self.advance(15)
-        self.assertEqual(len(self.commands), 2)
-
-    async def test_recovery_respects_pause_and_new_on_supersession(self):
-        entity, coordinator, client, _ = self.setup_light()
-        coordinator.config_entry.options[CONF_LIGHT_CORRECTION_PAUSE] = "switch.pause"
-        await entity.write(False)
-        self.emit()
-        self.health(remaining=60000)
+        await self.advance(120)
         self.paused = True
-        await self.advance(60)
+        self.health("healthy", 0, revision=2)
+        await self.drain()
         self.assertEqual(len(self.commands), 1)
-        await entity.async_turn_on()
+        self.binding("on")
         self.paused = False
-        entity._light_correction._pause_changed(
-            SimpleNamespace(data={"entity_id": "switch.pause"})
-        )
-        await self.advance(590)
-        self.assertEqual([value for _, value, _ in self.commands], [False, True])
-        client.confirm_light.assert_not_awaited()
-
-    async def test_health_final_admission_and_stale_recovery_are_guarded(self):
-        entity, _, _, _ = self.setup_light()
-        await entity.write(False)
-        self.emit()
-        controller = entity._light_correction
-        generation = controller.generation
-        self.health(remaining=60000)
-        recovery = self.events[-1][1]
-        self.assertFalse(controller._admit_write(generation))
-        controller.stop("closed")
-        self.dispatch(recovery, None)
-        await self.advance(1000)
-        self.assertIsNone(controller.health_timer)
+        entity._light_correction.check_policy()
+        await self.drain()
         self.assertEqual(len(self.commands), 1)
-        self.notification.assert_not_called()
 
-    async def test_snapshot_health_is_adopted_once_without_cooldown_extension(self):
-        entity, coordinator, _, _ = self.setup_light()
-        await entity.write(False)
-        self.emit()
-        coordinator.data["fixture-device"]["commandHealth"] = {
-            "status": "command_degraded",
-            "cooldownRemainingMs": 120000,
-        }
-        entity._handle_coordinator_update()
+    async def test_duplicate_projection_does_not_extend_cooldown(self):
+        entity, _, _, _ = await self.activate()
+        self.health(remaining=120000)
         await self.advance(60)
-        entity._handle_coordinator_update()
-        self.assertEqual(
-            entity.extra_state_attributes["command_health_cooldown_remaining_ms"], 60000
+        self.health(remaining=120000)
+        self.assertEqual(entity._light_correction.health_until, 120)
+
+    async def test_older_healthy_projection_cannot_clear_newer_degraded(self):
+        entity, _, _, _ = await self.activate()
+        self.health(remaining=120000, revision=2)
+        self.health("healthy", 0, revision=1)
+        self.assertEqual(entity._light_correction.health_until, 120)
+
+    async def test_explicit_send_failure_always_releases_busy_reservation(self):
+        entity, _, client, _ = await self.activate()
+        client.get_properties.side_effect = fixtures.EufySdkApiClientCommunicationError(
+            "synthetic"
         )
-        await self.advance(120)
-        self.assertEqual(len(self.commands), 2)
+        with self.assertRaises(fixtures.EufySdkApiClientCommunicationError):
+            await entity.write(False)
+        self.assertEqual(entity._light_correction.explicit_busy, 0)
 
     async def test_health_snapshot_race_preserves_newer_event(self):
         coordinator = aligned.coordinator_for(Mock())
@@ -279,40 +167,6 @@ class CommandSafetyTests(unittest.IsolatedAsyncioTestCase):
                         {**base, "responseLatencyMs": value}
                     ).response_latency_ms
                 )
-
-    async def test_suppressed_correction_maps_receipt_intent_and_refunds_unsent(self):
-        entity, _, client, _ = self.setup_light()
-        await entity.write(False)
-        original_send = client.set_property.side_effect
-        client.set_property.side_effect = None
-        client.set_property.return_value = _command_receipt(
-            {
-                "status": "cancelled_before_send",
-                "sendAttempted": False,
-                "effect": "unconfirmed",
-                "intent": 2,
-                "commandHealth": {
-                    "status": "command_degraded",
-                    "cooldownRemainingMs": 60000,
-                },
-            }
-        )
-        self.emit()
-        await self.advance(15)
-        controller = entity._light_correction
-        self.assertEqual(controller.intent, 2)
-        self.assertEqual(controller.attempts, 0)
-        self.assertEqual(controller.born, 0)
-        self.assertIsNotNone(controller.expiry)
-        self.notification.assert_not_called()
-        self.emit()
-        self.next_intent = 2
-        client.set_property.side_effect = original_send
-        await self.advance(75)
-        self.assertEqual(client.confirm_light.call_args.args[1], 2)
-        self.assertEqual(controller.intent, 3)
-        self.assertEqual(controller.attempts, 1)
-        self.assertEqual(self.commands[-1][:2], (75, False))
 
 
 class HealthProtocolTests(unittest.IsolatedAsyncioTestCase):
@@ -444,41 +298,3 @@ class HealthProtocolTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertTrue(cancels)
         self.assertTrue(all(frame.get("keepObservation") is True for frame in cancels))
-
-
-class GraceHealthTests(unittest.IsolatedAsyncioTestCase):
-    """Keep the existing grace and cap despite a command cooldown."""
-
-    _entity = fixtures.LightCorrectionTests._entity
-    _report = fixtures.LightCorrectionTests._report
-    setup_light = fixtures.LightCorrectionTests.setup_light
-    advance = fixtures.LightCorrectionTests.advance
-    dispatch = fixtures.LightCorrectionTests.dispatch
-    setup_grace = grace.LightGraceTests.setup_grace
-    observation = grace.LightGraceTests.observation
-    motion = grace.LightGraceTests.motion
-    arm = grace.LightGraceTests.arm
-    health = CommandSafetyTests.health
-
-    async def test_health_recovery_does_not_restart_motion_grace(self):
-        entity, _, _, _ = await self.arm()
-        self.health(remaining=60000)
-        await self.advance(661)
-        self.assertEqual(entity._light_correction.grace_due, 901)
-        await self.advance(901)
-        self.assertEqual(self.commands[-1][:2], (901, False))
-
-    async def test_motion_during_cooldown_preserves_original_cap(self):
-        entity, _, _, _ = await self.arm()
-        self.health(remaining=600000)
-        for moment in (800, 1000, 1200):
-            await self.advance(moment)
-            self.motion()
-        self.assertEqual(len(self.commands), 1)
-        await self.advance(1201)
-        self.assertEqual(entity._light_correction.grace_due, 1500)
-        await self.advance(1400)
-        self.motion()
-        self.assertEqual(entity._light_correction.grace_due, 1501)
-        await self.advance(1501)
-        self.assertEqual(self.commands[-1][:2], (1501, False))

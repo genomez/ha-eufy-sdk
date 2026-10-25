@@ -1,95 +1,121 @@
-"""Regression coverage for OFF-only correction and SDK-owned command health."""
+"""Exercise persistent command retries and final dispatch admission."""
 
-# ruff: noqa: ANN001, ANN201, D102, FBT003, INP001, PT009, SLF001
+# ruff: noqa: ANN001, ANN002, ANN003, ANN201, ANN202, D102, FBT003
+# ruff: noqa: INP001, PT009, SLF001
+import asyncio
 import unittest
-from types import SimpleNamespace
 
 import test_light_correction as fixtures
 
-from custom_components.eufy_sdk.api import CommandReceipt
 
+class CommandSafetyTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCase):
+    """Use real entity requests and the public safety lifecycle."""
 
-class CommandSafetyTests(unittest.IsolatedAsyncioTestCase):
-    """Drive real entity callbacks and controller timers with synthetic evidence."""
-
-    _entity = fixtures.LightCorrectionTests._entity
-    _report = fixtures.LightCorrectionTests._report
-    setup_light = fixtures.LightCorrectionTests.setup_light
-    emit = fixtures.LightCorrectionTests.emit
-    advance = fixtures.LightCorrectionTests.advance
-    dispatch = fixtures.LightCorrectionTests.dispatch
-
-    def health(self, status="command_degraded", remaining=600000):
-        self.entity._handle_property_changed(
-            SimpleNamespace(
-                data={
-                    "event": "commandHealth",
-                    "sn": "fixture-device",
-                    "property": "light",
-                    "status": status,
-                    "cooldownRemainingMs": remaining,
-                }
-            )
-        )
-
-    async def test_back_left_on_timeout_never_corrects_after_demand_ends(self):
-        entity, _, client, _ = self.setup_light(desired=True)
-        await entity.write(True)
-        entity._light_correction.receipt(
-            CommandReceipt(
-                "ack_timeout",
-                True,
-                "unknown",
-                intent=1,
-            )
-        )
-        self.emit()
-        await self.advance(188)
-        self._report(entity, False)
-        await self.advance(320)
-        self.assertEqual([value for _, value, _ in self.commands], [True])
-        client.confirm_light.assert_not_awaited()
-        self.assertEqual(
-            entity.extra_state_attributes["light_correction_suppression_reason"],
-            "on_observation_only",
-        )
-        self.emit("verification_exhausted")
-        await self.advance(600)
-        self.notification.assert_not_called()
-
-    async def test_front_yard_match_then_off_does_not_rearm_old_on(self):
-        entity, _, client, _ = self.setup_light(desired=True)
-        await entity.write(True)
-        entity._light_correction.receipt(
-            CommandReceipt(
-                "pending_accepted",
-                True,
-                "unconfirmed",
-                intent=1,
-            )
-        )
-        self.emit()
-        await self.advance(140)
-        self.emit("matched")
-        await self.advance(163)
-        self.emit()
-        await self.advance(317)
-        self.assertEqual([value for _, value, _ in self.commands], [True])
-        client.confirm_light.assert_not_awaited()
-        await entity.async_turn_off()
-        self.assertEqual([value for _, value, _ in self.commands], [True, False])
-        self.assertIs(entity._light_correction.desired, False)
-        await self.advance(600)
-        self.notification.assert_not_called()
-
-    async def test_off_correction_keeps_exact_bounds(self):
-        entity, _, client, _ = self.setup_light()
+    async def test_off_retries_continue_beyond_old_three_attempt_limit(self):
+        entity, _, _, _ = await self.activate()
         await entity.write(False)
-        self.emit()
-        await self.advance(600)
+        await self.advance(1080)
         self.assertEqual(
-            [(at, value) for at, value, _ in self.commands],
-            [(0, False), (15, False), (60, False), (300, False)],
+            [at for at, _, _ in self.commands], [0, 60, 180, 480, 780, 1080]
         )
-        self.assertEqual(entity._light_correction.attempts, 3)
-        self.assertLessEqual(client.confirm_light.await_count, 16)
+        self.assertTrue(all(value is False for _, value, _ in self.commands))
+
+    async def test_explicit_on_retry_backoff_and_off_supersession(self):
+        entity, _, _, _ = await self.activate(desired=True)
+        await entity.write(True)
+        await self.advance(510)
+        self.assertEqual([at for at, _, _ in self.commands], [0, 30, 90, 210, 510])
+        await entity.write(False)
+        await self.advance(1000)
+        self.assertTrue(all(value is False for _, value, _ in self.commands[5:]))
+
+    async def test_camera_match_stops_on_retry_without_reauthorizing_later_on(self):
+        entity, _, _, _ = await self.activate(desired=True)
+        await entity.write(True)
+        self.observation(True)
+        self.observation(False)
+        await self.advance(600)
+        self.assertEqual([value for _, value, _ in self.commands], [True])
+
+    async def test_matching_bounded_read_suppresses_duplicate_on(self):
+        entity, _, client, _ = await self.activate(desired=True)
+        await entity.write(True)
+        client.confirm_light.side_effect = lambda _sn, intent: {
+            "intent": intent,
+            "confirmed": True,
+            "observedValue": True,
+            "recoveryBusy": False,
+        }
+        await self.advance(120)
+        self.assertEqual([value for _, value, _ in self.commands], [True])
+        client.confirm_light.assert_awaited()
+        self.assertIs(entity._light_correction.pending, True)
+
+    async def test_only_one_automatic_attempt_outstanding(self):
+        entity, _, client, _ = await self.activate()
+        await entity.write(False)
+        send = client.set_property.side_effect
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def delayed(*args, **kwargs):
+            entered.set()
+            await release.wait()
+            return await send(*args, **kwargs)
+
+        client.set_property.side_effect = delayed
+        await self.advance(60)
+        self.assertTrue(entered.is_set())
+        await self.advance(600)
+        self.assertEqual(client.set_property.await_count, 2)
+        release.set()
+        await self.drain()
+        self.assertEqual(len(self.commands), 2)
+        self.assertIsNone(entity._light_correction.task)
+
+    async def test_pending_sdk_recovery_blocks_retries_until_final_read(self):
+        entity, _, client, _ = await self.activate(desired=True)
+        client.set_property.side_effect = None
+        client.set_property.return_value = fixtures.CommandReceipt(
+            "pending_accepted", True, "unconfirmed", intent=1
+        )
+        await entity.write(True)
+        client.confirm_light.side_effect = lambda _sn, intent: {
+            "intent": intent,
+            "confirmed": False,
+            "recoveryBusy": True,
+        }
+        await self.advance(120)
+        self.assertEqual(client.set_property.await_count, 1)
+        client.confirm_light.side_effect = lambda _sn, intent: {
+            "intent": intent,
+            "confirmed": False,
+            "recoveryBusy": False,
+        }
+        entity._light_correction.check_policy()
+        await self.drain()
+        self.assertEqual(client.set_property.await_count, 2)
+
+    async def test_intent_flip_during_capability_read_blocks_final_dispatch(self):
+        entity, _, client, _ = await self.activate()
+        await entity.write(False)
+        self.binding("off")
+
+        async def flip(_sn):
+            self.states["sensor.fixture_intent"].state = "on"
+            return [{"name": "light", "boundedStateWrites": True}]
+
+        client.get_properties.side_effect = flip
+        await self.advance(60)
+        self.assertEqual([value for _, value, _ in self.commands], [False])
+        self.assertFalse(entity._light_correction.on_authorized)
+
+    async def test_explicit_request_is_never_delayed_by_controller_queue(self):
+        entity, _, _, _ = await self.activate()
+        queue = entity._light_correction.queue
+        await queue.lock.acquire()
+        try:
+            await entity.write(True)
+            self.assertEqual([value for _, value, _ in self.commands], [True])
+        finally:
+            queue.lock.release()
