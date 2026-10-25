@@ -30,7 +30,10 @@ from custom_components.eufy_sdk.api import (
     camera_health_event,
 )
 from custom_components.eufy_sdk.binary_sensor import EufyCameraConnectivityBinarySensor
-from custom_components.eufy_sdk.camera_health import camera_health_serials
+from custom_components.eufy_sdk.camera_health import (
+    ROUTINE_REFRESH_SECONDS,
+    camera_health_serials,
+)
 from custom_components.eufy_sdk.sensor import EufyCameraConnectivityStatusSensor
 
 NOW_MS = 1792680000000
@@ -619,6 +622,96 @@ class CameraHealthEntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(health["outcomes"]["online"]["rejected"], 1)
         coordinator.data["station"].pop("cameraHealth")
         self.assertEqual(status.extra_state_attributes, {})
+
+    def test_routine_receipt_changes_refresh_at_most_every_interval(self):
+        coordinator = self.coordinator()
+        coordinator.data["station"]["cameraHealth"] = projection()
+        status = EufyCameraConnectivityStatusSensor(coordinator, "station")
+        with patch(
+            "custom_components.eufy_sdk.camera_health.monotonic", return_value=1000.0
+        ) as clock:
+            first = status.extra_state_attributes
+            coordinator.data["station"]["cameraHealth"] = projection(
+                revision=8,
+                lastHubReportMs=NOW_MS,
+                lastCloudParamMs=NOW_MS,
+                rssi={"value": -60, "valid": True, "lastValidMs": NOW_MS},
+                rawStatus={"p1131": None, "p1182": None, "observedMs": NOW_MS},
+            )
+            clock.return_value = 1000.0 + ROUTINE_REFRESH_SECONDS - 1
+            self.assertIs(status.extra_state_attributes, first)
+            self.assertEqual(first["revision"], 7)
+            clock.return_value = 1000.0 + ROUTINE_REFRESH_SECONDS
+            refreshed = status.extra_state_attributes
+            self.assertIsNot(refreshed, first)
+            self.assertEqual(refreshed["revision"], 8)
+            self.assertEqual(refreshed["rssi"], -60)
+            self.assertEqual(refreshed["last_hub_report"], "2026-10-22T14:40:00+00:00")
+            # A meaningful change publishes at once, with the latest routine values.
+            coordinator.data["station"]["cameraHealth"] = projection(
+                revision=9,
+                rssi={"value": -61, "valid": True, "lastValidMs": NOW_MS},
+                rawStatus={"p1131": 1, "p1182": None, "observedMs": NOW_MS},
+            )
+            clock.return_value += 1
+            published = status.extra_state_attributes
+            self.assertIsNot(published, refreshed)
+            self.assertEqual(
+                (
+                    published["raw_status_1131"],
+                    published["revision"],
+                    published["rssi"],
+                ),
+                (1, 9, -61),
+            )
+
+    def test_only_routine_fields_wait_for_the_interval(self):
+        routine = {
+            ("revision",),
+            ("lastHubReportMs",),
+            ("lastCloudParamMs",),
+            ("rssi", "value"),
+            ("rssi", "valid"),
+            ("rssi", "lastValidMs"),
+            ("rawStatus", "observedMs"),
+        }
+        base = projection()
+
+        def changed(value):
+            if isinstance(value, bool):
+                return not value
+            if isinstance(value, int):
+                return value + 1
+            if isinstance(value, str):
+                return value + "-changed"
+            return 1
+
+        leaves = []
+        for path in leaf_paths(base):
+            value = base
+            for key in path:
+                value = value[key]
+            if not isinstance(value, dict):
+                leaves.append((path, value))
+        self.assertTrue(routine <= {path for path, _ in leaves})
+        for path, value in leaves:
+            with self.subTest(path=path):
+                coordinator = self.coordinator()
+                coordinator.data["station"]["cameraHealth"] = deepcopy(base)
+                status = EufyCameraConnectivityStatusSensor(coordinator, "station")
+                with patch(
+                    "custom_components.eufy_sdk.camera_health.monotonic",
+                    return_value=1000.0,
+                ) as clock:
+                    first = status.extra_state_attributes
+                    coordinator.data["station"]["cameraHealth"] = replace_path(
+                        base, path, changed(value)
+                    )
+                    clock.return_value = 1001.0
+                    if path in routine:
+                        self.assertIs(status.extra_state_attributes, first)
+                    else:
+                        self.assertIsNot(status.extra_state_attributes, first)
 
     async def test_platforms_create_entities_only_for_valid_health_snapshots(self):
         coordinator = self.coordinator()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime
+from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EntityCategory
@@ -13,6 +14,28 @@ from .entity import EufySdkDeviceEntity
 
 if TYPE_CHECKING:
     from .coordinator import EufySdkDataUpdateCoordinator
+
+# Receipt bookkeeping that changes on nearly every SDK revision. When only these change,
+# attributes refresh at most once per interval, so HA does not record a new state row
+# every few seconds. Any other change still publishes immediately.
+ROUTINE_HEALTH_FIELDS = frozenset(
+    {"revision", "lastHubReportMs", "lastCloudParamMs", "rssi"}
+)
+ROUTINE_RAW_STATUS_FIELDS = frozenset({"observedMs"})
+ROUTINE_REFRESH_SECONDS = 900
+
+
+def _meaningful(health: dict) -> dict:
+    """Return the projection without routine receipt bookkeeping."""
+    result = {
+        key: value for key, value in health.items() if key not in ROUTINE_HEALTH_FIELDS
+    }
+    result["rawStatus"] = {
+        key: value
+        for key, value in health["rawStatus"].items()
+        if key not in ROUTINE_RAW_STATUS_FIELDS
+    }
+    return result
 
 
 def _utc(value: int | None) -> str | None:
@@ -35,6 +58,7 @@ class EufyCameraHealthEntity(EufySdkDeviceEntity):
         self._attr_unique_id = f"{sn}_{key}"
         self._health: dict | None = None
         self._health_attributes: dict[str, Any] = {}
+        self._health_built_at = 0.0
 
     async def async_added_to_hass(self) -> None:
         """Publish diagnostic unavailability even when no coordinator update follows."""
@@ -58,11 +82,19 @@ class EufyCameraHealthEntity(EufySdkDeviceEntity):
         return self.device.get("cameraHealth")
 
     def health_attributes(self) -> dict[str, Any]:
-        """Rebuild attributes only when the camera projection changes."""
+        """Rebuild on meaningful changes; routine-only changes at most per interval."""
         health = self.camera_health
         if health == self._health:
             return self._health_attributes
+        if (
+            health is not None
+            and self._health is not None
+            and _meaningful(health) == _meaningful(self._health)
+            and monotonic() - self._health_built_at < ROUTINE_REFRESH_SECONDS
+        ):
+            return self._health_attributes
         self._health = deepcopy(health)
+        self._health_built_at = monotonic()
         if health is None:
             self._health_attributes = {}
             return self._health_attributes
