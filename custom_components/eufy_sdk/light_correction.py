@@ -10,6 +10,7 @@ import math
 from collections import deque
 from time import monotonic, time
 from typing import Any
+from uuid import uuid4
 
 from homeassistant.components import persistent_notification
 from homeassistant.core import callback
@@ -25,6 +26,9 @@ CAP_SECONDS = 1800
 OFF_DWELL_SECONDS = 120
 GAP_SECONDS = 300
 OFF_ALERT_SECONDS = 300
+OFF_STUCK_BLOCKED_SECONDS = 300
+OFF_STUCK_ESCALATE_SECONDS = 120
+OFF_STUCK_ID_LENGTH = 32
 ON_ALERT_SECONDS = 600
 REPORT_FRESH_SECONDS = 120
 OFF_DELAYS = (60, 120, 300)
@@ -141,6 +145,9 @@ class LightCorrection:
         self.notice_queue: deque[dict] = deque()
         self.notice_retry_due = 0.0
         self.journal: deque[dict] = deque(maxlen=80)
+        self.off_stuck: dict | None = None
+        self.off_stuck_replay = False
+        self.waiting_since: float | None = None
 
     @property
     def options(self) -> dict:
@@ -206,6 +213,7 @@ class LightCorrection:
             if not self.enabled:
                 return
             if isinstance(saved, dict):
+                self._restore_off_stuck(saved.get("off_stuck"))
                 if not self.on_authorized and self.pending is None:
                     self.last_command = saved.get("last_command") is True
                     if saved.get("pending_off") is True:
@@ -282,6 +290,7 @@ class LightCorrection:
                     "notice_problem": self.notice_problem,
                     "notice_pending": self.notice_pending,
                     "notice_queue": list(self.notice_queue),
+                    "off_stuck": self.off_stuck,
                 },
                 1,
             )
@@ -486,6 +495,8 @@ class LightCorrection:
                 self.on_reported_at = None
             self.observed, self.observed_at = value, stamp / 1000
             self.report_received = monotonic()
+            if self.intent() is False and not self.paused:
+                self._off_stuck_confirmed()
             if "camera_gap" in self.notice_kinds:
                 self.notice_kinds.discard("camera_gap")
                 self.notice_kinds.discard("camera_restored")
@@ -579,6 +590,179 @@ class LightCorrection:
             or health.get("parentTransport") == "disconnected"
         )
 
+    def _waiting_reason(self) -> str | None:
+        """Project transport waits into finite, public incident categories."""
+        health = self.entity.device.get("cameraHealth") or {}
+        if monotonic() < self.health_until:
+            return "cooldown"
+        if getattr(self.entity.client, "connected", False) is not True:
+            return "bridge_disconnected"
+        if health.get("connectivity") == "offline":
+            return "camera_offline"
+        if health.get("parentTransport") == "disconnected":
+            return "parent_disconnected"
+        return None
+
+    def _restore_off_stuck(self, saved: Any) -> None:
+        """Drop malformed incidents without affecting the safety's saved state."""
+        if not isinstance(saved, dict) or set(saved) != {
+            "incident_id",
+            "reason",
+            "opened_at",
+            "off_since",
+            "escalate_at",
+            "confirmation_after",
+        }:
+            return
+        identity, reason = saved["incident_id"], saved["reason"]
+        if (
+            not isinstance(identity, str)
+            or len(identity) != OFF_STUCK_ID_LENGTH
+            or any(char not in "0123456789abcdef" for char in identity)
+            or not isinstance(reason, str)
+            or reason not in {"no_confirmation", "no_reports", "blocked"}
+        ):
+            return
+        opened, off, escalate = (
+            saved["opened_at"],
+            saved["off_since"],
+            saved["escalate_at"],
+        )
+        floor = saved["confirmation_after"]
+        if (
+            type(opened) is not int
+            or not 0 <= opened <= time()
+            or type(escalate) is not int
+            or escalate < opened + OFF_STUCK_ESCALATE_SECONDS
+            or (off is not None and (type(off) is not int or not 0 <= off <= opened))
+            or type(floor) not in (int, float)
+            or not opened <= floor < opened + 1
+            or floor > time()
+        ):
+            return
+        self.off_stuck = dict(saved)
+        self.off_stuck_replay = True
+
+    def _off_stuck_event(self, kind: str, **data: Any) -> None:
+        """Make matching attributes visible before publishing incident evidence."""
+        identity = self.entity.entity_id
+        state = self.entity.hass.states.get(identity)
+        name = getattr(state, "name", None) or self.entity.name or identity
+        self.entity.async_write_ha_state()
+        self.entity.hass.bus.async_fire(
+            SAFETY_EVENT, {"entity": identity, "name": name, "kind": kind, **data}
+        )
+
+    def _close_off_stuck(self, outcome: str) -> None:
+        if self.off_stuck is None:
+            return
+        identity = self.off_stuck["incident_id"]
+        self.off_stuck = None
+        self.off_stuck_replay = False
+        self._save()
+        self._off_stuck_event(
+            "off_stuck_closed",
+            incident_id=identity,
+            closed_at=int(time()),
+            outcome=outcome,
+        )
+
+    def _off_stuck_confirmed(self) -> None:
+        if (
+            self.off_stuck is not None
+            and self.observed is False
+            and self._fresh()
+            and self.observed_at > self.off_stuck["confirmation_after"]
+            and (self.pending is not False or self.observed_at > self.sent_at)
+        ):
+            self._close_off_stuck("confirmed_off")
+
+    def _check_off_stuck(
+        self, now: float, intent: bool | None, paused: bool, last: float
+    ) -> None:
+        """Report unresolved OFF incidents without authorizing any command."""
+        waiting = self._waiting_reason()
+        if waiting is None:
+            self.waiting_since = None
+        elif self.waiting_since is None:
+            self.waiting_since = now
+        if paused or intent is not False:
+            self._close_off_stuck(
+                "paused"
+                if paused
+                else "intent_on"
+                if intent is True
+                else "intent_unknown"
+            )
+            return
+        self._off_stuck_confirmed()
+        reason = None
+        if self.pending is False and now - self.pending_since >= OFF_ALERT_SECONDS:
+            reason = "no_confirmation"
+        elif self.observed is not False:
+            if now - last >= GAP_SECONDS:
+                reason = "no_reports"
+            elif (
+                self.waiting_since is not None
+                and now - self.waiting_since >= OFF_STUCK_BLOCKED_SECONDS
+            ):
+                reason = "blocked"
+        changed = False
+        if self.off_stuck is None and reason is not None:
+            wall = time()
+            opened = int(wall)
+            escalate = opened + OFF_STUCK_ESCALATE_SECONDS
+            if reason != "no_confirmation":
+                episode = (
+                    int(self.on_reported_at)
+                    if self.on_reported_at is not None
+                    else opened
+                )
+                escalate = max(escalate, episode + CAP_SECONDS)
+            off = self.off_since
+            if off is None and self.pending is False:
+                off = self.pending_since
+            self.off_stuck = {
+                "incident_id": uuid4().hex,
+                "reason": reason,
+                "opened_at": opened,
+                "off_since": int(wall - (now - off)) if off is not None else None,
+                "escalate_at": escalate,
+                # Retain subsecond ordering across restarts, with integer public times.
+                "confirmation_after": wall,
+            }
+            changed = True
+        elif (
+            self.off_stuck is not None
+            and reason == "no_confirmation"
+            and self.off_stuck["reason"] != reason
+        ):
+            self.off_stuck["reason"] = reason
+            self.off_stuck["escalate_at"] = min(
+                self.off_stuck["escalate_at"],
+                self.off_stuck["opened_at"] + OFF_STUCK_ESCALATE_SECONDS,
+            )
+            changed = True
+        if self.off_stuck is not None and (changed or self.off_stuck_replay):
+            self.off_stuck_replay = False
+            self._save()
+            self._off_stuck_event(
+                "off_stuck",
+                **{
+                    key: value
+                    for key, value in self.off_stuck.items()
+                    if key != "confirmation_after"
+                },
+                observed="on"
+                if self.observed is True
+                else "off"
+                if self.observed is False
+                else "unknown",
+                camera_reported_at=int(self.observed_at) if self.observed_at else None,
+                attempts=self.attempts,
+                waiting=waiting,
+            )
+
     def _allowed(self, generation: int, desired: bool, watchdog: bool) -> bool:
         return (
             generation == self.generation
@@ -597,6 +781,9 @@ class LightCorrection:
     def check_policy(self) -> None:  # noqa: PLR0912, PLR0915
         """Reconcile authority, status and a single periodic wakeup."""
         if not self.enabled:
+            if not self.entity._removed:
+                self.waiting_since = None
+                self._close_off_stuck("disabled")
             return
         now, intent = monotonic(), self.intent()
         self._expire_outcomes()
@@ -686,6 +873,12 @@ class LightCorrection:
         ):
             self.task = self.entity.hass.async_create_task(self._run(self.generation))
         self._arm()
+        self._check_off_stuck(
+            now,
+            intent,
+            paused or getattr(binding_state, "state", None) == "paused",
+            last,
+        )
         self.entity.async_write_ha_state()
 
     def _arm(self) -> None:
@@ -1039,6 +1232,9 @@ class LightCorrection:
         self._revoke_automatic()
         self.generation += 1
         self.state = state
+        if state == "disabled":
+            self.waiting_since = None
+            self._close_off_stuck("disabled")
         if self.timer is not None:
             self.timer()
             self.timer = None
@@ -1077,6 +1273,10 @@ class LightCorrection:
                     else "ha_command",
                     "floodlight_safety_intent": self.intent(),
                     "floodlight_safety_camera_reported_value": self.observed,
+                    "off_stuck_incident": (self.off_stuck or {}).get("incident_id"),
+                    "off_stuck_reason": (self.off_stuck or {}).get("reason"),
+                    "off_stuck_escalate_at": (self.off_stuck or {}).get("escalate_at"),
+                    "off_stuck_opened_at": (self.off_stuck or {}).get("opened_at"),
                 }
             )
         return result
