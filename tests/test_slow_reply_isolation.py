@@ -661,7 +661,8 @@ class SlowReplyIsolationTests(unittest.IsolatedAsyncioTestCase):
         self.transport.close.assert_not_awaited()
 
     async def test_slow_success_threshold_is_strictly_over_five_seconds(self):
-        for elapsed in (5, 5.001):
+        # Half a millisecond past the boundary: on a large clock base, 5.001 s can truncate to 5000 ms.
+        for elapsed in (5, 5.0015):
             with self.subTest(elapsed=elapsed):
                 task = asyncio.create_task(self.client.rpc("device.set", sn=PRIVATE))
                 await self.advance()
