@@ -1,3 +1,17 @@
+# Experimental.9 local preparation
+
+Version `0.3.1-s1.experimental.9` is prepared locally and unpublished. Pair add-on `0.4.1-s1.experimental.9`, integration/bridge `0.3.1-s1.experimental.9` and SDK `0.2.1-s1.experimental.9`.
+
+Failed SDK background read-through refreshes now report through the existing `state_refresh` origin and retain last-known values. Routine camera health attributes refresh less often to reduce recorder writes. Optional floodlight safety reports persisted unconfirmed OFF incidents through `off_stuck_incident`, `off_stuck_reason`, `off_stuck_opened_at` and `off_stuck_escalate_at`.
+
+Defaults are unchanged from .8: relay off, enabled only by boolean `webrtc_relay: true`; command keepalive 29000 ms; `light_correction_enabled` off. With safety off, the new OFF-stuck reporting is inactive and its attributes are not exposed. No new option or default is added. SDK documentation formatting is a documentation-only change.
+
+Known issues carried from .8: T8113-Z firmware 3.3.8 picture-then-black; live view sometimes needs another open or stalls awaiting the hub offer; unexplained floodlight ON events; deferred brightness/spotlight formatting. No fix for these is claimed. Keep battery-camera preload off.
+
+Local offline validation does not establish new device, account, media, HACS or soak acceptance. Publication, installation and tester messaging need separate owner approval. Owner-local recovery automation is outside this release.
+
+## Historical experimental.8 documentation
+
 # Experimental.8 verified public delivery
 
 Runtime/source release: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.8

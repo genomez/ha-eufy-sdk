@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.8",
+  "version": "0.3.1-s1.experimental.9",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.8.zip",
+  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.9.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
@@ -13,15 +13,15 @@
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "a6de72b4f3e62a208a3779cc6baa8e125dd4605e30c30aaaf2879644d39dbde1"
+      "sha256": "0dac69ca209e74820fd72a1a99d21be1511d36050267b666531f4409a0ec41f9"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "2211679a962240d5976444410c8817ed26269b7d8daaa814f5f351864f3d787d"
+      "sha256": "330873e2d18f1e777395add70aa67ca2223821cd7b910da68dd956ece567739f"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "53da79c970c7c06b06465a7cfe6a7db4a16092d974920b6efa91872482f9a86e"
+      "sha256": "1ab746e2341d6249b285deacdf003f17cbc9bd818c441b86c21119f424e9ffa1"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "d5c45a81d645b41082b9b18854d129cc126f48a50accd38d0a0788b4eacbd564"
+      "sha256": "7b1211622c4a417e8311cd49d33c7baa972b92cf9c087fdbd4dd962c2d3ab3ff"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -109,7 +109,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/camera_health.py",
-      "sha256": "9013942717549263e642bed3625d4a02efd5e784bd41ebca089c2ec16ef3fc2d"
+      "sha256": "f997c8e090092d5b7676fd7e13586024adec506ff1ec30fffa44291e7e39e4c4"
     },
     {
       "path": "custom_components/eufy_sdk/config_flow.py",
@@ -157,7 +157,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/light_correction.py",
-      "sha256": "bb745e84dd4899d508a719cd5f163bcca3153b2cb14af37ffcc1092250ce30e6"
+      "sha256": "7d422a442f16a20e68e79e85cc37c4f69d61090a7fb74d211c44f6364ce2edb2"
     },
     {
       "path": "custom_components/eufy_sdk/lock.py",
@@ -165,7 +165,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "f2f3a6c5680afd35117698138a39ef84d119ec685c1d609cea1a76467f6df697"
+      "sha256": "fd693c9488ab01282bac3bdb1ef3be08625446acaeb74d62c424416fee76f37c"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
@@ -248,7 +248,7 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Local unpublished exact review.20 runtime; fresh offline qualification recorded externally.",
+  "qualificationScope": "Exact installed runtime hashes except version metadata; fresh local offline suite",
   "officialReleaseArchiveSourceCommit": "6bb1365de39615d9e094b44b7665118451326e8d",
   "currentBranchDocumentationMayDifferFromReleasedArchive": true,
   "officialReleaseArchiveSha256": "c6402a686c65691ad950b40e50d14a35d22afedd96c1441c2a4e7e538a97df7c"
