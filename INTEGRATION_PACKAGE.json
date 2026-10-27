@@ -9,19 +9,19 @@
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "77a3457e1dd2a7b2389fcd670ab6cb2a3d79368b2e7bf4037ad78aa77731fb9e"
+      "sha256": "78b7d8834c62d6ee6dc4efe2cb701b0e09c3f877adbc9f12c352adb535b4a673"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "0dac69ca209e74820fd72a1a99d21be1511d36050267b666531f4409a0ec41f9"
+      "sha256": "8daf3616ed0d075648e950245ca098670acd49cdfc2e2229fdb9da0d34df830f"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "330873e2d18f1e777395add70aa67ca2223821cd7b910da68dd956ece567739f"
+      "sha256": "75bec73c53d8aea4c7271f7fc19852a1f160dabd29048f69c9eb725692e3ecaf"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "1ab746e2341d6249b285deacdf003f17cbc9bd818c441b86c21119f424e9ffa1"
+      "sha256": "36d33dee9ad47728349967ca8f31fa182b833930ebdcc44e4fae4770ae6b930e"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "7b1211622c4a417e8311cd49d33c7baa972b92cf9c087fdbd4dd962c2d3ab3ff"
+      "sha256": "4269fb4f5773bbbfcce7100f54f218b4ce832bd9cfd80029cc87db2a47b5e7dd"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -249,7 +249,7 @@
     }
   ],
   "qualificationScope": "Exact installed runtime hashes except version metadata; fresh local offline suite",
-  "officialReleaseArchiveSourceCommit": "6bb1365de39615d9e094b44b7665118451326e8d",
+  "officialReleaseArchiveSourceCommit": "bf6d218faa3df8734c8bfee594ed6ae6e807e1f3",
   "currentBranchDocumentationMayDifferFromReleasedArchive": true,
-  "officialReleaseArchiveSha256": "c6402a686c65691ad950b40e50d14a35d22afedd96c1441c2a4e7e538a97df7c"
+  "officialReleaseArchiveSha256": "544e4f23e927f5c27585cba9379dc47c4bc08aa03bbead4a3cb3188b04313213"
 }
