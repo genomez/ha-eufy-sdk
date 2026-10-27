@@ -95,7 +95,7 @@ class OffStuckEscalationTests(unittest.IsolatedAsyncioTestCase):
         await self.at(300)
         incident = self.incidents(entity)[0]
         self.assertEqual(incident["reason"], "no_reports")
-        self.assertEqual(incident["escalate_at"], incident["opened_at"] + 1800)
+        self.assertEqual(incident["escalate_at"], self.wall + 1800)
         self.assertEqual(incident["observed"], "unknown")
         self.assertIsNone(incident["camera_reported_at"])
         self.assertIsNone(incident["waiting"])
@@ -170,7 +170,7 @@ class OffStuckEscalationTests(unittest.IsolatedAsyncioTestCase):
                 self.controllers.remove(controller)
         self.assertEqual(self.sent, [])
 
-    async def test_blocked_unknown_observation_uses_open_time(self):
+    async def test_blocked_unknown_observation_uses_waiting_onset(self):
         entity, controller, client = await self.make()
         client.connected = False
         controller.check_policy()
@@ -183,7 +183,7 @@ class OffStuckEscalationTests(unittest.IsolatedAsyncioTestCase):
         incident = self.incidents(entity)[0]
         self.assertEqual(incident["reason"], "blocked")
         self.assertEqual(incident["observed"], "unknown")
-        self.assertEqual(incident["escalate_at"], incident["opened_at"] + 1800)
+        self.assertEqual(incident["escalate_at"], self.wall + 1800)
 
     async def test_blocked_wait_is_continuous_and_resets_after_recovery(self):
         entity, controller, client = await self.make()

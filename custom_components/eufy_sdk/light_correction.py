@@ -13,7 +13,8 @@ from typing import Any
 from uuid import uuid4
 
 from homeassistant.components import persistent_notification
-from homeassistant.core import callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
@@ -138,6 +139,9 @@ class LightCorrection:
         self.loading = False
         self.bound_entity: str | None = None
         self.started = monotonic()
+        self.silence_since: float | None = None
+        self.start_unsub = None
+        self.stopped = False
         self.notice_kind: str | None = None
         self.notice_kinds: set[str] = set()
         self.notice_problem = False
@@ -214,6 +218,17 @@ class LightCorrection:
                 return
             if isinstance(saved, dict):
                 self._restore_off_stuck(saved.get("off_stuck"))
+                observation = saved.get("observation")
+                if (
+                    self.observed is None
+                    and isinstance(observation, dict)
+                    and type(observation.get("value")) is bool
+                    and type(observation.get("at")) in (int, float)
+                    and math.isfinite(observation["at"])
+                    and 0 < observation["at"] <= time()
+                ):
+                    self.observed = observation["value"]
+                    self.observed_at = observation["at"]
                 if not self.on_authorized and self.pending is None:
                     self.last_command = saved.get("last_command") is True
                     if saved.get("pending_off") is True:
@@ -269,6 +284,13 @@ class LightCorrection:
                 self.pause_unsub = self.entity.hass.bus.async_listen(
                     "state_changed", self._state_changed
                 )
+            if (
+                self.entity.hass.state is not CoreState.running
+                and self.start_unsub is None
+            ):
+                self.start_unsub = self.entity.hass.bus.async_listen_once(
+                    EVENT_HOMEASSISTANT_STARTED, self._ha_started
+                )
             self.check_policy()
         except Exception:  # noqa: BLE001 - never retain raw storage exceptions
             self.loaded = False
@@ -277,8 +299,19 @@ class LightCorrection:
         finally:
             self.loading = False
 
+    @callback
+    def _ha_started(self, _event: Any) -> None:
+        self.start_unsub = None
+        self.check_policy()
+
+    def _stopping(self) -> bool:
+        return self.stopped or self.entity.hass.state in {
+            CoreState.stopping,
+            CoreState.final_write,
+        }
+
     def _save(self) -> None:
-        if self.store is not None and self.loaded:
+        if self.store is not None and self.loaded and not self._stopping():
             self.store.async_delay_save(
                 lambda: {
                     "last_command": self.last_command,
@@ -291,6 +324,7 @@ class LightCorrection:
                     "notice_pending": self.notice_pending,
                     "notice_queue": list(self.notice_queue),
                     "off_stuck": self.off_stuck,
+                    "observation": {"value": self.observed, "at": self.observed_at},
                 },
                 1,
             )
@@ -445,9 +479,10 @@ class LightCorrection:
         self.health_projection = None
 
     def reset_observations(self) -> None:
-        """Require a fresh report and new observed ON age after reconnect."""
+        """Retain confirmed evidence, but require fresh reports for commands."""
         self.report_floor = time()
-        self.observed = None
+        if self.silence_since is not None:
+            self.silence_since = monotonic()
         self.report_received = self.on_since = None
         self.on_reported_at = None
         self.motion_known = False
@@ -456,7 +491,7 @@ class LightCorrection:
 
     def observe(self, event: dict) -> None:
         """Only advancing, timestamped RTC reports qualify as camera evidence."""
-        if not self.enabled:
+        if not self.enabled or self._stopping():
             return
         stamp, values = event.get("observedAtMs"), event.get("properties")
         if (
@@ -495,6 +530,7 @@ class LightCorrection:
                 self.on_reported_at = None
             self.observed, self.observed_at = value, stamp / 1000
             self.report_received = monotonic()
+            self._save()
             if self.intent() is False and not self.paused:
                 self._off_stuck_confirmed()
             if "camera_gap" in self.notice_kinds:
@@ -551,6 +587,7 @@ class LightCorrection:
     def _fresh(self) -> bool:
         return (
             self.report_received is not None
+            and self.observed_at > self.report_floor
             and 0 <= time() - self.observed_at <= REPORT_FRESH_SECONDS
         )
 
@@ -654,7 +691,11 @@ class LightCorrection:
         )
 
     def _close_off_stuck(self, outcome: str) -> None:
-        if self.off_stuck is None:
+        if (
+            self.off_stuck is None
+            or self._stopping()
+            or self.entity.hass.state is not CoreState.running
+        ):
             return
         identity = self.off_stuck["incident_id"]
         self.off_stuck = None
@@ -677,10 +718,12 @@ class LightCorrection:
         ):
             self._close_off_stuck("confirmed_off")
 
-    def _check_off_stuck(
+    def _check_off_stuck(  # noqa: PLR0912
         self, now: float, intent: bool | None, paused: bool, last: float
     ) -> None:
         """Report unresolved OFF incidents without authorizing any command."""
+        if self._stopping() or self.entity.hass.state is not CoreState.running:
+            return
         waiting = self._waiting_reason()
         if waiting is None:
             self.waiting_since = None
@@ -700,7 +743,7 @@ class LightCorrection:
         if self.pending is False and now - self.pending_since >= OFF_ALERT_SECONDS:
             reason = "no_confirmation"
         elif self.observed is not False:
-            if now - last >= GAP_SECONDS:
+            if self.silence_since is not None and now - last >= GAP_SECONDS:
                 reason = "no_reports"
             elif (
                 self.waiting_since is not None
@@ -713,10 +756,11 @@ class LightCorrection:
             opened = int(wall)
             escalate = opened + OFF_STUCK_ESCALATE_SECONDS
             if reason != "no_confirmation":
+                onset = self.waiting_since if reason == "blocked" else last
                 episode = (
                     int(self.on_reported_at)
                     if self.on_reported_at is not None
-                    else opened
+                    else int(wall - (now - onset))
                 )
                 escalate = max(escalate, episode + CAP_SECONDS)
             off = self.off_since
@@ -768,6 +812,8 @@ class LightCorrection:
             generation == self.generation
             and self.enabled
             and self.loaded
+            and not self._stopping()
+            and self.entity.hass.state is CoreState.running
             and not self._waiting()
             and not self.explicit_busy
             and self.intent() is desired
@@ -780,11 +826,15 @@ class LightCorrection:
 
     def check_policy(self) -> None:  # noqa: PLR0912, PLR0915
         """Reconcile authority, status and a single periodic wakeup."""
+        if self._stopping() or self.entity.hass.state is not CoreState.running:
+            return
         if not self.enabled:
             if not self.entity._removed:
                 self.waiting_since = None
                 self._close_off_stuck("disabled")
             return
+        if self.silence_since is None and self.entity.client.connected is True:
+            self.silence_since = monotonic()
         now, intent = monotonic(), self.intent()
         self._expire_outcomes()
         paused = self.paused
@@ -848,6 +898,8 @@ class LightCorrection:
         last = (
             self.report_received if self.report_received is not None else self.started
         )
+        if self.silence_since is not None:
+            last = max(last, self.silence_since)
         if not self.paused and intent is not None and now - last >= GAP_SECONDS:
             self.state = "protection gap"
             self._notice("camera_gap", True)
@@ -882,6 +934,8 @@ class LightCorrection:
         self.entity.async_write_ha_state()
 
     def _arm(self) -> None:
+        if self._stopping():
+            return
         if self.timer is not None:
             self.timer()
 
@@ -1232,6 +1286,11 @@ class LightCorrection:
         self._revoke_automatic()
         self.generation += 1
         self.state = state
+        if state == "closed":
+            self.stopped = True
+            if self.start_unsub is not None:
+                self.start_unsub()
+                self.start_unsub = None
         if state == "disabled":
             self.waiting_since = None
             self._close_off_stuck("disabled")

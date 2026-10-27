@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, Mock, patch
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
 
 import custom_components.eufy_sdk as integration
 from custom_components.eufy_sdk.const import CONF_HOST, CONF_PORT
@@ -58,6 +58,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
             coordinator, "fixture-device", {"name": prop, "type": "bool"}
         )
         entity.hass = Mock()
+        entity.hass.state = CoreState.running
         entity.async_on_remove = Mock()
         seen = []
 
