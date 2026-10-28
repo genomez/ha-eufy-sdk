@@ -105,6 +105,8 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
     ) -> None:
         """Build the raw<->label maps from the spec's enumValues."""
         super().__init__(coordinator, sn, spec)
+        if self._prop == "recordingMode":
+            self._attr_name = "RTSP recording mode"
         # enumValues is {raw: label}; JSON object keys arrive as strings.
         self._label_by_raw = {str(k): str(v) for k, v in spec["enumValues"].items()}
         if spec["name"] == "nightVision" and "2" in self._label_by_raw:
