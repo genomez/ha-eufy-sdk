@@ -248,5 +248,8 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Exact committed integration package inputs; offline regression suite"
+  "qualificationScope": "Exact committed integration package inputs; offline regression suite",
+  "officialReleaseArchiveSourceCommit": "69e17a9d8caa1e1a55d46bd40493d45d25a1cfa8",
+  "officialReleaseArchiveSha256": "b14509a0ab5074e301558c98e2f40830ae7ceece0e6a53a9f77af7cde3409a97",
+  "currentBranchDocumentationMayDifferFromReleasedArchive": true
 }

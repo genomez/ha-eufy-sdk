@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "0.3.1-s1.experimental.10",
-  "status": "integration-release-package",
-  "published": false,
+  "status": "published-integration-only-delivery",
+  "published": true,
   "publicBaseCommit": "700f35dca69ff65ba5de8cc832d03000437ee37b",
   "exactInputCommit": "845efc5fa3bbd6b81ee628f30ec2e7fd72dfbe6c",
   "retainedComponents": {
@@ -14,5 +14,7 @@
   "integrationRelease": "https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.10",
   "installationAcceptance": false,
   "hacsAvailabilityVerified": false,
-  "releaseAvailabilityVerified": false
+  "releaseAvailabilityVerified": true,
+  "releaseArchiveSourceCommit": "69e17a9d8caa1e1a55d46bd40493d45d25a1cfa8",
+  "releaseArchiveSha256": "b14509a0ab5074e301558c98e2f40830ae7ceece0e6a53a9f77af7cde3409a97"
 }
