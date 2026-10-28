@@ -1,3 +1,38 @@
+# S1 experimental.10 — Overview
+
+Home Assistant custom integration for the S1 experimental stack. Install the integration ZIP or use HACS Redownload for this version, then restart Home Assistant.
+
+Integration `0.3.1-s1.experimental.10` requires add-on 0.4.1-s1.experimental.9 (unchanged). Bridge `0.3.1-s1.experimental.9` and SDK `0.2.1-s1.experimental.9` are unchanged. This is an integration-only update; keep the existing add-on.
+
+Update only the integration. Keep add-on `0.4.1-s1.experimental.9` and your existing configuration. This is an experimental fork, not an official upstream release.
+
+## Changes
+
+- With optional floodlight safety enabled, a light last confirmed off no longer opens a false "no reports" OFF-stuck incident after a Home Assistant restart or bridge reconnect. Incident closures are recorded after startup.
+- Pan/tilt acknowledgement timeouts now explain: "Pan/tilt command sent, but the camera didn't confirm in time; it may still have moved." The acknowledgement timeout and retry behavior are unchanged; this message does not confirm physical movement.
+- Event images refresh on new camera events and image-update signals, and once per completed device snapshot, instead of on every camera-health update. Availability recovery still refreshes the image; identical image data stays quiet.
+- The "Recording mode" select is now named "RTSP recording mode" to clarify that it controls RTSP/NAS recording, not HomeBase continuous recording. Existing entity IDs are unchanged.
+
+## Defaults and use
+
+Defaults are unchanged. Live view is off by default; only boolean `webrtc_relay: true` enables it. Changing that option requires an add-on restart. Command keepalive remains 29000 ms. Integration `light_correction_enabled` remains off. With safety off, OFF-stuck incident reporting is inactive and its four attributes are absent. No new option or default was added. Keep battery-camera preload off.
+
+## Known issues
+
+- T8113-Z firmware 3.3.8 can show a picture then black.
+- Some live-view sessions need another open or wait for the hub offer.
+- Unexplained floodlight ON events and brightness/spotlight command formatting remain unresolved. This update does not claim to fix these issues. Passive diagnostics do not establish physical state.
+
+## Releases, source and notices
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.9
+
+Integration release and ZIP checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.10
+
+See LICENSE and source headers for applicable license and author notices. Runtime/source archives retain their original notices and corresponding-source links.
+
+## Historical experimental.9 documentation
+
 # S1 experimental.9 — Overview
 
 Home Assistant custom integration for the S1 experimental stack. Install the paired integration ZIP or use HACS Redownload, then restart Home Assistant.
