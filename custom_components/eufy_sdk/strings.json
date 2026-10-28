@@ -192,7 +192,7 @@
   },
   "exceptions": {
     "ptz_ack_timeout": {
-      "message": "Pan sent, but the camera didn't confirm in time; it may still have moved."
+      "message": "Pan/tilt command sent, but the camera didn't confirm in time; it may still have moved."
     },
     "preset_empty": {
       "message": "Preset {slot} has no stored position. Save one there from the eufy app first."

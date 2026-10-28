@@ -71,6 +71,6 @@ class PtzAckTimeoutTests(unittest.IsolatedAsyncioTestCase):
                 strings = json.loads(path.read_text(encoding="utf-8"))
                 self.assertEqual(
                     strings["exceptions"]["ptz_ack_timeout"]["message"],
-                    "Pan sent, but the camera didn't confirm in time; "
+                    "Pan/tilt command sent, but the camera didn't confirm in time; "
                     "it may still have moved.",
                 )
