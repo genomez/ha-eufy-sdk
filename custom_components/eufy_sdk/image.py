@@ -54,9 +54,10 @@ class EufySdkEventImage(EufySdkDeviceEntity, ImageEntity):
     retained bytes at `/event-image/<sn>`. This entity fetches from the bridge (never
     the raw cloud URL — that needs the SDK's auth/decode). It refreshes on a
     detection push for the device (events that carry a new thumbnail — not
-    telemetry like ptzNotify) and on the coordinator poll, stamping a new
-    `image_last_updated` only when the bytes change — so an already-retained
-    thumbnail shows even before the first event.
+    telemetry like ptzNotify) and once per completed coordinator snapshot. Health
+    and unrelated state updates do not fetch or republish the image. Only changed
+    bytes or paired event metadata advance `image_last_updated`; an initial fetch
+    also shows an already-retained thumbnail before the first event.
     """
 
     _attr_translation_key = "last_event"
@@ -77,6 +78,8 @@ class EufySdkEventImage(EufySdkDeviceEntity, ImageEntity):
         self._image: bytes | None = None
         self._hash: str | None = None
         self._event_time: datetime | None = None
+        self._image_snapshot_generation = coordinator.completed_snapshot_generation
+        self._image_available = self.available
         # A detection push and the eventImageUpdated nudge both trigger a refresh.
         # Without this the two fetches race: an earlier fetch of the OLD bytes can
         # finish last and overwrite the new image while stamping a fresh time (time
@@ -111,9 +114,20 @@ class EufySdkEventImage(EufySdkDeviceEntity, ImageEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Piggyback the poll cadence to catch a thumbnail no event announced."""
-        self.hass.async_create_task(self._refresh())
-        super()._handle_coordinator_update()
+        """Check missed images once per snapshot, preserving availability changes."""
+        available = self.available
+        availability_changed = available != self._image_available
+        self._image_available = available
+        generation = self.coordinator.completed_snapshot_generation
+        if available and (
+            generation != self._image_snapshot_generation or availability_changed
+        ):
+            self._image_snapshot_generation = generation
+            self.hass.async_create_task(self._refresh())
+        # CoordinatorEntity writes on every notification. Only availability needs
+        # a write here; _refresh publishes changed image bytes or paired metadata.
+        if availability_changed:
+            self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
