@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.9",
+  "version": "0.3.1-s1.experimental.10",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.9.zip",
+  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.10.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "78b7d8834c62d6ee6dc4efe2cb701b0e09c3f877adbc9f12c352adb535b4a673"
+      "sha256": "4d8e7ee438dabd559202a6b4fdadf2c4f12dce82bf6c8aaff1fdb201bd3357ba"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "8daf3616ed0d075648e950245ca098670acd49cdfc2e2229fdb9da0d34df830f"
+      "sha256": "7c0134a2efbdd8df8d43da7a734c5822f2472b1d7a62acf502e1c9b078cb31a6"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "75bec73c53d8aea4c7271f7fc19852a1f160dabd29048f69c9eb725692e3ecaf"
+      "sha256": "5e1410d2ec260b3a6b77f27f2ee630fc83720bbb3357547dc246fb71db3a615a"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "36d33dee9ad47728349967ca8f31fa182b833930ebdcc44e4fae4770ae6b930e"
+      "sha256": "65a2cc1bc249a0dc64a984c0f3fd40456e0a186b50c6eaa04cfd30075cac229a"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "4269fb4f5773bbbfcce7100f54f218b4ce832bd9cfd80029cc87db2a47b5e7dd"
+      "sha256": "ece2fd652cd35abaef32350ab33d726121d6b1770c767b0c802bd27d69960bef"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -101,7 +101,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/button.py",
-      "sha256": "0c0e94469a0d898d73a4c321a841cb7f70bad694b8e1d0a029bafd8ef4890496"
+      "sha256": "f03249a59be4ea5b9473fe042d0f8b415f56f85e28fa885f98da957855d75825"
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
@@ -149,7 +149,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/image.py",
-      "sha256": "b9555b3af15d1c16d01f51e2e89fafdba0f8dc6d0e704dd36b0c7a8ab20ce505"
+      "sha256": "cccb87810452dfde5ddee8e5c79d51356851677ba9d4f3092ed3e97b48fa6e8c"
     },
     {
       "path": "custom_components/eufy_sdk/light.py",
@@ -157,7 +157,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/light_correction.py",
-      "sha256": "7d422a442f16a20e68e79e85cc37c4f69d61090a7fb74d211c44f6364ce2edb2"
+      "sha256": "6727e08921057b0cc5fd8e0f2e78f50d25ec6c0a64bd7b4ab7e9f002189bd8d5"
     },
     {
       "path": "custom_components/eufy_sdk/lock.py",
@@ -165,7 +165,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "fd693c9488ab01282bac3bdb1ef3be08625446acaeb74d62c424416fee76f37c"
+      "sha256": "0be998a5da60f1bd92f125b92271115cd44ef4ad1aadb244bc11954793d78dc5"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
@@ -209,7 +209,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/select.py",
-      "sha256": "edb9499f5cd9cfd974d04c24c307e03da5c95ca499d9375c4eee1df4461d9765"
+      "sha256": "b64465352ada7b37381be79df34b5394ca1df1ed27e330718997f396cdc211c5"
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
@@ -229,7 +229,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/strings.json",
-      "sha256": "c78e5d580a2df0e8e063e75a78c3d26cfd59e483c1ae98276b4bd098c9f24f10"
+      "sha256": "aa98e49f5721d446e2f563d79d916c6dedeb6cff2520f38f641525525b31933a"
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
@@ -237,7 +237,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/translations/en.json",
-      "sha256": "c78e5d580a2df0e8e063e75a78c3d26cfd59e483c1ae98276b4bd098c9f24f10"
+      "sha256": "aa98e49f5721d446e2f563d79d916c6dedeb6cff2520f38f641525525b31933a"
     },
     {
       "path": "custom_components/eufy_sdk/translations/it.json",
@@ -248,8 +248,5 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Exact installed runtime hashes except version metadata; fresh local offline suite",
-  "officialReleaseArchiveSourceCommit": "bf6d218faa3df8734c8bfee594ed6ae6e807e1f3",
-  "currentBranchDocumentationMayDifferFromReleasedArchive": true,
-  "officialReleaseArchiveSha256": "544e4f23e927f5c27585cba9379dc47c4bc08aa03bbead4a3cb3188b04313213"
+  "qualificationScope": "Exact committed integration package inputs; offline regression suite"
 }

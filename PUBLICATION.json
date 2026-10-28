@@ -1,27 +1,18 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.9",
-  "status": "published-runtime-and-source-delivery",
-  "published": true,
-  "publicBaseCommit": "628628378c9d2ac3769b28197d936e22b9b57913",
-  "exactInputCommit": "7bfd76217985072c01c60ac375ea70f69ef8e3bc",
-  "relayDefault": false,
-  "keepaliveMs": 29000,
-  "lightCorrectionDefault": false,
-  "registryManifestDigest": "sha256:fe2fca682ecf41655402abc7ba2da970995eeed4a6010f51865409b60141bd0e",
-  "runtimeSourceRelease": "https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.9",
-  "integrationRelease": "https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.9",
-  "publicationVerifiedAt": "2026-10-27T13:41:22.391861+00:00",
-  "sourcePreparationCommit": "bf6d218faa3df8734c8bfee594ed6ae6e807e1f3",
-  "sourcePreparationCommits": {
-    "eufy-sdk": "ff0c0c47981bede161544a1e410f55499afc5e44",
-    "ha-eufy-sdk-bridge": "f9ec2278eae82baa805863cc372cbbcba3b726fd",
-    "ha-eufy-sdk": "bf6d218faa3df8734c8bfee594ed6ae6e807e1f3"
+  "version": "0.3.1-s1.experimental.10",
+  "status": "integration-release-package",
+  "published": false,
+  "publicBaseCommit": "700f35dca69ff65ba5de8cc832d03000437ee37b",
+  "exactInputCommit": "845efc5fa3bbd6b81ee628f30ec2e7fd72dfbe6c",
+  "retainedComponents": {
+    "eufy-sdk": "02312bfe2eee3107ce19252c7b8730a9d5ac4c67",
+    "ha-eufy-sdk-bridge": "2e230cc8a978bc29b14dd64837146553289140b4",
+    "ha-eufy-sdk-addon": "95f97578519e56c84fc0b455153f7f9c5c4a1013"
   },
-  "releasePreparationRecordHistorical": true,
+  "runtimeSourceRelease": "https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.9",
+  "integrationRelease": "https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.10",
   "installationAcceptance": false,
   "hacsAvailabilityVerified": false,
-  "releaseArchiveSourceCommit": "bf6d218faa3df8734c8bfee594ed6ae6e807e1f3",
-  "releaseArchiveSha256": "544e4f23e927f5c27585cba9379dc47c4bc08aa03bbead4a3cb3188b04313213",
-  "releaseAvailabilityVerified": true
+  "releaseAvailabilityVerified": false
 }

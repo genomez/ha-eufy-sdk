@@ -44,8 +44,11 @@ Modified for genomez experimental.10, 2026-10-28.
 - `CORE_COMPATIBILITY.md`
 - `EXPERIMENTAL.md`
 - `INSTALL.md`
+- `INTEGRATION_PACKAGE.json`
 - `INTEGRATION_NOTICES.md`
+- `PUBLICATION.json`
 - `README.md`
+- `SOURCE_MANIFEST.json`
 - `custom_components/eufy_sdk/button.py`
 - `custom_components/eufy_sdk/image.py`
 - `custom_components/eufy_sdk/light_correction.py`
@@ -59,6 +62,7 @@ Modified for genomez experimental.10, 2026-10-28.
 - `tests/test_off_stuck_restart.py`
 - `tests/test_ptz_ack_timeout.py`
 - `tests/test_recording_mode_name.py`
+- `tools/build_integration_zip.py`
 
 ## Historical experimental.9 documentation
 
