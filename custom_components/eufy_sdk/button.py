@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
+from .api import EufySdkApiClientError
+from .const import DOMAIN
 from .entity import EufySdkDeviceEntity, has_capability
 
 if TYPE_CHECKING:
@@ -103,10 +106,9 @@ class EufySdkPtzButton(EufySdkDeviceEntity, ButtonEntity):
     """
     One pan-tilt step, in the direction this button carries.
 
-    Fire-and-forget: P2P carries no acknowledgement, so a press that returns without
-    raising means the frame left for the camera, not that the camera finished moving.
-    Where it ended up arrives separately as a `ptzNotify` event, which the Image entity
-    already watches.
+    Wait for the bridge's command acknowledgement. A missing acknowledgement does
+    not prove the camera stayed still, and an acknowledgement does not confirm its
+    final position; movement notifications arrive separately as `ptzNotify` events.
     """
 
     def __init__(
@@ -132,4 +134,12 @@ class EufySdkPtzButton(EufySdkDeviceEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Send this button's PTZ action to the bridge."""
         client = self.client
-        await client.action(self._sn, self._action, *self._args)
+        try:
+            await client.action(self._sn, self._action, *self._args)
+        except EufySdkApiClientError as err:
+            if str(err) != "command_ack_timeout":
+                raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ptz_ack_timeout",
+            ) from err
