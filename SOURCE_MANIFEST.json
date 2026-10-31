@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.10",
-  "status": "published-integration-only-delivery",
-  "publicBaselineCommit": "700f35dca69ff65ba5de8cc832d03000437ee37b",
-  "exactInputCommit": "845efc5fa3bbd6b81ee628f30ec2e7fd72dfbe6c",
+  "version": "0.3.1-s1.experimental.11",
+  "status": "prepared-locally-unpublished",
+  "publicBaselineCommit": "093aa68c3696344faa61755590edb809a31bb0ab",
+  "exactInputCommit": "a51d21216e84c007a1932330741bfcf466910a48",
   "files": {
     ".gitattributes": {
       "bytes": 18,
@@ -18,24 +18,24 @@
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
     "CORE_COMPATIBILITY.md": {
-      "bytes": 8924,
-      "sha256": "4d8e7ee438dabd559202a6b4fdadf2c4f12dce82bf6c8aaff1fdb201bd3357ba"
+      "bytes": 11970,
+      "sha256": "c6d1670fea39e173eee6367baca4de67be3ace749f4444973bc21e5bf9754418"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 47903,
-      "sha256": "7c0134a2efbdd8df8d43da7a734c5822f2472b1d7a62acf502e1c9b078cb31a6"
+      "bytes": 50850,
+      "sha256": "3c2b0c6e9367af910ecbcc3f16974ad2399595e5415f809ebf3616ef63275705"
     },
     "INSTALL.md": {
-      "bytes": 36628,
-      "sha256": "5e1410d2ec260b3a6b77f27f2ee630fc83720bbb3357547dc246fb71db3a615a"
+      "bytes": 39684,
+      "sha256": "04890fe5ae774bd4cd80bac3a9a59f486d216de9a56642740bc3acbf87a55161"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 26325,
-      "sha256": "65a2cc1bc249a0dc64a984c0f3fd40456e0a186b50c6eaa04cfd30075cac229a"
+      "bytes": 30355,
+      "sha256": "e137281bfb399ca50ba26a4b2068b9b82555dfb3c04f4e507fd0917f5cf1c8a2"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 9764,
-      "sha256": "89a6e595dcbc167df98fd979495865f527eed9d79ab4ab5770099362a9f9a8a6"
+      "bytes": 9532,
+      "sha256": "53e8a5f10543e89df5d8264c0e0ef8ef40d6e17a3159804204dfcb8636594317"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -46,12 +46,12 @@
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 1003,
-      "sha256": "83fab9f1760d1d1451ce9ba8be1f7b10736f67b896cdab72b67f01c00dfa3099"
+      "bytes": 449,
+      "sha256": "2c31d54e7996302ec65981aa33d23007d3b6e7d057ed387bf29b8f64460b3957"
     },
     "README.md": {
-      "bytes": 22029,
-      "sha256": "ece2fd652cd35abaef32350ab33d726121d6b1770c767b0c802bd27d69960bef"
+      "bytes": 24986,
+      "sha256": "97c11ebf1262db5a1607c43a56a9d0b07e7d69cbe95f9b64d4156f2210ed2c1f"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
@@ -187,7 +187,7 @@
     },
     "custom_components/eufy_sdk/manifest.json": {
       "bytes": 367,
-      "sha256": "0be998a5da60f1bd92f125b92271115cd44ef4ad1aadb244bc11954793d78dc5"
+      "sha256": "166dd39a649c18580c232965518621363269926715b80bff405cda87afb8ddd2"
     },
     "custom_components/eufy_sdk/manifest_reads.py": {
       "bytes": 5146,
@@ -326,8 +326,8 @@
       "sha256": "16b560007955d5ad83fb4e02f9d30cfd6a55594413ff7b90e60951eaddea7eae"
     },
     "tests/test_alarm_realtime.py": {
-      "bytes": 4242,
-      "sha256": "a7a7cb8febc02c3d01306e5e6484ec66e52d94a247810ed77ec64b168a9ef7a0"
+      "bytes": 4897,
+      "sha256": "5ae4cb0d27894ce54f720ab3cba123c01a221ddee479586d78f006fdae5be8d8"
     },
     "tests/test_aligned_state.py": {
       "bytes": 12414,
@@ -599,7 +599,7 @@
     },
     "tools/build_integration_zip.py": {
       "bytes": 4160,
-      "sha256": "c835893320a478936b40ac03bb45faee19c577308e301ba3c27201aa95c9f052"
+      "sha256": "dad8aae02260adf8ffb9cfd480638634b5e7916b055ee6986c4df726471f2d73"
     },
     "tools/check_refresh_recovery_mutations.py": {
       "bytes": 2376,

@@ -49,9 +49,13 @@ Modified for genomez experimental.11, 2026-10-31.
 - `EXPERIMENTAL.md`
 - `INSTALL.md`
 - `INTEGRATION_NOTICES.md`
+- `INTEGRATION_PACKAGE.json`
+- `PUBLICATION.json`
 - `README.md`
+- `SOURCE_MANIFEST.json`
 - `custom_components/eufy_sdk/manifest.json`
 - `tests/test_alarm_realtime.py`
+- `tools/build_integration_zip.py`
 
 ## Historical experimental.9 / experimental.10 documentation
 

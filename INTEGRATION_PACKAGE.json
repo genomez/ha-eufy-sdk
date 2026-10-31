@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.10",
+  "version": "0.3.1-s1.experimental.11",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.10.zip",
+  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.11.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "4d8e7ee438dabd559202a6b4fdadf2c4f12dce82bf6c8aaff1fdb201bd3357ba"
+      "sha256": "c6d1670fea39e173eee6367baca4de67be3ace749f4444973bc21e5bf9754418"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "7c0134a2efbdd8df8d43da7a734c5822f2472b1d7a62acf502e1c9b078cb31a6"
+      "sha256": "3c2b0c6e9367af910ecbcc3f16974ad2399595e5415f809ebf3616ef63275705"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "5e1410d2ec260b3a6b77f27f2ee630fc83720bbb3357547dc246fb71db3a615a"
+      "sha256": "04890fe5ae774bd4cd80bac3a9a59f486d216de9a56642740bc3acbf87a55161"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "65a2cc1bc249a0dc64a984c0f3fd40456e0a186b50c6eaa04cfd30075cac229a"
+      "sha256": "e137281bfb399ca50ba26a4b2068b9b82555dfb3c04f4e507fd0917f5cf1c8a2"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "ece2fd652cd35abaef32350ab33d726121d6b1770c767b0c802bd27d69960bef"
+      "sha256": "97c11ebf1262db5a1607c43a56a9d0b07e7d69cbe95f9b64d4156f2210ed2c1f"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -165,7 +165,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "0be998a5da60f1bd92f125b92271115cd44ef4ad1aadb244bc11954793d78dc5"
+      "sha256": "166dd39a649c18580c232965518621363269926715b80bff405cda87afb8ddd2"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
@@ -248,8 +248,5 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Exact committed integration package inputs; offline regression suite",
-  "officialReleaseArchiveSourceCommit": "69e17a9d8caa1e1a55d46bd40493d45d25a1cfa8",
-  "officialReleaseArchiveSha256": "b14509a0ab5074e301558c98e2f40830ae7ceece0e6a53a9f77af7cde3409a97",
-  "currentBranchDocumentationMayDifferFromReleasedArchive": true
+  "qualificationScope": "Offline regression tests; live behavior and installed entity transitions are unverified."
 }
