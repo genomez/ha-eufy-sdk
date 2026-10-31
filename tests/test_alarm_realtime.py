@@ -16,6 +16,22 @@ def _coordinator() -> Mock:
 
 
 class AlarmRealtimeTests(unittest.TestCase):
+    def test_sdk_explicit_stop_phase_clears_sounding_and_pending(self):
+        coordinator = _coordinator()
+        state = coordinator.data["homebase"]["state"]
+        state.update(alarmTriggered=True, alarmPending=True)
+
+        phase = alarm_sync.apply_alarm_event(
+            coordinator,
+            {"event": "alarm", "deviceSn": "homebase", "type": 16, "phase": "stopped"},
+        )
+
+        self.assertEqual(phase, "stopped")
+        self.assertFalse(state["alarmTriggered"])
+        self.assertFalse(state["alarmPending"])
+        self.assertEqual(state["armingMode"], 1)
+        coordinator.async_update_listeners.assert_called_once_with()
+
     def test_trigger_marks_station_sounding(self):
         coordinator = _coordinator()
 
