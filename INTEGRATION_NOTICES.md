@@ -14,6 +14,10 @@ Integration license and modifications: the ZIP contains one integration domain a
 - Streaming-quality sensors behind HomeBase S1 appear only when the camera has reported the corresponding quality parameter. The separate video-quality select is unchanged.
 - After updating both components and restarting Home Assistant, 15 existing RTSP stream switches and 15 existing streaming-quality sensors on the affected installation are expected to become unavailable. Their retained entity entries can be removed in Home Assistant. Streaming-quality sensors with reported support remain available.
 - Camera-health diagnostics show the last suppressed signal-strength reading, its reason and source. This diagnostic does not change the published signal strength or prove the current radio state.
+- More cameras now show Online/Offline status from HomeBase S1 (T9000). Offline/recovery testing covers T8425, T8426, T8416, T8214, T8134 and T8170; T8171 has not yet been offline-tested.
+- Camera status holds until the HomeBase reports a change.
+- After a HomeBase reconnect, cameras show unknown until the next routine status update, about 10 minutes by default plus polling and sweep time. Failed or disabled polling or missing reports can leave status unknown longer.
+- A camera marked offline never holds back light OFF commands or retries. Existing transport and safety checks still apply. Upgrade the add-on and integration together.
 
 ## Defaults and use
 
@@ -53,8 +57,14 @@ Modified for genomez experimental.11, 2026-10-31.
 - `PUBLICATION.json`
 - `README.md`
 - `SOURCE_MANIFEST.json`
+- `custom_components/eufy_sdk/light_correction.py`
 - `custom_components/eufy_sdk/manifest.json`
+- `docs/camera-connectivity.md`
 - `tests/test_alarm_realtime.py`
+- `tests/test_command_health.py`
+- `tests/test_floodlight_safety.py`
+- `tests/test_floodlight_safety_round2.py`
+- `tests/test_light_correction.py`
 - `tools/build_integration_zip.py`
 
 ## Historical experimental.9 / experimental.10 documentation
