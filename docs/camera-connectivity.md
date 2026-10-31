@@ -4,13 +4,13 @@ HomeBase S1 (T9000) per-camera status covers T8425, T8426, T8416, T8214,
 T8134, T8170 and T8171, with mains or battery power. Owner-reported offline/recovery
 testing covers T8425, T8426, T8416, T8214, T8134 and T8170.
 T8171 is **unconfirmed: not offline-tested; assumed to behave like the other HomeBase cameras**.
-These are prior owner observations; this source candidate has only local synthetic validation.
+These are prior owner observations; offline regression tests do not establish live camera behavior.
 
 Qualification requires an unambiguous T9000 parent. Changing the parent model
 retires the held assessment and old observers. The latest HomeBase p1131=1
 (or true) means online; 0 (or false) means offline. Both hold without expiry.
 p1131=2 or 3 means unknown. Other values remain raw diagnostics. Reports are
-ordered by local receipt ordinal; unorderable conflicts stay unknown, including
+ordered by local arrival order; unorderable conflicts stay unknown, including
 duplicates, until strictly newer evidence. Child media, push, cloud parameters
 and command outcomes do not establish or replace this assessment. Other models
 retain their existing contact-based rules.
