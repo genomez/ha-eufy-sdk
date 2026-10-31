@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "0.3.1-s1.experimental.10",
-  "status": "integration-release-package",
+  "status": "published-integration-only-delivery",
   "publicBaselineCommit": "700f35dca69ff65ba5de8cc832d03000437ee37b",
   "exactInputCommit": "845efc5fa3bbd6b81ee628f30ec2e7fd72dfbe6c",
   "files": {
@@ -34,8 +34,8 @@
       "sha256": "65a2cc1bc249a0dc64a984c0f3fd40456e0a186b50c6eaa04cfd30075cac229a"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 9512,
-      "sha256": "1f58535e948fdbf60444fb9bcb7ea2447f210963d3af889577d29c73989392db"
+      "bytes": 9764,
+      "sha256": "89a6e595dcbc167df98fd979495865f527eed9d79ab4ab5770099362a9f9a8a6"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -46,8 +46,8 @@
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 827,
-      "sha256": "dd1789ea62438c75fa584a05c3890836e8f0eb56a26a207b37fdaa49d010cd9d"
+      "bytes": 1003,
+      "sha256": "83fab9f1760d1d1451ce9ba8be1f7b10736f67b896cdab72b67f01c00dfa3099"
     },
     "README.md": {
       "bytes": 22029,
