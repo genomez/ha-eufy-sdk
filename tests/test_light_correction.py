@@ -13,10 +13,12 @@ import test_bounded_state_writes as bounded
 import test_floodlight_state_hold as fixtures
 from aiohttp import WSMsgType
 from homeassistant.core import HassJob, HassJobType, HomeAssistant
+from test_camera_health import projection as camera_projection
 
 from custom_components.eufy_sdk.api import (
     CommandReceipt,
     EufySdkApiClientCommunicationError,
+    camera_health,
     late_contrary_event,
 )
 from custom_components.eufy_sdk.const import (
@@ -696,3 +698,126 @@ class LightCorrectionProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events, [hello, event, {"event": "bridgeDisconnected"}])
         self.assertFalse(client.late_contrary_effects_supported)
         self.assertNotIn("discard", json.dumps(events))
+
+
+class OfflineOffSafetyTests(SafetyFixture, unittest.IsolatedAsyncioTestCase):
+    """Camera health cannot suspend OFF-direction protection."""
+
+    def offline(self):
+        self.entity.device["cameraHealth"] = camera_health(
+            camera_projection(
+                connectivity="offline",
+                basis="vendor_status",
+                evidence="hub_reported",
+                parentTransport="connected",
+            )
+        )
+        self.assertIsNotNone(self.entity.device["cameraHealth"])
+
+    async def test_offline_status_must_not_suspend_off_retry(self):
+        entity, _, _, _ = self.setup_light(desired=False)
+        self.offline()
+        controller = entity._light_correction
+        await controller.async_added()
+        await entity.write(False)
+        self.assertEqual([value for _, value, _ in self.commands], [False])
+        self.observation(True)
+        await self.advance(61)
+        self.assertGreaterEqual(len(self.commands), 2)
+        self.assertTrue(all(value is False for _, value, _ in self.commands))
+        self.assertEqual(controller._waiting_reason(), "camera_offline")
+        self.assertFalse(controller._waiting(desired=False))
+        self.assertTrue(controller._waiting(desired=True))
+
+    async def test_offline_persisted_startup_off_retries_with_existing_budget(self):
+        entity, _, _, _ = await self.activate()
+        await entity.write(False)
+        entity._light_correction.stop("closed")
+        self.offline()
+        entity._light_correction = LightCorrection(entity)
+        await entity._light_correction.async_added()
+        self.assertIs(entity._light_correction.pending, False)
+        self.observation(True)
+        await self.advance(61)
+        self.assertEqual([value for _, value, _ in self.commands], [False, False])
+
+    async def test_offline_rejoin_off_resumes_after_bridge_ready(self):
+        entity, _, client, _ = await self.activate()
+        self.offline()
+        await entity.write(False)
+        client.connected = False
+        entity._handle_property_changed(
+            SimpleNamespace(data={"event": "bridgeDisconnected"})
+        )
+        await self.advance(61)
+        self.assertEqual(len(self.commands), 1)
+        client.connected = True
+        entity._handle_property_changed(SimpleNamespace(data={"event": "ready"}))
+        self.observation(True)
+        await self.advance(91)
+        self.assertGreaterEqual(len(self.commands), 2)
+        self.assertTrue(all(value is False for _, value, _ in self.commands))
+
+    async def test_offline_watchdog_and_correction_off_keep_quiet_deadline(self):
+        await self.activate()
+        self.offline()
+        self.observation(True, telemetry={"motion": False})
+        for moment in range(60, 901, 60):
+            await self.advance(moment)
+            self.observation(True, telemetry={"motion": False})
+            await self.drain()
+        self.assertEqual(
+            [(at, value) for at, value, _ in self.commands], [(900, False)]
+        )
+        self.observation(True)
+        await self.advance(961)
+        self.assertEqual([value for _, value, _ in self.commands], [False, False])
+
+    async def test_offline_preserves_real_transport_and_cooldown_gates(self):
+        entity, _, client, _ = await self.activate()
+        self.offline()
+        controller = entity._light_correction
+        await entity.write(False)
+        self.observation(True)
+        controller.health_until = 120
+        await self.advance(61)
+        self.assertEqual(len(self.commands), 1)
+        controller.health_until = 0
+        entity.device["cameraHealth"]["parentTransport"] = "disconnected"
+        await self.advance(121)
+        self.assertEqual(len(self.commands), 1)
+        entity.device["cameraHealth"]["parentTransport"] = "connected"
+        controller.check_policy()
+        await self.drain()
+        self.assertEqual(len(self.commands), 2)
+        self.assertTrue(client.connected)
+
+    async def test_offline_incidents_keep_classification_and_no_confirmation_deadline(
+        self,
+    ):
+        entity, _, _, _ = await self.activate()
+        self.offline()
+        await entity.write(False)
+        self.observation(True)
+        await self.advance(299)
+        self.assertIsNone(entity._light_correction.off_stuck)
+        await self.advance(300)
+        incident = entity._light_correction.off_stuck
+        self.assertEqual(incident["reason"], "no_confirmation")
+        self.assertEqual(incident["opened_at"], 10300)
+        self.assertEqual(incident["escalate_at"], 10420)
+        self.assertEqual(entity._light_correction._waiting_reason(), "camera_offline")
+        self.assertGreater(len(self.commands), 1)
+
+    async def test_offline_automatic_on_still_waits_until_online(self):
+        entity, _, _, _ = await self.activate(desired=True)
+        self.offline()
+        await entity.write(True)
+        self.observation(False)
+        await self.advance(61)
+        self.assertEqual([value for _, value, _ in self.commands], [True])
+        self.assertTrue(entity._light_correction._waiting(desired=True))
+        entity.device["cameraHealth"]["connectivity"] = "online"
+        entity._light_correction.check_policy()
+        await self.drain()
+        self.assertEqual([value for _, value, _ in self.commands], [True, True])

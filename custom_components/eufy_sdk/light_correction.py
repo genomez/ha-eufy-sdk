@@ -617,13 +617,13 @@ class LightCorrection:
             )
         )
 
-    def _waiting(self) -> bool:
+    def _waiting(self, *, desired: bool | None = False) -> bool:
         health = self.entity.device.get("cameraHealth") or {}
         return (
             self.paused
             or monotonic() < self.health_until
             or getattr(self.entity.client, "connected", False) is not True
-            or health.get("connectivity") == "offline"
+            or (desired is True and health.get("connectivity") == "offline")
             or health.get("parentTransport") == "disconnected"
         )
 
@@ -814,7 +814,7 @@ class LightCorrection:
             and self.loaded
             and not self._stopping()
             and self.entity.hass.state is CoreState.running
-            and not self._waiting()
+            and not self._waiting(desired=desired)
             and not self.explicit_busy
             and self.intent() is desired
             and not self.recovery_pending
@@ -879,7 +879,7 @@ class LightCorrection:
                 self._notice("intent_gap", True)
         elif not self.loaded:
             self.state = "protection gap"
-        elif self._waiting():
+        elif self._waiting(desired=intent):
             self.state = "waiting for camera"
         elif self.pending is not None:
             self.state = "retrying ON" if self.pending else "retrying OFF"
@@ -916,7 +916,7 @@ class LightCorrection:
         if (
             self.loaded
             and self.task is None
-            and not self._waiting()
+            and not self._waiting(desired=intent)
             and (
                 self.recovery_pending
                 or (self.pending is not None and now >= self.retry_due)

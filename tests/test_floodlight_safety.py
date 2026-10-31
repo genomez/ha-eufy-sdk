@@ -334,12 +334,12 @@ class FloodlightSafetyTests(unittest.IsolatedAsyncioTestCase):
         await self.at(1500)
         self.assertEqual(len(self.sent), 6)
 
-    async def test_offline_wait_and_resume_trigger(self):
+    async def test_offline_off_retry_continues_without_resume_trigger(self):
         entity, controller, _ = await self.make()
         await entity.write(False)
         entity.device["cameraHealth"] = {"connectivity": "offline"}
         await self.at(65)
-        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(len(self.sent), 2)
         entity.device["cameraHealth"] = {"connectivity": "online"}
         controller.check_policy()
         await self.drain()

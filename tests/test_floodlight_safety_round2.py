@@ -198,12 +198,14 @@ class FloodlightSafetyRound2Tests(unittest.IsolatedAsyncioTestCase):
         await self.at(1500.01)
         self.assertEqual(len(self.sent), 1)
 
-    async def test_unhealthy_telemetry_cannot_qualify_quiet_or_dispatch(self):
+    async def test_transport_and_stale_telemetry_gate_off_but_camera_offline_does_not(
+        self,
+    ):
         entity, controller, client = await self.make()
         self.report(controller, True)
         self.now = 901
         self.report(controller, True)
-        for mode in ("disconnected", "offline", "parent_disconnected", "stale"):
+        for mode in ("disconnected", "parent_disconnected", "stale"):
             with self.subTest(mode=mode):
                 client.connected = mode != "disconnected"
                 entity.device["cameraHealth"] = {
@@ -220,12 +222,22 @@ class FloodlightSafetyRound2Tests(unittest.IsolatedAsyncioTestCase):
                 await self.drain()
                 self.assertEqual(self.sent, [])
         client.connected = True
-        entity.device["cameraHealth"] = {"connectivity": "online"}
+        entity.device["cameraHealth"] = {
+            "connectivity": "offline",
+            "parentTransport": "connected",
+        }
+        controller.observed_at = self.wall + self.now - 1
+        with self.subTest(mode="offline"):
+            self.assertTrue(controller._quiet())
+            controller.check_policy()
+            await self.drain()
+            self.assertEqual(len(self.sent), 1)
         self.now = 1801
         self.report(controller, True, motion=True)
         await self.drain()
         self.assertFalse(controller._quiet())
-        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(len(self.sent), 2)
+        self.assertTrue(all(row[2] is False for row in self.sent))
 
     async def test_controller_120_second_window_preserves_presentation_window(self):
         self.assertEqual(MAX_OBSERVATION_AGE_SECONDS, 60)

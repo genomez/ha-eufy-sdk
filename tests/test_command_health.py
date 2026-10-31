@@ -30,16 +30,16 @@ class CommandSafetyTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCas
         await self.advance(120)
         self.assertEqual([at for at, _, _ in self.commands], [0, 120])
 
-    async def test_offline_camera_waits_then_retries_when_back(self):
+    async def test_offline_camera_keeps_off_retry_schedule_when_back(self):
         entity, _, _, _ = await self.activate()
         await entity.write(False)
         entity.device["cameraHealth"] = {"connectivity": "offline"}
         await self.advance(300)
-        self.assertEqual([at for at, _, _ in self.commands], [0])
+        self.assertEqual([at for at, _, _ in self.commands], [0, 60, 180])
         entity.device["cameraHealth"] = {"connectivity": "online"}
         entity._light_correction.check_policy()
         await self.drain()
-        self.assertEqual([at for at, _, _ in self.commands], [0, 300])
+        self.assertEqual([at for at, _, _ in self.commands], [0, 60, 180])
 
     async def test_explicit_request_bypasses_degraded_automatic_wait(self):
         entity, _, _, _ = await self.activate()
