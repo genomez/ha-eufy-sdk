@@ -1,3 +1,40 @@
+# S1 experimental.11 — Experimental support and limitations
+
+Home Assistant custom integration for the S1 experimental stack. Use the paired integration ZIP or HACS Redownload, then restart Home Assistant.
+
+Pair add-on `0.4.1-s1.experimental.11`, integration/bridge `0.3.1-s1.experimental.11` and SDK `0.2.1-s1.experimental.11`.
+
+Use matching release versions and retain your existing configuration unless deliberately changing an option.
+
+## Changes
+
+- Diagnostics keep bounded failure-only command and property-write history, so failures remain visible when later commands succeed. The SDK error history is limited to 32 entries.
+- Event thumbnail decoding supports the V2 encrypted-chroma variant. Alarm pushes that explicitly report an app stop are labelled stopped rather than triggered.
+- Unsupported RTSP stream publish controls are hidden for cameras behind HomeBase S1. RTSP URLs and the existing recording/authentication settings retain their existing support rules.
+- Streaming-quality sensors behind HomeBase S1 appear only when the camera has reported the corresponding quality parameter. The separate video-quality select is unchanged.
+- After updating both components and restarting Home Assistant, 15 existing RTSP stream switches and 15 existing streaming-quality sensors on the affected installation are expected to become unavailable. Their retained entity entries can be removed in Home Assistant. Streaming-quality sensors with reported support remain available.
+- Camera-health diagnostics show the last suppressed signal-strength reading, its reason and source. This diagnostic does not change the published signal strength or prove the current radio state.
+
+## Defaults and use
+
+Defaults are unchanged. Live view is off by default; only boolean `webrtc_relay: true` enables it. Changing that option requires an add-on restart. Command keepalive remains 29000 ms. Integration `light_correction_enabled` remains off. With safety off, OFF-stuck incident reporting is inactive and its four attributes are absent. No new option or default was added. Keep battery-camera preload off.
+
+## Known issues
+
+- T8113-Z firmware 3.3.8 can show a picture then black.
+- Some live-view sessions need another open or wait for the hub offer.
+- Unexplained floodlight ON events and brightness/spotlight command formatting remain unresolved. This update does not claim to fix these issues. Passive diagnostics do not establish physical state.
+
+## Releases, source and notices
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.11
+
+Integration release and ZIP checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.11
+
+See LICENSE and source headers for applicable license and author notices. Runtime/source archives retain their original notices and corresponding-source links.
+
+## Historical experimental.9 / experimental.10 documentation
+
 # S1 experimental.10 — Experimental support and limitations
 
 Home Assistant custom integration for the S1 experimental stack. Install the integration ZIP or use HACS Redownload for this version, then restart Home Assistant.
