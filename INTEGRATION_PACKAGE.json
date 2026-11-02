@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.11",
+  "version": "0.3.1-s1.experimental.12",
   "domain": "eufy_sdk",
   "owner": "genomez",
-  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.11.zip",
+  "filename": "eufy-sdk-s1-0.3.1-s1.experimental.12.zip",
   "hacsMode": "normal repository layout; not zip_release",
   "manualInstallSubtree": "custom_components/eufy_sdk/",
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
+      "sha256": "bbede9deb02082f50d9a5158e873a2259dca35fb3503660e4b648526d8ab8151"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "3dff0dda8bee181f0df7cef8dad6885a9a54719bd380fbea2609c297e9093cfb"
+      "sha256": "6ccb98975f57b334dea810343d49b62d8abbdecd59d3edbc385358b555673dad"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "4b09aa921a0b6bd5fcb436d51f2ef55c8d3f2e1a29ee7f71892ded18b587d24b"
+      "sha256": "76f70fd7161ee729fd2eb37e1929ed3bd03760eac6a8ed37a0c35c601de12aa4"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "eaeea84acfffd3c4e832ade5eaf2c8b432717c8c7296851a994350595209d0a0"
+      "sha256": "98a75b71aff065ed35e850e73bbbca0219f0f23deeff19c87212f4fe2b1fdc60"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "f85e54f335ee694fe5eaade3664075141d0c7b91bb764f231f3dea8494217c33"
+      "sha256": "506c3dcd8aa6b72b5cf5727940a2b066c9c5ae9397364a99f8356d63c4e54ea7"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -37,7 +37,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/__init__.py",
-      "sha256": "218eeba5ca06bdc0a1f9e92ac4c701d9c89ae01bd9026f46026abf46e08fcd1a"
+      "sha256": "0be2e56625f92e919000acc638520a359377e4846cf5cb8533ce5747f61e0e91"
     },
     {
       "path": "custom_components/eufy_sdk/alarm_control_panel.py",
@@ -121,7 +121,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/coordinator.py",
-      "sha256": "639a033170fc2aeba15c669f6790ff20e27178661f08aeb230631495a4ff471a"
+      "sha256": "7b4a05613b9faa9f5502b58505683c80607d20c8d4b6445b86708e6f2cec2643"
     },
     {
       "path": "custom_components/eufy_sdk/data.py",
@@ -137,7 +137,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "772dcf2e4b5f6c192ac036953d904cc8ff368f8d8670cbcec33b5c5289fc1e63"
+      "sha256": "97f8e52a6ff3ce38f2ceac84d6f9a684a112cd0226a4e69edf1fc2389db9504b"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -146,6 +146,10 @@
     {
       "path": "custom_components/eufy_sdk/event_image.py",
       "sha256": "d13e87d314c4e3e4eb956de7d68c94aeca3402631af52cedf02e23240866d627"
+    },
+    {
+      "path": "custom_components/eufy_sdk/firmware_metadata.py",
+      "sha256": "1a39c674de66a4dafadb129f7231726d02ef88d2b541d72bedcf167f31647aef"
     },
     {
       "path": "custom_components/eufy_sdk/image.py",
@@ -165,7 +169,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest.json",
-      "sha256": "166dd39a649c18580c232965518621363269926715b80bff405cda87afb8ddd2"
+      "sha256": "01de4bf3f4354fb8a72ed9868cc01ae9501654b68ba33480b63eb07c9b121d5a"
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
@@ -213,7 +217,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "26d018904720d225bdf25c29eb5fd2e2152c087b0188122211b6d0605c647bfe"
+      "sha256": "4e2b3a70070924837fda43f443daf94477afab3284ada8ec7d353e8bf0c6a50b"
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
@@ -225,7 +229,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/storage_telemetry.py",
-      "sha256": "6f9099b305ef5d61972d5957e76c7c2d9dc3da8679c7ac74ab20841cbcc6d206"
+      "sha256": "7f35ca69c93c68921a91d142e00e75a115f7474c4824c18c0707f95c59d9c2e9"
     },
     {
       "path": "custom_components/eufy_sdk/strings.json",
@@ -248,8 +252,5 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Offline regression tests; live behavior and installed entity transitions are unverified.",
-  "officialReleaseArchiveSourceCommit": "bcaa58e38d66b48786c33dcd5f0aba82a2890785",
-  "officialReleaseArchiveSha256": "6b146055071e4eb4273e62b02ec54525628f2b7a0482df63ebfc432e171b93ed",
-  "currentBranchDocumentationMayDifferFromReleasedArchive": true
+  "qualificationScope": "Offline regression tests; live behavior and installed entity transitions are unverified."
 }
