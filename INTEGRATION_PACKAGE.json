@@ -9,19 +9,19 @@
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "cadf2a0e5a7c1d639b30faf8b3b03ae9e6cbf47b0976b7e1387785a8bf72fbdb"
+      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "a9daffa271294d161330823771dc1d745492f83e2b55eea945ee3813665ba3fd"
+      "sha256": "3dff0dda8bee181f0df7cef8dad6885a9a54719bd380fbea2609c297e9093cfb"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "c42aaa6651e40466d4ce50824710384bf1646d05e3cff2a45c42deba250ef68e"
+      "sha256": "4b09aa921a0b6bd5fcb436d51f2ef55c8d3f2e1a29ee7f71892ded18b587d24b"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "d66db22a18eeb84120c83c36b976cb14a5b1570d17ce9621d823b3b0cba468c8"
+      "sha256": "eaeea84acfffd3c4e832ade5eaf2c8b432717c8c7296851a994350595209d0a0"
     },
     {
       "path": "LICENSE",
@@ -29,7 +29,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "0c511335cfa6e58596dc8f8fd2bebc3273e54a14e2f9b04dd4c009134a5e0459"
+      "sha256": "f85e54f335ee694fe5eaade3664075141d0c7b91bb764f231f3dea8494217c33"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
@@ -248,5 +248,8 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     }
   ],
-  "qualificationScope": "Offline regression tests; live behavior and installed entity transitions are unverified."
+  "qualificationScope": "Offline regression tests; live behavior and installed entity transitions are unverified.",
+  "officialReleaseArchiveSourceCommit": "bcaa58e38d66b48786c33dcd5f0aba82a2890785",
+  "officialReleaseArchiveSha256": "6b146055071e4eb4273e62b02ec54525628f2b7a0482df63ebfc432e171b93ed",
+  "currentBranchDocumentationMayDifferFromReleasedArchive": true
 }

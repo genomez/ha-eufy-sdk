@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "0.3.1-s1.experimental.11",
-  "status": "prepared-locally-unpublished",
+  "status": "published-source-delivery",
   "publicBaselineCommit": "093aa68c3696344faa61755590edb809a31bb0ab",
   "exactInputCommit": "01482b7fac0286758f1d7b868eac0e21348789e7",
   "files": {
@@ -18,24 +18,24 @@
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
     "CORE_COMPATIBILITY.md": {
-      "bytes": 12611,
-      "sha256": "cadf2a0e5a7c1d639b30faf8b3b03ae9e6cbf47b0976b7e1387785a8bf72fbdb"
+      "bytes": 13067,
+      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 51491,
-      "sha256": "a9daffa271294d161330823771dc1d745492f83e2b55eea945ee3813665ba3fd"
+      "bytes": 51947,
+      "sha256": "3dff0dda8bee181f0df7cef8dad6885a9a54719bd380fbea2609c297e9093cfb"
     },
     "INSTALL.md": {
-      "bytes": 40325,
-      "sha256": "c42aaa6651e40466d4ce50824710384bf1646d05e3cff2a45c42deba250ef68e"
+      "bytes": 40781,
+      "sha256": "4b09aa921a0b6bd5fcb436d51f2ef55c8d3f2e1a29ee7f71892ded18b587d24b"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 31226,
-      "sha256": "d66db22a18eeb84120c83c36b976cb14a5b1570d17ce9621d823b3b0cba468c8"
+      "bytes": 31631,
+      "sha256": "eaeea84acfffd3c4e832ade5eaf2c8b432717c8c7296851a994350595209d0a0"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 9532,
-      "sha256": "91a3e2cdb29c6067e68f694e4bf8ae22457453ff547466f024386e438bf00dcf"
+      "bytes": 9784,
+      "sha256": "1fffb166e4282248d50afd61aaedb6b3ac0f72ec4e55af9e6ce2d93cd96be83b"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -46,12 +46,12 @@
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 449,
-      "sha256": "26bd0e6edd835d94c383cdfb3f66d24025be2b1c72fe70db2f9649df9aa6b2ec"
+      "bytes": 1664,
+      "sha256": "209423844f1b3134e2e2e221c51a0681d46ee4512e184781fd5d7ebe957383c8"
     },
     "README.md": {
-      "bytes": 25627,
-      "sha256": "0c511335cfa6e58596dc8f8fd2bebc3273e54a14e2f9b04dd4c009134a5e0459"
+      "bytes": 26083,
+      "sha256": "f85e54f335ee694fe5eaade3664075141d0c7b91bb764f231f3dea8494217c33"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
@@ -613,5 +613,6 @@
       "bytes": 3936,
       "sha256": "24a70a03bf667254199d2eb182e287f26f64e6f0fac641b41cdf932c8ef5d04c"
     }
-  }
+  },
+  "preparationRecordsHistorical": true
 }
