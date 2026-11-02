@@ -1,19 +1,24 @@
 """Firmware presentation uses ordinary snapshots, never device commands."""
 
-# ruff: noqa: ANN001, ANN201, D101, D102, D103, INP001, PT009, S108, SLF001
+# ruff: noqa: ANN001, ANN201, ANN202, D101, D102, D103, INP001, PT009, S108, SLF001
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import test_aligned_state as aligned
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.template import Template
 
 from custom_components.eufy_sdk.const import DOMAIN
 from custom_components.eufy_sdk.entity import EufySdkDeviceEntity, firmware_version
+from custom_components.eufy_sdk.firmware_metadata import (
+    apply_metadata_event,
+    sync_firmware_registry,
+)
 from custom_components.eufy_sdk.manifest_reads import normalize_snapshot
-from custom_components.eufy_sdk.sensor import EufySdkInfoSensor
+from custom_components.eufy_sdk.sensor import EufySdkFirmwareSensor, EufySdkInfoSensor
 
 
 def coordinator(version=None):
@@ -33,6 +38,86 @@ def coordinator(version=None):
 
 
 class FirmwareMetadataTests(unittest.TestCase):
+    def test_passive_event_updates_registry_info_and_native_sensor_without_client_calls(
+        self,
+    ):
+        coord = coordinator("4.4.0.4")
+        coord.hass = Mock()
+        coord._pending_metadata_events = {}
+        info = EufySdkInfoSensor(coord, "synthetic")
+        firmware = EufySdkFirmwareSensor(coord, "synthetic")
+        registry = Mock()
+        device = SimpleNamespace(
+            id="sdk-device", sw_version="4.4.0.4", identifiers={(DOMAIN, "synthetic")}
+        )
+        with (
+            patch(
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_get",
+                return_value=registry,
+            ),
+            patch(
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_entries_for_config_entry",
+                return_value=[device],
+            ),
+        ):
+            self.assertTrue(
+                apply_metadata_event(
+                    coord,
+                    {
+                        "event": "deviceMetadata",
+                        "deviceSn": "synthetic",
+                        "firmwareVersion": "4.4.1.4",
+                    },
+                )
+            )
+        self.assertEqual(firmware.native_value, "4.4.1.4")
+        self.assertEqual(info.extra_state_attributes["firmware_version"], "4.4.1.4")
+        self.assertEqual(coord._pending_metadata_events, {"synthetic": "4.4.1.4"})
+        registry.async_update_device.assert_called_once_with(
+            "sdk-device", sw_version="4.4.1.4"
+        )
+        coord.config_entry.runtime_data.client.assert_not_called()
+        for value in ({}, "https://example.test/version", 4):
+            self.assertFalse(
+                apply_metadata_event(
+                    coord,
+                    {
+                        "event": "deviceMetadata",
+                        "deviceSn": "synthetic",
+                        "firmwareVersion": value,
+                    },
+                )
+            )
+
+    def test_registry_sync_without_info_preserves_other_integrations(
+        self,
+    ):
+        registry = Mock()
+        sdk = SimpleNamespace(
+            id="sdk", sw_version="4.4.0.4", identifiers={(DOMAIN, "synthetic")}
+        )
+        legacy = SimpleNamespace(
+            id="legacy",
+            sw_version="4.4.0.4",
+            identifiers={("eufy_security", "synthetic")},
+        )
+        with (
+            patch(
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_get",
+                return_value=registry,
+            ),
+            patch(
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_entries_for_config_entry",
+                return_value=[sdk, legacy],
+            ),
+        ):
+            sync_firmware_registry(
+                Mock(), "synthetic-entry", {"synthetic": {"firmwareVersion": "4.4.1.4"}}
+            )
+        registry.async_update_device.assert_called_once_with(
+            "sdk", sw_version="4.4.1.4"
+        )
+
     def test_validated_info_only_and_initial_device_info(self):
         for invalid in (
             None,
@@ -84,10 +169,11 @@ class FirmwareMetadataTests(unittest.TestCase):
         )
         with (
             patch(
-                "custom_components.eufy_sdk.sensor.dr.async_get", return_value=registry
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_get",
+                return_value=registry,
             ),
             patch(
-                "custom_components.eufy_sdk.sensor.dr.async_entries_for_config_entry",
+                "custom_components.eufy_sdk.firmware_metadata.dr.async_entries_for_config_entry",
                 return_value=[device],
             ) as entries,
         ):
@@ -122,11 +208,11 @@ class FirmwareMetadataTests(unittest.TestCase):
             )
             with (
                 patch(
-                    "custom_components.eufy_sdk.sensor.dr.async_get",
+                    "custom_components.eufy_sdk.firmware_metadata.dr.async_get",
                     return_value=registry,
                 ),
                 patch(
-                    "custom_components.eufy_sdk.sensor.dr.async_entries_for_config_entry",
+                    "custom_components.eufy_sdk.firmware_metadata.dr.async_entries_for_config_entry",
                     return_value=[device],
                 ),
             ):
@@ -136,6 +222,52 @@ class FirmwareMetadataTests(unittest.TestCase):
 
 
 class NativeFirmwareTests(unittest.IsolatedAsyncioTestCase):
+    async def test_metadata_event_wins_over_overlapping_old_snapshot(self):
+        coord = aligned.coordinator_for(Mock(connected=True))
+        coord.config_entry.entry_id = "synthetic-entry"
+        coord.data["station"]["firmwareVersion"] = "4.4.0.4"
+        coord._clear_fast_retry = Mock()
+
+        async def snapshot():
+            self.assertTrue(
+                apply_metadata_event(
+                    coord,
+                    {
+                        "event": "deviceMetadata",
+                        "deviceSn": "station",
+                        "firmwareVersion": "4.4.1.4",
+                    },
+                )
+            )
+            return {"station": {"firmwareVersion": "4.4.0.4"}}
+
+        coord._read_snapshot = snapshot
+        with (
+            patch(
+                "custom_components.eufy_sdk.firmware_metadata.sync_firmware_registry"
+            ),
+            patch("custom_components.eufy_sdk.coordinator.sync_firmware_registry"),
+        ):
+            result = await coord._async_refresh_snapshot()
+        self.assertEqual(result["station"]["firmwareVersion"], "4.4.1.4")
+
+    async def test_ordinary_snapshot_updates_registry_without_info_sensor(self):
+        coord = aligned.coordinator_for(Mock(connected=True))
+        coord.config_entry.entry_id = "synthetic-entry"
+        coord._read_snapshot = AsyncMock(
+            return_value={"station": {"firmwareVersion": "4.4.1.4"}}
+        )
+        coord._clear_fast_retry = Mock()
+        with patch(
+            "custom_components.eufy_sdk.coordinator.sync_firmware_registry"
+        ) as sync:
+            await coord._async_refresh_snapshot()
+        sync.assert_called_once_with(
+            coord.hass,
+            "synthetic-entry",
+            {"station": {"firmwareVersion": "4.4.1.4", "state": {}}},
+        )
+
     async def test_real_registry_updates_without_restart_and_no_legacy_write(self):
         hass = HomeAssistant("/tmp/offline-firmware-test")
         registry = dr.DeviceRegistry(hass)

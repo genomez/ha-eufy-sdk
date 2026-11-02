@@ -455,7 +455,9 @@ class BoundedEntityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_manifest_failure_does_not_send_using_stale_eligibility(self):
         entity, _coordinator, client, _seen = self.bounded_entity()
-        client.get_properties.side_effect = EufySdkApiClientError("bridge_update_failed")
+        client.get_properties.side_effect = EufySdkApiClientError(
+            "bridge_update_failed"
+        )
         with self.assertRaisesRegex(EufySdkApiClientError, "bridge_update_failed"):
             await entity.write(True)
         client.set_property.assert_not_awaited()
@@ -606,7 +608,7 @@ class BoundedEntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             entity.extra_state_attributes["command_status"], "acknowledged"
         )
-        self.assertEqual(entity._light_guard_owner, 2)
+        self.assertIsNone(entity._light_guard_owner)
 
     async def test_old_supersession_still_fails_its_caller_without_changing_new_hold(
         self,

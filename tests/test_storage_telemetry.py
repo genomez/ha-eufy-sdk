@@ -69,6 +69,16 @@ def coordinator(devices=None):
 
 
 class StorageValidationTests(unittest.TestCase):
+    def test_explicit_firmware_allow_list_retains_strict_reply_validation(self):
+        for version in ("4.4.0.4", "4.4.1.4", "4.4.2.4"):
+            with self.subTest(version=version):
+                row = device()
+                row["firmwareVersion"] = version
+                expected = "unavailable" if version == "4.4.2.4" else "current"
+                self.assertEqual(storage_reading(row, NOW)[0], expected)
+                row["storageTelemetry"]["values"]["used_bytes"] = -1
+                self.assertEqual(storage_reading(row, NOW), ("unavailable", None))
+
     def test_valid_zero_and_consistent_percent(self):
         row = device()
         values = row["storageTelemetry"]["values"]

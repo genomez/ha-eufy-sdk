@@ -26,6 +26,7 @@ from .api import (
 )
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
+from .firmware_metadata import firmware_version
 from .light_correction import LightCorrection
 from .pushmap import DETECTION_EVENTS
 
@@ -205,6 +206,7 @@ class EufySolixEntity(Entity):
 POST_WRITE_REFRESH_SECS = 20
 LIGHT_SETTLE_MAX_SECS = 30
 LIGHT_CONTRADICTION_SECS = 8
+LIGHT_ACK_DISPLAY_SECS = 45
 
 
 class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
@@ -248,24 +250,6 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
         if self.hass.is_stopping:
             return
         super()._async_write_ha_state()
-
-
-FIRMWARE_VERSION_MAX_LENGTH = 64
-
-
-def firmware_version(record: dict) -> str | None:
-    """Validate only the SDK Info projection, never legacy state or wire parameters."""
-    value = record.get("firmwareVersion")
-    if not isinstance(value, str):
-        return None
-    version = value.strip()
-    if (
-        len(version) <= FIRMWARE_VERSION_MAX_LENGTH
-        and re.fullmatch(r"[A-Za-z0-9._+-]+", version)
-        and re.search(r"[0-9]", version)
-    ):
-        return version
-    return None
 
 
 def label_for(prop: str) -> str:
@@ -347,6 +331,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._post_write_unsub: Callable[[], None] | None = None
         self._light_guard_owner: int | None = None
         self._light_guard_value: Any = None
+        self._light_ack_display = False
         self._light_candidate_generation = 0
         self._light_deadline_unsub: Callable[[], None] | None = None
         self._light_candidate_unsub: Callable[[], None] | None = None
@@ -657,7 +642,13 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             self._assumed_value = value
             self._optimistic_owner = owner
             if self._prop == "light":
-                self._start_light_settle(owner, lifecycle, value)
+                self._start_light_settle(
+                    owner,
+                    lifecycle,
+                    value,
+                    acknowledged=isinstance(receipt, CommandReceipt)
+                    and receipt.status == "acknowledged",
+                )
                 if (
                     light_marker != self._light_state_marker()
                     or report_generation != self._report_generation
@@ -688,15 +679,19 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                 setattr(self, name, None)
         self._light_guard_owner = None
         self._light_guard_value = None
+        self._light_ack_display = False
         self._light_candidate_generation = (
             getattr(self, "_light_candidate_generation", 0) + 1
         )
 
-    def _start_light_settle(self, owner: int, lifecycle: int, value: Any) -> None:
-        """Bound uncertainty; a persistent contrary value can end it sooner."""
+    def _start_light_settle(
+        self, owner: int, lifecycle: int, value: Any, *, acknowledged: bool = False
+    ) -> None:
+        """Hold ACK display for at most 45 seconds; legacy success uses a debounce."""
         self._clear_light_settle()
         self._light_guard_owner = owner
         self._light_guard_value = value
+        self._light_ack_display = acknowledged
         self._light_state_seen = self._light_state_marker()
 
         @callback
@@ -716,7 +711,9 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
         self._light_finish = finish
         self._light_deadline_unsub = async_call_later(
-            self.hass, LIGHT_SETTLE_MAX_SECS, finish
+            self.hass,
+            LIGHT_ACK_DISPLAY_SECS if acknowledged else LIGHT_SETTLE_MAX_SECS,
+            finish,
         )
 
     @callback
@@ -735,7 +732,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
 
     @callback
     def _update_light_candidate(self, *, force: bool = False) -> None:
-        """Accept agreement immediately; debounce only a contrary presentation."""
+        """Release ACK display on agreement; keep contrary reports until expiry."""
         if self._light_guard_owner is None:
             return
         marker = self._light_state_marker()
@@ -743,7 +740,12 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             return
         self._light_state_seen = marker
         value = self.device.get("state", {}).get(self._prop)
-        if value == self._light_guard_value:
+        if value == self._light_guard_value and (
+            not self._light_ack_display or type(value) is bool
+        ):
+            if self._light_ack_display:
+                self._light_finish(None)
+                return
             if self._optimistic_owner == self._light_guard_owner:
                 self._optimistic_owner = None
                 self._assumed_value = None
@@ -757,7 +759,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                 self._light_candidate_unsub()
                 self._light_candidate_unsub = None
                 self._light_candidate_generation += 1
-        elif self._light_candidate_unsub is None:
+        elif not self._light_ack_display and self._light_candidate_unsub is None:
             generation = self._light_candidate_generation
             finish = self._light_finish
 

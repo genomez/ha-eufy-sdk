@@ -28,6 +28,7 @@ from .api import (
     command_health_is_current,
 )
 from .const import LOGGER
+from .firmware_metadata import sync_firmware_registry
 
 if TYPE_CHECKING:
     from .data import EufySdkConfigEntry
@@ -292,6 +293,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._pending_state_events: dict[str, dict] | None = {}
         self._pending_command_health: dict[str, dict] | None = {}
         self._pending_camera_health: dict[str, dict] | None = {}
+        self._pending_metadata_events: dict[str, str | None] | None = {}
         try:
             snapshot = await self._read_snapshot()
             self._merge_snapshot_events(snapshot, health_generation, camera_generation)
@@ -312,11 +314,15 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             )
             self.snapshot_fresh = True
             self.last_complete_snapshot_ms = int(time.time() * 1000)
+            entry = getattr(self, "config_entry", None)
+            if entry is not None and getattr(entry, "entry_id", None):
+                sync_firmware_registry(self.hass, entry.entry_id, snapshot)
             return snapshot
         finally:
             self._pending_state_events = None
             self._pending_command_health = None
             self._pending_camera_health = None
+            self._pending_metadata_events = None
 
     def _merge_snapshot_events(
         self, snapshot: dict, health_generation: int, camera_generation: int
@@ -324,6 +330,11 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         """Apply identical lifecycle and event ordering to fresh and cached data."""
         self._project_snapshot_health(snapshot, health_generation)
         self._project_snapshot_camera_health(snapshot, camera_generation)
+        for serial, version in (
+            getattr(self, "_pending_metadata_events", None) or {}
+        ).items():
+            if serial in snapshot:
+                snapshot[serial]["firmwareVersion"] = version
         # Alarm lifecycle state belongs to this loaded entry and its bounded
         # stop/auto-clear timers. An ordinary list omitting it is not a stop.
         for serial, device in snapshot.items():

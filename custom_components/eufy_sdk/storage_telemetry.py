@@ -88,7 +88,7 @@ def supports_storage(device: dict[str, Any]) -> bool:
     return (
         device.get("codec") == "station"
         and device.get("model") == "T9000"
-        and device.get("firmwareVersion") == "4.4.0.4"
+        and device.get("firmwareVersion") in ("4.4.0.4", "4.4.1.4")
         and device.get("stationSn") in (None, device.get("sn"))
         and isinstance(telemetry, dict)
         and type(telemetry.get("schemaVersion")) is int

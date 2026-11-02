@@ -12,13 +12,12 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
-from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
 from .api import CAMERA_CONNECTIVITY
 from .bespoke import BITFIELD_SWITCHES
 from .camera_health import EufyCameraHealthEntity, camera_health_serials
-from .const import CONF_HOST, DOMAIN, EVENT_TYPE, LOGGER, SOLIX_READING_EVENT
+from .const import CONF_HOST, EVENT_TYPE, LOGGER, SOLIX_READING_EVENT
 from .entity import (
     EufySdkDeviceEntity,
     EufySdkPropertyEntity,
@@ -29,6 +28,7 @@ from .entity import (
     remove_stale_solix_entities,
     solix_devices_with,
 )
+from .firmware_metadata import sync_firmware_registry
 from .light import LIGHT_HIDDEN_PROPS
 from .schedule_logic import current_mode_for, mode_label
 from .storage_telemetry import storage_sensors
@@ -336,6 +336,11 @@ async def async_setup_entry(
     ]
     entities.extend(storage_sensors(coordinator))
     entities.extend(
+        EufySdkFirmwareSensor(coordinator, sn)
+        for sn, device in coordinator.data.items()
+        if device.get("codec") == "station"
+    )
+    entities.extend(
         EufyCameraConnectivityStatusSensor(coordinator, sn)
         for sn in camera_health_serials(coordinator)
     )
@@ -481,6 +486,24 @@ class EufyCameraConnectivityStatusSensor(EufyCameraHealthEntity, SensorEntity):
         return self.health_attributes()
 
 
+class EufySdkFirmwareSensor(EufySdkDeviceEntity, SensorEntity):
+    """Current station firmware from received metadata, with no polling of its own."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Firmware version"
+    _attr_icon = "mdi:chip"
+
+    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
+        """Bind one native station firmware entity."""
+        super().__init__(coordinator, sn)
+        self._attr_unique_id = f"{sn}_firmware_version"
+
+    @property
+    def native_value(self) -> str | None:
+        """Expose only the current SDK version; absent metadata is unknown."""
+        return firmware_version(self.device)
+
+
 class EufySdkInfoSensor(EufySdkDeviceEntity, SensorEntity):
     """A diagnostic sensor: value = the device codec, attributes = its capabilities."""
 
@@ -510,15 +533,12 @@ class EufySdkInfoSensor(EufySdkDeviceEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update the existing device record from ordinary snapshots."""
-        if self.available and (version := firmware_version(self.device)):
-            registry = dr.async_get(self.hass)
-            for device in dr.async_entries_for_config_entry(
-                registry, self.coordinator.config_entry.entry_id
-            ):
-                if (DOMAIN, self._sn) in device.identifiers:
-                    if device.sw_version != version:
-                        registry.async_update_device(device.id, sw_version=version)
-                    break
+        if self.available:
+            sync_firmware_registry(
+                self.hass,
+                self.coordinator.config_entry.entry_id,
+                {self._sn: self.device},
+            )
         # Omitted metadata leaves the registry's last report intact, but the live
         # Info attribute becomes None so a display cannot present it as current.
         super()._handle_coordinator_update()

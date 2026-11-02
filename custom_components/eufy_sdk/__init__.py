@@ -37,6 +37,7 @@ from .const import (
 )
 from .coordinator import EufySdkDataUpdateCoordinator
 from .data import EufySdkData
+from .firmware_metadata import apply_metadata_event
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
 from .pushmap import DOORBELL_EVENT
@@ -155,6 +156,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         coordinator.apply_command_health_event(evt)
         if evt.get("event") == "cameraHealth":
             coordinator.apply_camera_health_event(evt)
+        if evt.get("event") == "deviceMetadata":
+            apply_metadata_event(coordinator, evt)
         hass.bus.async_fire(EVENT_TYPE, evt)
         event = evt.get("event")
         # Pushes can arrive before the first device snapshot. Keep forwarding

@@ -267,6 +267,40 @@ class CameraHealthValidationTests(unittest.TestCase):
 
 
 class CameraHealthProjectionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_conflict_invalidation_retires_online_even_across_stale_snapshot(
+        self,
+    ):
+        coordinator = self.coordinator()
+        coordinator.apply_camera_health_event(event(revision=8, connectivity="online"))
+        sensor = EufyCameraConnectivityStatusSensor(coordinator, "station")
+        self.assertEqual(sensor.native_value, "online")
+        invalidation = event(
+            revision=9,
+            connectivity="unknown",
+            basis="startup",
+            evidence="none",
+            lastContactMs=None,
+            lastContactSource=None,
+            parentTransport="unknown",
+        )
+
+        async def snapshot():
+            coordinator.apply_camera_health_event(invalidation)
+            return {
+                "station": {
+                    "cameraHealth": projection(revision=8, connectivity="online")
+                }
+            }
+
+        coordinator._read_snapshot = snapshot
+        coordinator.data = await coordinator._async_update_data()
+        self.assertEqual(sensor.native_value, "unknown")
+        coordinator.apply_camera_health_event(event(revision=8, connectivity="online"))
+        self.assertEqual(sensor.native_value, "unknown")
+        coordinator._read_snapshot = AsyncMock(return_value={"station": {}})
+        coordinator.data = await coordinator._async_update_data()
+        self.assertEqual(sensor.native_value, "unknown")
+
     """Preserve event/snapshot ordering and retire evidence across reconnection."""
 
     client = bounded.BoundedProtocolTests.client
