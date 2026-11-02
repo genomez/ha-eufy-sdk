@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers import device_registry as dr
 
+from .api import DEVICE_SN_MAX_LENGTH
 from .const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 FIRMWARE_VERSION_MAX_LENGTH = 64
+MAX_PENDING_METADATA_EVENTS = 1024
 
 
 def firmware_version(record: dict) -> str | None:
@@ -51,22 +53,28 @@ def sync_firmware_registry(
 
 
 def apply_metadata_event(coordinator: Any, event: dict) -> bool:
-    """Apply validated metadata and journal it across an overlapping snapshot."""
+    """Journal validated metadata during a snapshot; publish only known devices."""
     serial = event.get("deviceSn")
     value = event.get("firmwareVersion")
     if (
         event.get("event") != "deviceMetadata"
         or not isinstance(serial, str)
-        or serial not in (coordinator.data or {})
+        or not 1 <= len(serial) <= DEVICE_SN_MAX_LENGTH
         or "firmwareVersion" not in event
         or (value is not None and firmware_version(event) is None)
     ):
         return False
     value = firmware_version(event)
-    coordinator.data[serial]["firmwareVersion"] = value
     pending = getattr(coordinator, "_pending_metadata_events", None)
-    if pending is not None:
+    # New devices may first appear in the in-flight list. The snapshot merge
+    # checks membership; refresh completion/failure discards this bounded journal.
+    if pending is not None and (
+        serial in pending or len(pending) < MAX_PENDING_METADATA_EVENTS
+    ):
         pending[serial] = value
+    if serial not in (coordinator.data or {}):
+        return False
+    coordinator.data[serial]["firmwareVersion"] = value
     sync_firmware_registry(
         coordinator.hass,
         coordinator.config_entry.entry_id,

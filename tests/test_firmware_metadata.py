@@ -1,19 +1,24 @@
 """Firmware presentation uses ordinary snapshots, never device commands."""
 
-# ruff: noqa: ANN001, ANN201, ANN202, D101, D102, D103, INP001, PT009, S108, SLF001
+# ruff: noqa: ANN001, ANN201, ANN202, D101, D102, D103, INP001, PT009, PT027, S108, SLF001
 
+import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import test_aligned_state as aligned
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.template import Template
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.eufy_sdk.api import DEVICE_SN_MAX_LENGTH
 from custom_components.eufy_sdk.const import DOMAIN
 from custom_components.eufy_sdk.entity import EufySdkDeviceEntity, firmware_version
 from custom_components.eufy_sdk.firmware_metadata import (
+    MAX_PENDING_METADATA_EVENTS,
     apply_metadata_event,
     sync_firmware_registry,
 )
@@ -38,6 +43,89 @@ def coordinator(version=None):
 
 
 class FirmwareMetadataTests(unittest.TestCase):
+    def test_unknown_serial_is_not_published_and_journal_is_bounded(self):
+        coord = coordinator("4.4.0.4")
+        coord._pending_metadata_events = {}
+        with patch(
+            "custom_components.eufy_sdk.firmware_metadata.sync_firmware_registry"
+        ) as sync:
+            for index in range(MAX_PENDING_METADATA_EVENTS + 1):
+                self.assertFalse(
+                    apply_metadata_event(
+                        coord,
+                        {
+                            "event": "deviceMetadata",
+                            "deviceSn": f"new-{index}",
+                            "firmwareVersion": "4.4.1.4",
+                        },
+                    )
+                )
+            self.assertEqual(
+                len(coord._pending_metadata_events), MAX_PENDING_METADATA_EVENTS
+            )
+            self.assertNotIn(
+                f"new-{MAX_PENDING_METADATA_EVENTS}", coord._pending_metadata_events
+            )
+            apply_metadata_event(
+                coord,
+                {
+                    "event": "deviceMetadata",
+                    "deviceSn": "new-0",
+                    "firmwareVersion": None,
+                },
+            )
+            self.assertIsNone(coord._pending_metadata_events["new-0"])
+            self.assertEqual(set(coord.data), {"synthetic"})
+            sync.assert_not_called()
+            coord.async_update_listeners.assert_not_called()
+
+    def test_invalid_events_cannot_enter_snapshot_journal(self):
+        coord = coordinator()
+        coord._pending_metadata_events = {}
+        for invalid in (
+            {"event": "propertyChanged"},
+            {"deviceSn": None},
+            {"deviceSn": ""},
+            {"deviceSn": "x" * (DEVICE_SN_MAX_LENGTH + 1)},
+            {"firmwareVersion": "https://example.test/version"},
+            {"firmwareVersion": {}},
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertFalse(
+                    apply_metadata_event(
+                        coord,
+                        {
+                            "event": "deviceMetadata",
+                            "deviceSn": "new-station",
+                            "firmwareVersion": "4.4.1.4",
+                            **invalid,
+                        },
+                    )
+                )
+        self.assertFalse(
+            apply_metadata_event(
+                coord, {"event": "deviceMetadata", "deviceSn": "new-station"}
+            )
+        )
+        self.assertEqual(coord._pending_metadata_events, {})
+
+    def test_unknown_serial_outside_refresh_is_ignored(self):
+        coord = coordinator()
+        coord._pending_metadata_events = None
+        self.assertFalse(
+            apply_metadata_event(
+                coord,
+                {
+                    "event": "deviceMetadata",
+                    "deviceSn": "new-station",
+                    "firmwareVersion": "4.4.1.4",
+                },
+            )
+        )
+        self.assertIsNone(coord._pending_metadata_events)
+        self.assertEqual(set(coord.data), {"synthetic"})
+        coord.async_update_listeners.assert_not_called()
+
     def test_passive_event_updates_registry_info_and_native_sensor_without_client_calls(
         self,
     ):
@@ -222,6 +310,114 @@ class FirmwareMetadataTests(unittest.TestCase):
 
 
 class NativeFirmwareTests(unittest.IsolatedAsyncioTestCase):
+    async def test_new_serial_metadata_wins_over_first_overlapping_snapshot(self):
+        for previous in (None, {}, {"existing": {"firmwareVersion": "1.0"}}):
+            with self.subTest(previous=previous):
+                coord = aligned.coordinator_for(Mock(connected=True))
+                coord.config_entry.entry_id = "synthetic-entry"
+                coord.data = previous
+                coord._clear_fast_retry = Mock()
+
+                async def snapshot(coord=coord):
+                    self.assertFalse(
+                        apply_metadata_event(
+                            coord,
+                            {
+                                "event": "deviceMetadata",
+                                "deviceSn": "new-station",
+                                "firmwareVersion": "4.4.1.4",
+                            },
+                        )
+                    )
+                    self.assertEqual(
+                        coord._pending_metadata_events, {"new-station": "4.4.1.4"}
+                    )
+                    self.assertNotIn("new-station", coord.data or {})
+                    return {"new-station": {"firmwareVersion": "4.4.0.4"}}
+
+                coord._read_snapshot = snapshot
+                with (
+                    patch(
+                        "custom_components.eufy_sdk.firmware_metadata.sync_firmware_registry"
+                    ) as immediate_sync,
+                    patch(
+                        "custom_components.eufy_sdk.coordinator.sync_firmware_registry"
+                    ) as sync,
+                ):
+                    result = await coord._async_refresh_snapshot()
+                self.assertEqual(result["new-station"]["firmwareVersion"], "4.4.1.4")
+                immediate_sync.assert_not_called()
+                coord.async_update_listeners.assert_not_called()
+                sync.assert_called_once_with(coord.hass, "synthetic-entry", result)
+                self.assertIsNone(coord._pending_metadata_events)
+
+    async def test_latest_metadata_applies_only_to_completed_snapshot_members(self):
+        coord = aligned.coordinator_for(Mock(connected=True))
+        coord._clear_fast_retry = Mock()
+
+        async def snapshot():
+            for serial, version in (
+                ("new-station", "4.4.1.4"),
+                ("absent", "9.9"),
+                ("new-station", None),
+            ):
+                apply_metadata_event(
+                    coord,
+                    {
+                        "event": "deviceMetadata",
+                        "deviceSn": serial,
+                        "firmwareVersion": version,
+                    },
+                )
+            return {"new-station": {"firmwareVersion": "4.4.0.4"}}
+
+        coord._read_snapshot = snapshot
+        result = await coord._async_refresh_snapshot()
+        self.assertEqual(
+            result, {"new-station": {"firmwareVersion": None, "state": {}}}
+        )
+        self.assertIsNone(coord._pending_metadata_events)
+        coord._read_snapshot = AsyncMock(
+            return_value={"absent": {"firmwareVersion": "1.0"}}
+        )
+        result = await coord._async_refresh_snapshot()
+        self.assertEqual(result["absent"]["firmwareVersion"], "1.0")
+
+    async def test_snapshot_failure_or_cancellation_discards_metadata_journal(self):
+        for error in (
+            UpdateFailed("synthetic failure"),
+            ConfigEntryAuthFailed("synthetic auth"),
+            asyncio.CancelledError(),
+        ):
+            with self.subTest(error=type(error).__name__):
+                coord = aligned.coordinator_for(Mock(connected=True))
+                coord._clear_fast_retry = Mock()
+                coord._schedule_fast_retry = Mock()
+
+                async def snapshot(coord=coord, error=error):
+                    apply_metadata_event(
+                        coord,
+                        {
+                            "event": "deviceMetadata",
+                            "deviceSn": "new-station",
+                            "firmwareVersion": "4.4.1.4",
+                        },
+                    )
+                    self.assertEqual(
+                        coord._pending_metadata_events, {"new-station": "4.4.1.4"}
+                    )
+                    raise error
+
+                coord._read_snapshot = snapshot
+                with self.assertRaises(type(error)):
+                    await coord._async_refresh_snapshot()
+                self.assertIsNone(coord._pending_metadata_events)
+                coord._read_snapshot = AsyncMock(
+                    return_value={"new-station": {"firmwareVersion": "4.4.0.4"}}
+                )
+                result = await coord._async_refresh_snapshot()
+                self.assertEqual(result["new-station"]["firmwareVersion"], "4.4.0.4")
+
     async def test_metadata_event_wins_over_overlapping_old_snapshot(self):
         coord = aligned.coordinator_for(Mock(connected=True))
         coord.config_entry.entry_id = "synthetic-entry"

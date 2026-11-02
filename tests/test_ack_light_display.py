@@ -1,8 +1,8 @@
 """Acknowledged light presentation stays separate from receipts and OFF safety."""
 
-# ruff: noqa: ANN001, ANN201, D101, D102, FBT002, FBT003, INP001, PT009, PT027, SLF001
+# ruff: noqa: ANN001, ANN003, ANN201, ANN202, D101, D102, FBT002, FBT003, INP001, PT009, PT027, SLF001
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import test_late_light_settle as timing
 import test_light_correction as safety
@@ -85,18 +85,69 @@ class AckDisplayTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AckSafetyTests(safety.SafetyFixture, unittest.IsolatedAsyncioTestCase):
-    async def test_off_verification_and_retries_run_while_display_holds(self):
+    def setup_light(self, **kwargs):
+        result = super().setup_light(**kwargs)
+
+        def later(_hass, seconds, action):
+            event = [self.now + seconds, action, False]
+            self.events.append(event)
+            return lambda: event.__setitem__(2, True)
+
+        timer = patch("custom_components.eufy_sdk.entity.async_call_later", later)
+        timer.start()
+        self.addCleanup(timer.stop)
+        return result
+
+    async def test_raw_on_during_hold_then_off_retry_after_sixty_second_delay(self):
         entity, coordinator, _, seen = await self.activate()
+        controller = entity._light_correction
         self.observation(True)
         await entity.write(False)
+        self.assertEqual(controller.retry_due, 60)
         seen.clear()
         seen.append(entity.is_on)
         await self.advance(11)
         self._report(entity, True)
         self.observation(True)
         self.assertTrue(coordinator.data["fixture-device"]["state"]["light"])
+        self.assertTrue(controller.observed)
         self.assertFalse(entity.is_on)
         await self.advance(44)
         self.assertEqual(seen, [False])
+        self.assertTrue(controller.observed)
+        self.assertEqual(len(self.commands), 1)
+        await self.advance(45)
+        self.assertEqual(seen, [False, True])
+        self.assertIsNone(entity._light_guard_owner)
+        await self.advance(59.99)
+        self.assertEqual(len(self.commands), 1)
+        # The 60-second OFF delay is checked on a 15-second policy tick.
+        await self.advance(60)
+        self.assertEqual(len(self.commands), 1)
         await self.advance(71)
-        self.assertEqual([value for _, value, _ in self.commands], [False, False])
+        self.assertEqual(
+            [(stamp, value) for stamp, value, _ in self.commands],
+            [(0, False), (71, False)],
+        )
+        self.assertTrue(entity.is_on)
+        self.assertIsNone(entity._light_guard_owner)
+
+    async def test_raw_on_and_existing_stuck_incident_survive_new_off_hold(self):
+        entity, _, _, _ = await self.activate()
+        self.observation(True)
+        await entity.write(False)
+        await self.advance(301)
+        self.observation(True)
+        controller = entity._light_correction
+        self.assertIsNotNone(controller.off_stuck)
+        incident = controller.off_stuck["incident_id"]
+        await entity.write(False)
+        await self.advance(312)
+        self._report(entity, True)
+        self.observation(True)
+        self.assertEqual(entity.state, "off")
+        self.assertTrue(controller.observed)
+        self.assertEqual(controller.off_stuck["incident_id"], incident)
+        self.assertEqual(entity.extra_state_attributes["off_stuck_incident"], incident)
+        await self.advance(346)
+        self.assertEqual(entity.state, "on")
