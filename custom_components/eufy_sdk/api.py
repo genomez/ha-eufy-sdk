@@ -499,7 +499,7 @@ def _bounded_rpc_error(
 def _bounded_clock_uncertainty(
     clock: dict[str, Any], sent_ms: float, received_ms: float, elapsed_ms: float
 ) -> float:
-    """Validate the exchange and allocate the same clock reserve as the bridge."""
+    """Declare a conservative v1 uncertainty accepted by old and new bridges."""
     sent = clock.get("bridgeSentAtMs")
     received = clock.get("bridgeReceivedAtMs")
     if (
@@ -518,8 +518,9 @@ def _bounded_clock_uncertainty(
     ):
         message = "command_clock_unavailable"
         raise EufySdkApiClientCommunicationError(message)
-    # Match the bridge: 1 ms exchange floor, 3 ms movement plus
-    # two (1 ms quantization + 1 ms bracket gap) measurement errors.
+    # Match the new bridge's internal reserve: 1 ms exchange floor, 3 ms movement
+    # and two (1 ms quantization + 1 ms bracket gap) errors. Legacy v1 bridges
+    # accept this larger declaration without needing a capability version change.
     round_trip_ms = received_ms - sent_ms
     processing_ms = sent - received
     uncertainty_ms = (

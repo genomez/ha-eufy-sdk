@@ -10,7 +10,10 @@ from unittest.mock import patch
 import test_bounded_state_writes as bounded
 from test_light_correction import SafetyFixture
 
-from custom_components.eufy_sdk.api import EufySdkApiClientError
+from custom_components.eufy_sdk.api import (
+    EufySdkApiClientError,
+    _bounded_clock_uncertainty,
+)
 
 ACCEPTED = bounded.ACCEPTED
 
@@ -19,6 +22,35 @@ class ClockMarginTests(unittest.IsolatedAsyncioTestCase):
     """Exercise the real RPC boundary with synthetic bridge replies."""
 
     client = bounded.BoundedProtocolTests.client
+
+    async def test_reserved_v1_declaration_remains_compatible_with_old_bridge(self):
+        client = self.client()
+        with patch(
+            "custom_components.eufy_sdk.api.time.time", side_effect=[1000, 1000.04]
+        ):
+            await client.set_property("fixture", "light", False, bounded=True)
+        execution = self.frames[-1]["execution"]
+        handshake = self.frames[0]
+        round_trip = execution["callerReceivedAtMs"] - handshake["callerSentAtMs"]
+        # The df4259f bridge's unchanged v1 admission uses the unreserved exchange.
+        legacy_uncertainty = round_trip / 2 + 1
+        self.assertEqual(legacy_uncertainty, 21)
+        self.assertEqual(execution["clockUncertaintyMs"], 28)
+        self.assertGreaterEqual(execution["clockUncertaintyMs"], legacy_uncertainty)
+        self.assertLessEqual(execution["clockUncertaintyMs"], 1000)
+        self.assertEqual(len(self.frames), 2)
+
+    def test_submillisecond_declaration_and_processing_envelope_boundary(self):
+        clock = {
+            "version": 1,
+            "callerSentAtMs": 100000,
+            "bridgeReceivedAtMs": 100000,
+            "bridgeSentAtMs": 100002,
+            "clockToken": "fixture",
+        }
+        with self.assertRaisesRegex(EufySdkApiClientError, "command_clock_unavailable"):
+            _bounded_clock_uncertainty(clock, 100000, 100000.5, 0.5)
+        self.assertEqual(_bounded_clock_uncertainty(clock, 100000, 100001, 1), 8)
 
     async def test_submillisecond_exchange_clamps_and_reserves(self):
         client = self.client()
