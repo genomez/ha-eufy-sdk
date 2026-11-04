@@ -1074,12 +1074,20 @@ class LightCorrection:
                 ):
                     self._confirmed()
                 self._save()
-        except asyncio.CancelledError:
-            if admitted and runtime_generation == self.runtime_generation:
+        except asyncio.CancelledError as error:
+            if (
+                admitted
+                and getattr(error, "send_attempted", None) is not False
+                and runtime_generation == self.runtime_generation
+            ):
                 self.uncertain_outcome()
             raise
-        except Exception:  # noqa: BLE001 - no transport exceptions in diagnostics
-            if admitted and runtime_generation == self.runtime_generation:
+        except Exception as error:  # noqa: BLE001 - no transport exceptions in diagnostics
+            if (
+                admitted
+                and getattr(error, "send_attempted", None) is not False
+                and runtime_generation == self.runtime_generation
+            ):
                 self.uncertain_outcome()
             self.retry_due = monotonic() + TICK_SECONDS
             self._record("request_unconfirmed")

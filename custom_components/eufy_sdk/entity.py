@@ -586,9 +586,10 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
                     receipt = await self.client.set_property(
                         self._sn, self._prop, value
                     )
-            except BaseException:
+            except BaseException as error:
                 if (
                     admitted
+                    and getattr(error, "send_attempted", None) is not False
                     and self._light_correction is not None
                     and safety_runtime == self._light_correction.runtime_generation
                 ):

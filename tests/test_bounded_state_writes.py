@@ -98,7 +98,7 @@ class BoundedProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution["callerExpiresAtMs"], 1080000)
         self.assertLessEqual(execution["remainingBudgetMs"], 79600)
         self.assertEqual(execution["callerReceivedAtMs"], 1000400)
-        self.assertEqual(execution["clockUncertaintyMs"], 201)
+        self.assertEqual(execution["clockUncertaintyMs"], 208)
         self.assertEqual(client._bounded_requests, {})
         self.assertEqual(client._cancel_tasks, set())
 

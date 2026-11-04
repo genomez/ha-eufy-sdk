@@ -32,6 +32,7 @@ class EufySdkApiClientError(HomeAssistantError):
     """A general bridge error."""
 
     failure: RpcFailure | None = None
+    send_attempted: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,11 @@ BOUNDED_PROFILE = "bounded-state-v1"
 BOUNDED_CALLER_SECONDS = 80
 GUARD_MODE_TIMEOUT_SECONDS = 60
 BOUNDED_CLOCK_MAX_MS = 1000
+BOUNDED_CLOCK_SAMPLE_GAP_MS = 1
+BOUNDED_CLOCK_MOVEMENT_MS = 3
+BOUNDED_CLOCK_RESERVE_MS = BOUNDED_CLOCK_MOVEMENT_MS + 2 * (
+    1 + BOUNDED_CLOCK_SAMPLE_GAP_MS
+)
 CLOCK_TOKEN_MAX_LENGTH = 128
 DEVICE_SN_MAX_LENGTH = 128
 LATE_CONTRARY_WINDOW_MS = 600000
@@ -476,15 +482,74 @@ WEBRTC_ERROR_CODES = frozenset(
 )
 
 
+def _bounded_rpc_error(
+    message: str, cmd: str, args: dict[str, Any], reply: dict[str, Any]
+) -> EufySdkApiClientError:
+    """Accept strict pre-SDK proof only on a bounded property failure reply."""
+    error = EufySdkApiClientError(message)
+    if (
+        cmd == "device.set"
+        and "execution" in args
+        and reply.get("sendAttempted") is False
+    ):
+        error.send_attempted = False
+    return error
+
+
+def _bounded_clock_uncertainty(
+    clock: dict[str, Any], sent_ms: float, received_ms: float, elapsed_ms: float
+) -> float:
+    """Validate the exchange and allocate the same clock reserve as the bridge."""
+    sent = clock.get("bridgeSentAtMs")
+    received = clock.get("bridgeReceivedAtMs")
+    if (
+        not all(_finite_number(value) for value in (sent_ms, received_ms, elapsed_ms))
+        or type(clock.get("version")) is not int
+        or clock["version"] != 1
+        or clock.get("callerSentAtMs") != sent_ms
+        or not _finite_number(sent)
+        or not _finite_number(received)
+        or sent < received
+        or elapsed_ms < 0
+        or received_ms < sent_ms
+        or not isinstance(clock.get("clockToken"), str)
+        or not 1 <= len(clock["clockToken"]) <= CLOCK_TOKEN_MAX_LENGTH
+        or abs(received_ms - sent_ms - elapsed_ms) > BOUNDED_CLOCK_MAX_MS
+    ):
+        message = "command_clock_unavailable"
+        raise EufySdkApiClientCommunicationError(message)
+    # Match the bridge: 1 ms exchange floor, 3 ms movement plus
+    # two (1 ms quantization + 1 ms bracket gap) measurement errors.
+    round_trip_ms = received_ms - sent_ms
+    processing_ms = sent - received
+    uncertainty_ms = (
+        max(1, (round_trip_ms - processing_ms) / 2 + 1) + BOUNDED_CLOCK_RESERVE_MS
+    )
+    if (
+        processing_ms - round_trip_ms > 1
+        or not 0 < uncertainty_ms <= BOUNDED_CLOCK_MAX_MS
+    ):
+        message = "command_clock_unavailable"
+        raise EufySdkApiClientCommunicationError(message)
+    return uncertainty_ms
+
+
 class EufySdkApiClientCommunicationError(EufySdkApiClientError):
     """The bridge could not be reached / spoke unexpectedly."""
 
     category = "other"
 
-    def __init__(self, message: str, *, category: str = "other") -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: str = "other",
+        send_attempted: bool | None = None,
+    ) -> None:
         """Keep the public message separate from a fixed transport category."""
         super().__init__(message)
         self.category = category
+        self.send_attempted = send_attempted
 
 
 class EufySdkApiClientReplyTimeoutError(EufySdkApiClientCommunicationError):
@@ -1105,7 +1170,7 @@ class EufySdkApiClient:
             raise EufySdkApiClientCommunicationError(msg, category="not_connected")
         if _send_guard is not None and not _send_guard():
             message = "light_correction_paused_before_send"
-            raise EufySdkApiClientCommunicationError(message)
+            raise EufySdkApiClientCommunicationError(message, send_attempted=False)
         self._next_id += 1
         mid = self._next_id
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_event_loop().create_future()
@@ -1195,7 +1260,9 @@ class EufySdkApiClient:
                 )
                 else "bridge_request_rejected"
             )
-            raise EufySdkApiClientError(msg)
+            # Only bounded bridge replies carry pre-SDK proof. Legacy replies,
+            # missing flags and error text alone leave transmission unknown.
+            raise _bounded_rpc_error(msg, cmd, args, reply)
         return reply
 
     # ── auth (mirrors the bridge's auth.* protocol) ──
@@ -1390,7 +1457,7 @@ class EufySdkApiClient:
             if key in reply
         }
 
-    async def set_property(  # noqa: PLR0912, PLR0913, PLR0915
+    async def set_property(  # noqa: C901, PLR0912, PLR0913, PLR0915
         self,
         sn: str,
         name: str,
@@ -1488,88 +1555,129 @@ class EufySdkApiClient:
                     caller.cancel()
                     return
 
+        attempt_may_have_sent = False
+
+        def dispatch_guard() -> bool:
+            # Recheck on every device RPC, including the retry. This runs at
+            # the existing transport send boundary, before a request is queued.
+            if invocation.superseded or loop.time() >= caller_deadline:
+                code = (
+                    "command_superseded_before_send"
+                    if invocation.superseded
+                    else "command_expired_before_send"
+                )
+                error = EufySdkApiClientCommunicationError(code)
+                error.send_attempted = False
+                raise error
+            return _send_guard is None or _send_guard()
+
         try:
             async with asyncio.timeout_at(caller_deadline):
-                clock = await self.rpc(
-                    "boundedStateClock",
-                    version=1,
-                    callerSentAtMs=born_wall_ms,
-                    _transport=transport,
-                )
-                self._require_connection(transport, generation)
-                if invocation.superseded:
-                    return CommandReceipt(
-                        "superseded_before_send",
-                        send_attempted=False,
-                        effect="unconfirmed",
-                    )
-                received_ms = time.time() * 1000
-                elapsed_ms = (loop.time() - born) * 1000
-                sent = clock.get("bridgeSentAtMs")
-                received = clock.get("bridgeReceivedAtMs")
-                if (
-                    type(clock.get("version")) is not int
-                    or clock["version"] != 1
-                    or clock.get("callerSentAtMs") != born_wall_ms
-                    or not _finite_number(sent)
-                    or not _finite_number(received)
-                    or sent < received
-                    or received_ms < born_wall_ms
-                    or not isinstance(clock.get("clockToken"), str)
-                    or not 1 <= len(clock["clockToken"]) <= CLOCK_TOKEN_MAX_LENGTH
-                    or abs(received_ms - born_wall_ms - elapsed_ms)
-                    > BOUNDED_CLOCK_MAX_MS
-                ):
-                    message = "command_clock_unavailable"
-                    raise EufySdkApiClientCommunicationError(message)
-                uncertainty_ms = (
-                    received_ms - born_wall_ms - (sent - received)
-                ) / 2 + 1
-                if not 0 < uncertainty_ms <= BOUNDED_CLOCK_MAX_MS:
-                    message = "command_clock_unavailable"
-                    raise EufySdkApiClientCommunicationError(message)
-                remaining_ms = min(
-                    expires_ms - received_ms, (caller_deadline - loop.time()) * 1000
-                )
-                if remaining_ms <= 0:
-                    message = "command_expired_before_send"
-                    raise EufySdkApiClientCommunicationError(message)
-                clock_guard = asyncio.create_task(watch_clock(uncertainty_ms))
-                reply = await self.rpc(
-                    "device.set",
-                    timeout=remaining_ms / 1000,
-                    _transport=transport,
-                    _cancel_on_abort=True,
-                    **(
-                        {
-                            "_send_guard": _send_guard,
-                            "_correction_key": key,
-                            "_correction_keep_observation": correction,
-                            "_retain_automatic_light": retain_automatic_light,
-                        }
-                        if automatic or _send_guard is not None
-                        else {}
-                    ),
-                    sn=sn,
-                    name=name,
-                    value=value,
-                    execution={
-                        "version": 1,
-                        "profile": BOUNDED_PROFILE,
-                        "callerExpiresAtMs": expires_ms,
-                        "remainingBudgetMs": remaining_ms,
-                        "clockToken": clock["clockToken"],
-                        "callerReceivedAtMs": received_ms,
-                        "clockUncertaintyMs": uncertainty_ms,
-                        **({"automatic": True} if automatic else {}),
-                        **({"correction": True} if correction else {}),
-                        **(
-                            {"correctionExpiresAtMs": correction_expires_at_ms}
-                            if correction and correction_expires_at_ms is not None
-                            else {}
-                        ),
-                    },
-                )
+                for attempt in range(2):
+                    if invocation.superseded:
+                        return CommandReceipt(
+                            "superseded_before_send",
+                            send_attempted=False,
+                            effect="unconfirmed",
+                        )
+                    if loop.time() >= caller_deadline:
+                        message = "command_expired_before_send"
+                        raise EufySdkApiClientCommunicationError(
+                            message, send_attempted=False
+                        )
+                    sent_ms = born_wall_ms if attempt == 0 else time.time() * 1000
+                    sent_mono = born if attempt == 0 else loop.time()
+                    attempt_may_have_sent = False
+                    try:
+                        clock = await self.rpc(
+                            "boundedStateClock",
+                            version=1,
+                            callerSentAtMs=sent_ms,
+                            _transport=transport,
+                        )
+                        self._require_connection(transport, generation)
+                        if invocation.superseded:
+                            return CommandReceipt(
+                                "superseded_before_send",
+                                send_attempted=False,
+                                effect="unconfirmed",
+                            )
+                        received_ms = time.time() * 1000
+                        elapsed_ms = (loop.time() - sent_mono) * 1000
+                        uncertainty_ms = _bounded_clock_uncertainty(
+                            clock, sent_ms, received_ms, elapsed_ms
+                        )
+                        remaining_ms = min(
+                            expires_ms - received_ms,
+                            (caller_deadline - loop.time()) * 1000,
+                        )
+                        if remaining_ms <= 0:
+                            message = "command_expired_before_send"
+                            raise EufySdkApiClientCommunicationError(message)
+                        clock_guard = asyncio.create_task(
+                            watch_clock(BOUNDED_CLOCK_MOVEMENT_MS)
+                        )
+                        attempt_may_have_sent = True
+                        reply = await self.rpc(
+                            "device.set",
+                            timeout=remaining_ms / 1000,
+                            _transport=transport,
+                            _cancel_on_abort=True,
+                            _send_guard=dispatch_guard,
+                            **(
+                                {
+                                    "_correction_key": key,
+                                    "_correction_keep_observation": correction,
+                                    "_retain_automatic_light": retain_automatic_light,
+                                }
+                                if automatic or _send_guard is not None
+                                else {}
+                            ),
+                            sn=sn,
+                            name=name,
+                            value=value,
+                            execution={
+                                "version": 1,
+                                "profile": BOUNDED_PROFILE,
+                                "callerExpiresAtMs": expires_ms,
+                                "remainingBudgetMs": remaining_ms,
+                                "clockToken": clock["clockToken"],
+                                "callerReceivedAtMs": received_ms,
+                                "clockUncertaintyMs": uncertainty_ms,
+                                **({"automatic": True} if automatic else {}),
+                                **({"correction": True} if correction else {}),
+                                **(
+                                    {"correctionExpiresAtMs": correction_expires_at_ms}
+                                    if correction
+                                    and correction_expires_at_ms is not None
+                                    else {}
+                                ),
+                            },
+                        )
+                    except EufySdkApiClientError as error:
+                        bridge_refused = (
+                            attempt_may_have_sent and error.send_attempted is False
+                        )
+                        if error.send_attempted is False:
+                            attempt_may_have_sent = False
+                        if not attempt_may_have_sent:
+                            error.send_attempted = False
+                        if not (
+                            attempt == 0
+                            and value is False
+                            and bridge_refused
+                            and str(error) == "command_clock_unavailable"
+                            and error.send_attempted is False
+                        ):
+                            raise
+                        continue
+                    finally:
+                        if clock_guard is not None:
+                            clock_guard.cancel()
+                            with suppress(asyncio.CancelledError):
+                                await clock_guard
+                            clock_guard = None
+                    break
                 self._require_connection(transport, generation)
                 receipt = _command_receipt(reply.get("receipt"))
                 previous = self._command_health_projections.get(sn)
@@ -1589,13 +1697,17 @@ class EufySdkApiClient:
                     )
                 return receipt
         except TimeoutError:
-            message = "bridge_request_timeout"
-            raise EufySdkApiClientCommunicationError(message) from None
-        except asyncio.CancelledError:
+            error = EufySdkApiClientCommunicationError("bridge_request_timeout")
+            if not attempt_may_have_sent:
+                error.send_attempted = False
+            raise error from None
+        except asyncio.CancelledError as error:
             if clock_changed:
                 caller.uncancel()
                 message = "command_clock_unavailable"
                 raise EufySdkApiClientCommunicationError(message) from None
+            if not attempt_may_have_sent:
+                error.send_attempted = False
             raise
         finally:
             if self._bounded_invocations.get(key) is invocation:
