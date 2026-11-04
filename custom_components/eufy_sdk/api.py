@@ -1706,8 +1706,9 @@ class EufySdkApiClient:
                 error.send_attempted = False
             raise error from None
         except asyncio.CancelledError as error:
-            if clock_changed:
-                caller.uncancel()
+            # Remove only the watcher's own request; any additional caller
+            # cancellation keeps ownership and propagates unchanged.
+            if clock_changed and caller.uncancel() == 0:
                 message = "command_clock_unavailable"
                 raise EufySdkApiClientCommunicationError(message) from None
             if not attempt_may_have_sent:

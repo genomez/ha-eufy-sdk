@@ -4,6 +4,7 @@
 # ruff: noqa: INP001, PT009, PT027, SLF001
 
 import asyncio
+import time
 import unittest
 from unittest.mock import patch
 
@@ -271,6 +272,52 @@ class ClockMarginTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancel_with_running_watcher_prevents_retry(self):
         await self._cancel_at_refusal_cleanup(active_watcher=True)
+
+    async def test_clock_change_keeps_concurrent_caller_cancellation(self):
+        client = self.client()
+        original = client._ws.send_json.side_effect
+        real_sleep = asyncio.sleep
+        real_wall = time.time
+        loop = asyncio.get_running_loop()
+        shift = [0]
+        cancellations = []
+        writes = []
+        task = None
+
+        def external_cancel():
+            cancellations.append(task.cancel())
+
+        async def sleep(delay, result=None):
+            await real_sleep(delay, result)
+            if asyncio.current_task().get_coro().__name__ == "watch_clock":
+                # A separate caller cancellation lands just before the watcher
+                # observes the wall-clock jump and cancels the caller itself.
+                loop.call_soon(external_cancel)
+
+        async def reply(payload):
+            if payload["cmd"] == "device.set":
+                writes.append(payload)
+                shift[0] = 2
+                return
+            await original(payload)
+
+        client._ws.send_json.side_effect = reply
+        with (
+            patch.object(asyncio, "sleep", new=sleep),
+            patch(
+                "custom_components.eufy_sdk.api.time.time",
+                side_effect=lambda: real_wall() + shift[0],
+            ),
+        ):
+            task = asyncio.create_task(
+                client.set_property("fixture", "light", False, bounded=True)
+            )
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            await asyncio.gather(*tuple(client._cancel_tasks))
+        self.assertEqual(cancellations, [True])
+        self.assertEqual(len(writes), 1)
+        self.assertTrue(task.cancelled())
 
 
 class KnownNotSentHoldTests(SafetyFixture, unittest.IsolatedAsyncioTestCase):
