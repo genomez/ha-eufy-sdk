@@ -1675,8 +1675,11 @@ class EufySdkApiClient:
                     finally:
                         if clock_guard is not None:
                             clock_guard.cancel()
-                            with suppress(asyncio.CancelledError):
-                                await clock_guard
+                            # asyncio.wait never raises the watcher's own
+                            # cancellation, so caller cancellation or the
+                            # invocation timeout still propagates here and
+                            # cannot be consumed before a retry starts.
+                            await asyncio.wait({clock_guard})
                             clock_guard = None
                     break
                 self._require_connection(transport, generation)
@@ -1715,8 +1718,7 @@ class EufySdkApiClient:
                 self._bounded_invocations.pop(key)
             if clock_guard is not None:
                 clock_guard.cancel()
-                with suppress(asyncio.CancelledError):
-                    await clock_guard
+                await asyncio.wait({clock_guard})
 
     async def reboot(self, sn: str) -> None:
         """Reboot a HomeBase (hub-only; it drops offline for a minute or two)."""

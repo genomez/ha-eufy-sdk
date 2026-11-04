@@ -229,6 +229,49 @@ class ClockMarginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(receipt.status, "superseded_before_send")
         self.assertEqual([p["value"] for p in writes], [False, True])
 
+    async def _cancel_at_refusal_cleanup(self, *, active_watcher):
+        client = self.client()
+        original = client._ws.send_json.side_effect
+        writes = []
+        cancellations = []
+
+        async def reply(payload):
+            if payload["cmd"] == "device.set":
+                writes.append(payload)
+                if len(writes) == 1:
+                    if active_watcher:
+                        await asyncio.sleep(0)
+                    task = asyncio.current_task()
+
+                    def cancel():
+                        cancellations.append(task.cancel())
+
+                    asyncio.get_running_loop().call_soon(cancel)
+                    client._pending[payload["id"]].set_result(
+                        {
+                            "ok": False,
+                            "code": "command_clock_unavailable",
+                            "sendAttempted": False,
+                        }
+                    )
+                    return
+            await original(payload)
+
+        client._ws.send_json.side_effect = reply
+        task = asyncio.create_task(
+            client.set_property("fixture", "light", False, bounded=True)
+        )
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertEqual(cancellations, [True])
+        self.assertEqual(len(writes), 1)
+
+    async def test_cancel_during_refusal_cleanup_prevents_retry(self):
+        await self._cancel_at_refusal_cleanup(active_watcher=False)
+
+    async def test_cancel_with_running_watcher_prevents_retry(self):
+        await self._cancel_at_refusal_cleanup(active_watcher=True)
+
 
 class KnownNotSentHoldTests(SafetyFixture, unittest.IsolatedAsyncioTestCase):
     """Preserve correction ownership only for possibly transmitted failures."""
