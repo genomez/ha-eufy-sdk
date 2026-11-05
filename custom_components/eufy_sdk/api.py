@@ -23,6 +23,8 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .const import LOGGER
 from .manifest_reads import normalize_properties, normalize_snapshot
+from .recordings_api import RecordingsApi
+from .recordings_models import capability as recordings_capability
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -565,7 +567,7 @@ class EufySdkApiClientAuthenticationError(EufySdkApiClientError):
     """The bridge is not authenticated (needs 2FA/captcha) or rejected a command."""
 
 
-class EufySdkApiClient:
+class EufySdkApiClient(RecordingsApi):
     """A connection to one ha-eufy-sdk bridge."""
 
     def __init__(
@@ -1038,6 +1040,9 @@ class EufySdkApiClient:
                     continue
                 data = msg.json()
                 if data.get("event") == "hello":
+                    self.recordings_capability = recordings_capability(
+                        data.get("recordings")
+                    )
                     self._set_bounded_capability(data.get("boundedStateWrites"))
                     self._set_late_contrary_capability(data.get("lateContraryEffects"))
                     # Keep the last advertisement through a disconnect. The next

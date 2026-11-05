@@ -165,7 +165,8 @@
           "legacy_doorbell_pressed": "Use legacy doorbell pressed event",
           "light_correction_enabled": "Floodlight safety",
           "light_correction_pause_entity": "Pause floodlight safety helper (optional)",
-          "light_safety_notify_service": "Floodlight safety notify service (optional)"
+          "light_safety_notify_service": "Floodlight safety notify service (optional)",
+          "recordings_enabled": "Browse recordings (covers and metadata only)"
         },
         "data_description": {
           "soc_refresh_seconds": "How often HA re-reads a Solarbank's discharge/charge limits from the cloud, so an app-side change reflects on the sliders. Only applies if you have a Solarbank.",
@@ -196,6 +197,12 @@
     },
     "preset_empty": {
       "message": "Preset {slot} has no stored position. Save one there from the eufy app first."
+    },
+    "recordings_browse_only": {
+      "message": "Browse only — video unavailable"
+    },
+    "recordings_unavailable": {
+      "message": "Recordings unavailable"
     }
   },
   "device_automation": {
@@ -226,5 +233,14 @@
         }
       }
     }
+  },
+  "common": {
+    "browse_only": "Browse only — video unavailable",
+    "unavailable": "Recordings unavailable",
+    "refresh": "Catalog refresh requested; use Refresh",
+    "disclosure": "latest 20 station-wide; history incomplete",
+    "retained": "May no longer be on HomeBase",
+    "unknown_time": "Time unknown",
+    "unknown_duration": "duration unknown"
   }
 }

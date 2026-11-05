@@ -69,3 +69,5 @@ ATTR_SLOTS = "slots"
 # not a poll — it just stops a long live view from re-asking on every refresh. Long
 # enough to be free, short enough that a preset added in the eufy app turns up.
 SLOT_REREAD_SECS = 600
+
+CONF_RECORDINGS_ENABLED = "recordings_enabled"

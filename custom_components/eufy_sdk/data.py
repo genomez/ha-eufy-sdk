@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
     from .api import EufySdkApiClient
     from .coordinator import EufySdkDataUpdateCoordinator
+    from .recordings import RecordingRuntime
 
 
 type EufySdkConfigEntry = ConfigEntry[EufySdkData]
@@ -36,3 +37,5 @@ class EufySdkData:
     # Full entry snapshots distinguish live safety changes from reload options.
     options_snapshot: dict[str, Any] = field(default_factory=dict)
     entry_data_snapshot: dict[str, Any] = field(default_factory=dict)
+
+    recordings: RecordingRuntime | None = None

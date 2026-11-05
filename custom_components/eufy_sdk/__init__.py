@@ -26,6 +26,7 @@ from .const import (
     CONF_LEGACY_DOORBELL_PRESSED,
     CONF_POLL_INTERVAL,
     CONF_PORT,
+    CONF_RECORDINGS_ENABLED,
     CONF_SOC_REFRESH,
     DEFAULT_POLL_INTERVAL_MIN,
     DEFAULT_SOC_REFRESH_SEC,
@@ -41,6 +42,8 @@ from .firmware_metadata import apply_metadata_event
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
 from .pushmap import DOORBELL_EVENT
+from .recordings import RecordingRuntime
+from .recordings_http import async_register_view
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -136,8 +139,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.async_on_unload(_stop_recovery)
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
     doorbell_event_ids: dict[tuple[str, str], None] = {}
+    recordings: RecordingRuntime | None = None
 
     def _on_event(evt: dict) -> None:  # noqa: PLR0912 - explicit bridge event dispatch
+        if evt.get("event") == "recordings.changed":
+            if recordings is not None:
+                recordings.changed(evt)
+            return
         if evt.get("event") == DOORBELL_EVENT:
             serial, event_id = evt.get("deviceSn"), evt.get("eventId")
             if (
@@ -214,6 +222,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     def _on_reconnect() -> None:
         """Drop camera evidence from the retired transport before refreshing."""
         coordinator.reset_camera_health()
+        if recordings is not None:
+            recordings.reset()
         _refresh_now()
 
     client = EufySdkApiClient(
@@ -239,6 +249,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         coordinator._clear_fast_retry(stop=True)  # noqa: SLF001
         await client.close()
         raise
+
+    if entry.options.get(CONF_RECORDINGS_ENABLED, True) and isinstance(
+        getattr(client, "recordings_capability", None), dict
+    ):
+        recordings = RecordingRuntime(client)
+        entry.runtime_data.recordings = recordings
+        entry.async_on_unload(recordings.close)
+        if isinstance(hass.data, dict):
+            await async_register_view(hass)
 
     # Push the chosen poll interval to the bridge (the cloud-poll cadence lives there).
     try:
@@ -271,6 +290,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> 
     """Unload a config entry and close the bridge connection."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        if getattr(entry.runtime_data, "recordings", None) is not None:
+            entry.runtime_data.recordings.close()
         await entry.runtime_data.client.close()
     return unloaded
 
@@ -291,6 +312,7 @@ async def _async_reload_on_update(
         CONF_POLL_INTERVAL: DEFAULT_POLL_INTERVAL_MIN,
         CONF_SOC_REFRESH: DEFAULT_SOC_REFRESH_SEC,
         CONF_LEGACY_DOORBELL_PRESSED: False,
+        CONF_RECORDINGS_ENABLED: True,
     }
     previous_reload = defaults | {
         key: value for key, value in previous.items() if key not in LIGHT_SAFETY_OPTIONS

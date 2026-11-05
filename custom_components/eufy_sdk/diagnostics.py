@@ -5,6 +5,10 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
+from .media_source import folder_id, navigation_path
+from .recordings import RecordingRuntime
+from .recordings_models import RecordingsError
+
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
@@ -40,7 +44,23 @@ async def async_get_config_entry_diagnostics(
     controllers = getattr(coordinator, "_light_safety_controllers", ())
     if not isinstance(controllers, (set, list, tuple)):
         controllers = ()
+    runtime = getattr(data, "recordings", None)
+    links = []
+    if isinstance(runtime, RecordingRuntime) and runtime.available_scope() is not None:
+        try:
+            if not runtime.cameras:
+                await runtime.list_cameras()
+            links = [
+                {
+                    "folder_media_id": folder_id(runtime.scope, camera),
+                    "navigation_path": navigation_path(runtime.scope, camera),
+                }
+                for camera in runtime.cameras
+            ]
+        except RecordingsError:
+            pass
     return {
+        "recordings": links,
         "connection": {
             "bridge_connected": bool(client.connected),
             "last_update_success": bool(coordinator.last_update_success),

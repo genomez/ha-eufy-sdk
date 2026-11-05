@@ -26,6 +26,7 @@ from .const import (
     CONF_LIGHT_SAFETY_NOTIFY_SERVICE,
     CONF_POLL_INTERVAL,
     CONF_PORT,
+    CONF_RECORDINGS_ENABLED,
     CONF_SOC_REFRESH,
     DEFAULT_POLL_INTERVAL_MIN,
     DEFAULT_PORT,
@@ -485,6 +486,10 @@ class EufySdkOptionsFlow(config_entries.OptionsFlow):
                             mode=selector.NumberSelectorMode.BOX,
                         ),
                     ),
+                    vol.Required(
+                        CONF_RECORDINGS_ENABLED,
+                        default=options.get(CONF_RECORDINGS_ENABLED, True),
+                    ): selector.BooleanSelector(),
                     vol.Required(
                         CONF_LEGACY_DOORBELL_PRESSED,
                         default=options.get(CONF_LEGACY_DOORBELL_PRESSED, False),
