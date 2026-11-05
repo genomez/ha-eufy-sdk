@@ -1,6 +1,8 @@
 # ruff: noqa: ANN201, D100, D101, D102, INP001, PT009, PT027
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.parse import unquote
 
 from fixtures import recordings_v1 as fixture
@@ -15,6 +17,20 @@ from custom_components.eufy_sdk.media_source import (
     title,
 )
 from custom_components.eufy_sdk.recordings_models import DISCLOSURE
+
+
+def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format"):
+    """Build an unknown-time event using only synthetic metadata."""
+    return {
+        **fixture.event(event_id),
+        "startedAtMs": None,
+        "endedAtMs": None,
+        "startedAtLocal": None,
+        "startedAtUtc": None,
+        "sourceStartLocal": "2026-11-01 01:30:00" if status == "ambiguous" else None,
+        "timeStatus": status,
+        "stationPresence": "seen_in_latest_window",
+    }
 
 
 class MediaTests(unittest.IsolatedAsyncioTestCase):
@@ -58,12 +74,13 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.runtime.client.rpc.assert_awaited_once_with(
             "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
         )
-        self.assertIn(DISCLOSURE, result.children[-1].title)
+        self.assertEqual(len(result.children), 1)
+        self.assertTrue(all(DISCLOSURE not in child.title for child in result.children))
         self.assertEqual(
             result.title, self.runtime.cameras[fixture.CAMERA]["name"].strip()
         )
         row = result.children[0]
-        self.assertTrue(row.title.startswith("2026-11-04 12:00:00 · 10 s"))
+        self.assertTrue(row.title.startswith("12:00 PM · Nov 4 · 10 s"))
         self.assertIn("May no longer be on HomeBase", row.title)
         self.assertFalse(row.can_play)
         self.assertTrue(row.can_expand)
@@ -114,16 +131,23 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.children, [])
 
     async def test_empty_failed_and_truncated_states(self):
-        page = fixture.page([])
-        page["truncated"] = True
-        page["refresh"]["state"] = "failed"
-        self.runtime.client.rpc.return_value = {"ok": True, "recordings": page}
-        result = await self.source.async_browse_media(
-            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
-        )
-        self.assertIn("cached; refresh failed", result.children[-1].title)
-        self.assertIn("truncated", result.children[-1].title)
-        self.assertIn("use Refresh", result.children[-1].title)
+        for state in ("idle", "scheduled", "deferred", "failed", "rate_limited"):
+            with self.subTest(state=state):
+                page = fixture.page([])
+                page["truncated"] = True
+                page["refresh"]["state"] = state
+                page["lastSuccessfulQueryAtMs"] = fixture.event()["startedAtMs"]
+                self.runtime.client.rpc.return_value = {"ok": True, "recordings": page}
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+                )
+                self.assertEqual(result.children, [])
+                self.assertEqual(
+                    self.runtime.pages[fixture.CAMERA]["disclosure"], DISCLOSURE
+                )
+                self.assertEqual(
+                    self.runtime.pages[fixture.CAMERA]["refresh"]["state"], state
+                )
 
     async def test_deep_link_exact_empty_content_type_and_rename_stability(self):
         path = navigation_path(fixture.SCOPE, fixture.CAMERA)
@@ -143,17 +167,232 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.runtime.cameras[fixture.CAMERA]["name"] = "Renamed synthetic camera"
         self.assertEqual(uri, folder_id(fixture.SCOPE, fixture.CAMERA))
 
-    async def test_ambiguous_unknown_titles_and_known_time_order(self):
-        unknown = {
-            **fixture.event(),
-            "startedAtLocal": None,
-            "startedAtUtc": None,
-            "sourceStartLocal": "2026-11-01 01:30:00",
-            "timeStatus": "ambiguous",
-            "durationSeconds": None,
+    async def test_time_first_titles_preserve_station_wall_time(self):
+        cases = (
+            ("2026-11-05T11:32:04-06:00", "11:32 AM · Nov 5 · 24 s"),
+            ("2026-11-05T00:07:00-06:00", "12:07 AM · Nov 5 · 24 s"),
+            ("2026-11-05T12:07:00-06:00", "12:07 PM · Nov 5 · 24 s"),
+            ("2026-11-05T23:09:00-06:00", "11:09 PM · Nov 5 · 24 s"),
+            ("2026-07-05T09:03:00-05:00", "9:03 AM · Jul 5 · 24 s"),
+            ("2026-11-01T01:30:00-05:00", "1:30 AM · Nov 1 · 24 s"),
+            ("2026-11-01T01:30:00-06:00", "1:30 AM · Nov 1 · 24 s"),
+            ("2026-01-01T00:00:00-06:00", "12:00 AM · Jan 1 · 24 s"),
+            ("2026-12-31T23:59:59-06:00", "11:59 PM · Dec 31 · 24 s"),
+        )
+        for local, expected in cases:
+            with self.subTest(local=local):
+                event = {
+                    **fixture.event(),
+                    "startedAtLocal": local,
+                    "durationSeconds": 24,
+                    "stationPresence": "seen_in_latest_window",
+                }
+                self.assertEqual(title(event), expected)
+
+    async def test_titles_do_not_use_locale_or_platform_strftime(self):
+        class NoStrftime(datetime):
+            def strftime(self, _format: str) -> str:
+                raise AssertionError
+
+        event = {**fixture.event(), "stationPresence": "seen_in_latest_window"}
+        with patch("custom_components.eufy_sdk.media_source.datetime", NoStrftime):
+            self.assertEqual(title(event), "12:00 PM · Nov 4 · 10 s")
+
+    async def test_unknown_and_invalid_duration_omitted(self):
+        for duration in (None, -1, float("nan"), float("inf"), True, "24", 86401):
+            with self.subTest(duration=duration):
+                event = {
+                    **fixture.event(),
+                    "durationSeconds": duration,
+                    "stationPresence": "seen_in_latest_window",
+                }
+                self.assertEqual(title(event), "12:00 PM · Nov 4")
+                self.assertEqual(
+                    title({**unknown_event(), "durationSeconds": duration}),
+                    "Time unknown",
+                )
+        for duration, expected in ((0, "0"), (2.5, "2.5")):
+            with self.subTest(duration=duration):
+                self.assertEqual(
+                    title({**unknown_event(), "durationSeconds": duration}),
+                    f"Time unknown · {expected} s",
+                )
+
+    async def test_unknown_titles_keep_time_status_in_detail_only(self):
+        for status in ("ambiguous", "invalid", "unknown_format"):
+            with self.subTest(status=status):
+                event = unknown_event(status=status)
+                self.assertEqual(title(event), "Time unknown · 10 s")
+                self.assertIn(
+                    "Chicago time " + status.replace("_", " "),
+                    title(event, detail=True),
+                )
+                self.assertIn("Browse only", title(event, detail=True))
+
+    async def test_unknown_folder_last_and_known_events_newest_first(self):
+        newer = fixture.event()
+        older = {
+            **fixture.event(fixture.OTHER),
+            "startedAtMs": newer["startedAtMs"] - 60000,
+            "endedAtMs": newer["endedAtMs"] - 60000,
+            "startedAtUtc": "2026-11-04T17:59:00Z",
+            "startedAtLocal": "2026-11-04T11:59:00-06:00",
+            "sourceStartLocal": "2026-11-04 11:59:00",
         }
-        result = title(unknown)
-        self.assertTrue(result.startswith("2026-11-01 01:30:00 · duration unknown"))
-        self.assertIn("Chicago time ambiguous", result)
-        unknown.update(sourceStartLocal=None, timeStatus="unknown_format")
-        self.assertTrue(title(unknown).startswith("Time unknown"))
+        rows = [
+            unknown_event("e_" + "U" * 22),
+            older,
+            unknown_event("e_" + "V" * 22, "ambiguous"),
+            newer,
+            unknown_event("e_" + "W" * 22, "invalid"),
+        ]
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page(rows),
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        )
+        self.assertEqual(len(result.children), 3)
+        self.assertEqual(
+            [row.media_content_id.rsplit("/", 1)[-1] for row in result.children[:-1]],
+            [fixture.EVENT, fixture.OTHER],
+        )
+        folder = result.children[-1]
+        self.assertEqual(folder.title, "Time unknown (3)")
+        self.assertEqual(
+            folder.media_content_id, folder_id(fixture.SCOPE, fixture.CAMERA) + "/u"
+        )
+        self.assertTrue(folder.can_expand)
+        self.assertFalse(folder.can_play)
+        self.assertEqual(folder.media_content_type, "")
+        self.assertIsNone(folder.thumbnail)
+        self.assertTrue(all(DISCLOSURE not in row.title for row in result.children))
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
+        )
+
+    async def test_unknown_folder_contents_order_and_event_shape(self):
+        older = unknown_event()
+        newer = {
+            **unknown_event("e_" + "U" * 22, "ambiguous"),
+            "firstObservedAtMs": older["firstObservedAtMs"] + 1000,
+            "durationSeconds": None,
+            "coverRevision": "cover_2",
+        }
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([older, fixture.event(), newer]),
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/u")
+        )
+        self.assertEqual(result.title, "Time unknown (2)")
+        self.assertEqual(
+            [row.title for row in result.children],
+            ["Time unknown", "Time unknown · 10 s"],
+        )
+        for row, event in zip(result.children, (newer, older), strict=True):
+            self.assertEqual(
+                row.media_content_id,
+                folder_id(fixture.SCOPE, fixture.CAMERA) + "/e/" + event["eventId"],
+            )
+            self.assertTrue(row.can_expand)
+            self.assertFalse(row.can_play)
+            self.assertEqual(row.media_content_type, "")
+            self.assertIsNone(row.children)
+            self.assertEqual(
+                row.thumbnail,
+                f"/api/eufy_sdk/recordings/{fixture.SCOPE}/{fixture.CAMERA}/{event['eventId']}/cover"
+                + ("?v=cover_2" if event is newer else ""),
+            )
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
+        )
+
+    async def test_only_unknown_events_have_one_folder(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([unknown_event()]),
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        )
+        self.assertEqual([row.title for row in result.children], ["Time unknown (1)"])
+
+    async def test_unknown_event_detail_retains_canonical_identifier(self):
+        event = unknown_event()
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([event]),
+        }
+        identifier = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/e/{fixture.OTHER}"
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=identifier)
+        )
+        self.assertEqual(
+            result.media_content_id, "media-source://eufy_sdk/" + identifier
+        )
+        self.assertEqual(result.children, [])
+        self.assertTrue(result.title.startswith("Time unknown · 10 s"))
+        self.assertFalse(result.can_play)
+        self.assertTrue(result.thumbnail)
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.catalog",
+            timeout=3,
+            cameraId=fixture.CAMERA,
+            refresh="if_due",
+            focusEventId=fixture.OTHER,
+        )
+
+    async def test_unknown_folder_absent_route_fails_closed(self):
+        for rows in ([], [fixture.event()]):
+            with self.subTest(empty=not rows):
+                self.runtime.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.page(rows),
+                }
+                with self.assertRaisesRegex(BrowseError, "^Recordings unavailable$"):
+                    await self.source.async_browse_media(
+                        SimpleNamespace(
+                            identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/u"
+                        )
+                    )
+
+    async def test_unknown_folder_and_note_identifiers_fail_closed(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        for identifier in (
+            base + "/U",
+            base + "/u/",
+            base + "/u?query=value",
+            base + "/u#fragment",
+            base + "/u/e/" + fixture.EVENT,
+            base + "/u/../u",
+            base + "/u/unknown",
+            base + "/note",
+            base + "/n/disclosure",
+            base + "/e/u",
+            f"s/s_{'Z' * 22}/c/{fixture.CAMERA}/u",
+            f"s/{fixture.SCOPE}/c/invalid/u",
+        ):
+            with (
+                self.subTest(identifier=identifier),
+                self.assertRaisesRegex(BrowseError, "^Recordings unavailable$"),
+            ):
+                await self.source.async_browse_media(
+                    SimpleNamespace(identifier=identifier)
+                )
+        self.runtime.client.rpc.assert_not_awaited()
+
+    async def test_unknown_folder_for_unenrolled_opaque_camera_fails_closed(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.cameras(),
+        }
+        with self.assertRaisesRegex(BrowseError, "^Recordings unavailable$"):
+            await self.source.async_browse_media(
+                SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/c_{'Z' * 22}/u")
+            )
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.cameras", timeout=3
+        )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -14,13 +15,28 @@ from homeassistant.components.media_source.error import Unresolvable
 from homeassistant.config_entries import ConfigEntryState
 
 from .const import DOMAIN
-from .recordings_models import DISCLOSURE, TIMEZONE, RecordingsError, opaque_id, require
+from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
 
 if TYPE_CHECKING:
     from homeassistant.components.media_source import MediaSourceItem, PlayMedia
     from homeassistant.core import HomeAssistant
 
     from .recordings import RecordingRuntime
+
+MONTHS = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
 
 
 def folder_id(scope: str, camera: str) -> str:
@@ -38,9 +54,12 @@ def navigation_path(scope: str, camera: str) -> str:
 def parse_identifier(identifier: str) -> tuple[str, str, str | None]:
     """Reject external URLs, cursors, names, queries and forged paths."""
     parts = identifier.split("/")
-    require(len(parts) in (4, 6) and parts[0] == "s" and parts[2] == "c")
+    require(len(parts) in (4, 5, 6) and parts[0] == "s" and parts[2] == "c")
     scope, camera = opaque_id(parts[1], "s"), opaque_id(parts[3], "c")
     event = None
+    if len(parts) == 5:
+        # The fixed category needs no identity beyond the opaque camera path.
+        require(parts[4] == "u")
     if len(parts) == 6:
         require(parts[4] == "e")
         event = opaque_id(parts[5], "e")
@@ -69,18 +88,27 @@ def find_runtime(hass: HomeAssistant, scope: str) -> RecordingRuntime:
 
 
 def title(event: dict, *, detail: bool = False) -> str:
-    """Keep the Advanced Camera Card timestamp prefix in Chicago time."""
-    if event["startedAtLocal"] is not None:
+    """Show station-local time first with fixed English display labels."""
+    if event["timeStatus"] == "valid" and event["startedAtLocal"] is not None:
         local = datetime.fromisoformat(event["startedAtLocal"]).astimezone(
             ZoneInfo(TIMEZONE)
         )
-        start = local.strftime("%Y-%m-%d %H:%M:%S")
+        period = "AM" if local.hour < 12 else "PM"
+        start = (
+            f"{local.hour % 12 or 12}:{local.minute:02d} {period}"
+            f" · {MONTHS[local.month - 1]} {local.day}"
+        )
     else:
-        start = event["sourceStartLocal"] or "Time unknown"
+        start = "Time unknown"
     duration = event["durationSeconds"]
-    duration_text = "duration unknown" if duration is None else f"{duration:g} s"
-    result = f"{start} · {duration_text}"
-    if event["timeStatus"] != "valid":
+    result = start
+    if (
+        type(duration) in (int, float)
+        and math.isfinite(duration)
+        and 0 <= duration <= 86400
+    ):
+        result += f" · {duration:g} s"
+    if detail and event["timeStatus"] != "valid":
         result += " · Chicago time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
         result += " · UTC " + event["startedAtUtc"]
@@ -149,10 +177,21 @@ class EufyRecordingMediaSource(MediaSource):
                     children=children,
                 )
             scope, camera, event_id = parse_identifier(item.identifier)
+            unknown_time = item.identifier.endswith("/u")
             runtime = find_runtime(self.hass, scope)
             page = await runtime.browse(camera, event_id)
+            unknown_events = [
+                event for event in page["events"] if event["timeStatus"] != "valid"
+            ]
+            if unknown_time:
+                require(bool(unknown_events))
             children = []
             for event in page["events"]:
+                if (
+                    event_id is None
+                    and (event["timeStatus"] != "valid") != unknown_time
+                ):
+                    continue
                 identifier = f"s/{scope}/c/{camera}/e/{event['eventId']}"
                 thumbnail = (
                     f"/api/{DOMAIN}/recordings/{scope}/{camera}/"
@@ -169,39 +208,14 @@ class EufyRecordingMediaSource(MediaSource):
                 if event_id:
                     return row
                 children.append(row)
-            name = DISCLOSURE
-            state = page["refresh"]["state"]
-            if state in ("deferred", "failed", "rate_limited"):
-                name += " · cached; refresh " + state
-            elif page["lastSuccessfulQueryAtMs"] is not None:
-                queried = datetime.fromtimestamp(
-                    page["lastSuccessfulQueryAtMs"] / 1000, ZoneInfo(TIMEZONE)
-                )
-                name += " · queried " + queried.strftime(
-                    "%Y-%m-%d %H:%M:%S America/Chicago"
-                )
-            if page["truncated"]:
-                name += " · first 100 events; truncated"
-            if not children:
-                name += (
-                    " · catalog refresh requested; use Refresh"
-                    if state == "scheduled"
-                    else " · no cached events; use Refresh"
-                )
-            children.append(
-                BrowseMediaSource(
-                    domain=DOMAIN,
-                    identifier=item.identifier,
-                    media_class=MediaClass.DIRECTORY,
-                    media_content_type="",
-                    title=name,
-                    can_play=False,
-                    can_expand=False,
-                )
-            )
+            unknown_title = f"Time unknown ({len(unknown_events)})"
+            if unknown_events and not unknown_time:
+                children.append(directory(f"s/{scope}/c/{camera}/u", unknown_title))
             return directory(
                 item.identifier,
-                runtime.cameras[camera]["name"].strip(),
+                unknown_title
+                if unknown_time
+                else runtime.cameras[camera]["name"].strip(),
                 children=children,
             )
         except (RecordingsError, KeyError, ValueError):
