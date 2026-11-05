@@ -1039,10 +1039,11 @@ class EufySdkApiClient(RecordingsApi):
                 if msg.type is not aiohttp.WSMsgType.TEXT:
                     continue
                 data = msg.json()
-                if data.get("event") == "hello":
+                if data.get("event") in ("hello", "recordings.capability"):
                     self.recordings_capability = recordings_capability(
                         data.get("recordings")
                     )
+                if data.get("event") == "hello":
                     self._set_bounded_capability(data.get("boundedStateWrites"))
                     self._set_late_contrary_capability(data.get("lateContraryEffects"))
                     # Keep the last advertisement through a disconnect. The next

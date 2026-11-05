@@ -59,11 +59,14 @@ class PrivacyTests(unittest.IsolatedAsyncioTestCase):
                     await integration.async_setup_entry(hass, entry)
                 runtime = entry.runtime_data.recordings
                 self.assertEqual(runtime is not None, enabled and supported)
-                if runtime is not None:
+                if enabled:
+                    # Register the authenticated route even before enrollment so
+                    # a later capability event can enable it without a reload.
                     register.assert_awaited_once_with(hass)
-                    runtime.changed = Mock()
                 else:
                     register.assert_not_awaited()
+                if runtime is not None:
+                    runtime.changed = Mock()
                 notification = {"event": "recordings.changed", "raw": CANARY}
                 constructor.call_args.kwargs["on_event"](notification)
                 hass.bus.async_fire.assert_not_called()

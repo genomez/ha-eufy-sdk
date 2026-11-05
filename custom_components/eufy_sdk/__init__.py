@@ -141,10 +141,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     doorbell_event_ids: dict[tuple[str, str], None] = {}
     recordings: RecordingRuntime | None = None
 
+    def _sync_recordings() -> None:
+        """Reconcile media source discovery after every capability advertisement."""
+        nonlocal recordings
+        capability = getattr(client, "recordings_capability", None)
+        enabled = entry.options.get(CONF_RECORDINGS_ENABLED, True) and isinstance(
+            capability, dict
+        )
+        if recordings is not None and (
+            not enabled or recordings.scope not in (None, capability.get("scopeId"))
+        ):
+            recordings.close()
+            recordings = None
+        if enabled and recordings is None:
+            recordings = RecordingRuntime(client)
+        entry.runtime_data.recordings = recordings
+
+    def _close_recordings() -> None:
+        if recordings is not None:
+            recordings.close()
+
+    entry.async_on_unload(_close_recordings)
+
     def _on_event(evt: dict) -> None:  # noqa: PLR0912 - explicit bridge event dispatch
+        if evt.get("event") in ("hello", "recordings.capability"):
+            _sync_recordings()
+            if evt["event"] == "recordings.capability":
+                return
         if evt.get("event") == "recordings.changed":
             if recordings is not None:
                 recordings.changed(evt)
+            _sync_recordings()
             return
         if evt.get("event") == DOORBELL_EVENT:
             serial, event_id = evt.get("deviceSn"), evt.get("eventId")
@@ -247,16 +274,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         # A failed or cancelled setup will not reach async_unload_entry. Retire
         # this attempt's client and timer before HA creates another coordinator.
         coordinator._clear_fast_retry(stop=True)  # noqa: SLF001
+        _close_recordings()
         await client.close()
         raise
 
-    if entry.options.get(CONF_RECORDINGS_ENABLED, True) and isinstance(
-        getattr(client, "recordings_capability", None), dict
-    ):
-        recordings = RecordingRuntime(client)
-        entry.runtime_data.recordings = recordings
-        entry.async_on_unload(recordings.close)
-        if isinstance(hass.data, dict):
+    if entry.options.get(CONF_RECORDINGS_ENABLED, True):
+        _sync_recordings()
+        if isinstance(hass.data, dict) and hass.http is not None:
             await async_register_view(hass)
 
     # Push the chosen poll interval to the bridge (the cloud-poll cadence lives there).
