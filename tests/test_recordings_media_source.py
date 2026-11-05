@@ -131,6 +131,14 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.children, [])
 
     async def test_empty_failed_and_truncated_states(self):
+        name = self.runtime.cameras[fixture.CAMERA]["name"].strip()
+        expected = {
+            "idle": " · no events yet · newest 100",
+            "scheduled": " · checking for events · newest 100",
+            "deferred": " · showing saved list · no events yet · newest 100",
+            "failed": " · showing saved list · no events yet · newest 100",
+            "rate_limited": " · no events yet · newest 100",
+        }
         for state in ("idle", "scheduled", "deferred", "failed", "rate_limited"):
             with self.subTest(state=state):
                 page = fixture.page([])
@@ -142,12 +150,33 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
                 )
                 self.assertEqual(result.children, [])
+                self.assertEqual(result.title, name + expected[state])
                 self.assertEqual(
                     self.runtime.pages[fixture.CAMERA]["disclosure"], DISCLOSURE
                 )
                 self.assertEqual(
                     self.runtime.pages[fixture.CAMERA]["refresh"]["state"], state
                 )
+
+    async def test_folder_status_only_when_something_is_off(self):
+        name = self.runtime.cameras[fixture.CAMERA]["name"].strip()
+        for state, suffix in (
+            ("idle", ""),
+            ("rate_limited", ""),
+            ("scheduled", ""),
+            ("failed", " · showing saved list"),
+            ("deferred", " · showing saved list"),
+        ):
+            with self.subTest(state=state):
+                page = fixture.page()
+                page["refresh"]["state"] = state
+                self.runtime.pages.clear()
+                self.runtime.client.rpc.return_value = {"ok": True, "recordings": page}
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+                )
+                self.assertEqual(len(result.children), 1)
+                self.assertEqual(result.title, name + suffix)
 
     async def test_deep_link_exact_empty_content_type_and_rename_stability(self):
         path = navigation_path(fixture.SCOPE, fixture.CAMERA)

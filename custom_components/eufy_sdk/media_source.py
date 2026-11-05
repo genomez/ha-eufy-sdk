@@ -140,6 +140,19 @@ def directory(
     )
 
 
+def folder_status(page: dict, *, empty: bool) -> str:
+    """Return a short camera-folder title suffix only when something is off."""
+    state = page["refresh"]["state"]
+    parts = []
+    if state in ("deferred", "failed"):
+        parts.append("showing saved list")
+    if empty:
+        parts.append("checking for events" if state == "scheduled" else "no events yet")
+    if page["truncated"]:
+        parts.append("newest 100")
+    return "".join(" · " + part for part in parts)
+
+
 async def async_get_media_source(hass: HomeAssistant) -> EufyRecordingMediaSource:
     """Return the provider; unsupported entries are hidden from its root."""
     return EufyRecordingMediaSource(hass)
@@ -215,7 +228,8 @@ class EufyRecordingMediaSource(MediaSource):
                 item.identifier,
                 unknown_title
                 if unknown_time
-                else runtime.cameras[camera]["name"].strip(),
+                else runtime.cameras[camera]["name"].strip()
+                + folder_status(page, empty=not children),
                 children=children,
             )
         except (RecordingsError, KeyError, ValueError):
