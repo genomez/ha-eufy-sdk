@@ -7,6 +7,7 @@ import aiohttp
 from fixtures import recordings_v1 as fixture
 
 from custom_components.eufy_sdk import recordings_models as models
+from custom_components.eufy_sdk.recordings import RecordingRuntime
 
 
 class ContractTests(unittest.TestCase):
@@ -125,6 +126,20 @@ class ContractTests(unittest.TestCase):
 
 
 class ApiTests(unittest.IsolatedAsyncioTestCase):
+    async def test_3o_style_bridge_five_camera_roster_is_accepted(self):
+        client = fixture.client()
+        roster = fixture.cameras()
+        self.assertEqual(len(roster["cameras"]), 5)
+        client.rpc.return_value = {"ok": True, "recordings": roster}
+        runtime = RecordingRuntime(client)
+        self.addCleanup(runtime.close)
+
+        self.assertEqual(await runtime.list_cameras(), roster["cameras"])
+        self.assertEqual(
+            list(runtime.cameras), [row["cameraId"] for row in roster["cameras"]]
+        )
+        client.rpc.assert_awaited_once_with("recordings.cameras", timeout=3)
+
     async def test_scope_replacement_during_rpc_is_a_safe_failure(self):
         client = fixture.client()
 
