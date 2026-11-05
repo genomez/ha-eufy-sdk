@@ -107,7 +107,19 @@ class ContractTests(unittest.TestCase):
     def test_camera_count_scope_and_uniqueness(self):
         result = models.cameras(fixture.cameras(), fixture.SCOPE)
         self.assertEqual(len(result["cameras"]), 5)
-        for rows in ([], result["cameras"][:4], [result["cameras"][0]] * 5):
+        grown = [
+            *result["cameras"],
+            {**result["cameras"][0], "cameraId": "c_" + "Z" * 22},
+        ]
+        self.assertEqual(
+            len(
+                models.cameras({**fixture.cameras(), "cameras": grown}, fixture.SCOPE)[
+                    "cameras"
+                ]
+            ),
+            6,
+        )
+        for rows in ([], [result["cameras"][0]] * 5):
             with self.assertRaises(models.RecordingsError):
                 models.cameras({**fixture.cameras(), "cameras": rows}, fixture.SCOPE)
 

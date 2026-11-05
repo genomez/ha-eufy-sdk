@@ -1,6 +1,6 @@
 # Browse-only recordings
 
-With a bridge advertising recordings contract v1 and a valid five-camera scope,
+With a bridge advertising recordings contract v1 and a valid station-child camera scope,
 the integration enables **Browse recordings** by default. Disable it in the
 integration options to unload recording interests and pending thumbnail requests.
 A bridge without the capability keeps its existing camera, image and light behavior.
@@ -15,15 +15,15 @@ prefetches covers in the background.
 The HomeBase query sees the latest 20 station-wide events. The bridge accumulates a
 seven-day, evictable catalog, capped at 2,000 rows total and 400 per camera. Each
 camera browse returns up to 100 newest events; a truncated result is disclosed,
-without pagination. An empty folder does not prove that the camera has no history.
+with bounded station paging while a camera folder has interest. An empty folder does not prove that the camera has no history.
 “May no longer be on HomeBase” marks retained events outside the last successful
 station window. Every event is an expandable information folder: video playback,
 downloads and media resolution are unavailable in Phase 1.
 
-Event titles start with Chicago local `YYYY-MM-DD HH:mm:ss · type · duration` for
+Event titles start with Chicago local `YYYY-MM-DD HH:mm:ss · duration` for
 Advanced Camera Card date parsing. Unknown times have an explicit status. Event
-details include UTC when known. Unknown numeric event types use `Event <code>`;
-unqualified vendor labels are never displayed.
+details include UTC when known. Folder titles contain only the trimmed camera name;
+history and cache status appear in a non-playable information child.
 
 Thumbnail demand uses a 60-second camera-folder interest and the bridge's shared
 admission budget (up to four uncached covers). Only a ready WS reply allows a
@@ -54,3 +54,11 @@ by this integration. Before deployment, qualify the frontend route and authentic
 relative thumbnails on the actual desktop and Android versions, and check that an
 anonymous thumbnail request is refused. Local synthetic unit tests do not establish
 those live UI behaviors or qualify the bridge/SDK/device pairing.
+
+
+The bridge enrolls cameras already classified in its inventory beneath the one
+T9000 station, excluding J Safe after trimming and case folding. Battery cameras
+use the same station-only metadata and cover path. No camera is contacted by browsing.
+Diagnostics include sanitized bridge recording counts, masked unknown time shapes,
+paging status and cache counts, alongside opaque folder links. The diagnostic read
+is cache-only; older bridges without the optional RPC retain folder links.

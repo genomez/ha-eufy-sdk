@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from .media_source import folder_id, navigation_path
@@ -59,8 +60,12 @@ async def async_get_config_entry_diagnostics(
             ]
         except RecordingsError:
             pass
+    recordings = {"folders": links}
+    if isinstance(runtime, RecordingRuntime) and runtime.available_scope() is not None:
+        with suppress(RecordingsError, AttributeError):
+            recordings.update(await client.recordings_diagnostics())
     return {
-        "recordings": links,
+        "recordings": recordings,
         "connection": {
             "bridge_connected": bool(client.connected),
             "last_update_success": bool(coordinator.last_update_success),

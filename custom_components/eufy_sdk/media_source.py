@@ -79,14 +79,13 @@ def title(event: dict, *, detail: bool = False) -> str:
         start = event["sourceStartLocal"] or "Time unknown"
     duration = event["durationSeconds"]
     duration_text = "duration unknown" if duration is None else f"{duration:g} s"
-    result = (
-        f"{start} · {event['eventType']['label']} · {duration_text} · America/Chicago"
-    )
+    result = f"{start} · {duration_text}"
     if event["timeStatus"] != "valid":
         result += " · Chicago time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
         result += " · UTC " + event["startedAtUtc"]
-    result += " · Browse only — video unavailable"
+    if detail:
+        result += " · Browse only — video unavailable"
     if event["stationPresence"] == "not_in_latest_window":
         result += " · May no longer be on HomeBase"
     return result
@@ -143,9 +142,7 @@ class EufyRecordingMediaSource(MediaSource):
                 for runtime in runtimes(self.hass):
                     for camera in await runtime.list_cameras():
                         identifier = f"s/{runtime.scope}/c/{camera['cameraId']}"
-                        children.append(
-                            directory(identifier, camera["name"] + " · " + DISCLOSURE)
-                        )
+                        children.append(directory(identifier, camera["name"].strip()))
                 return directory(
                     "",
                     "Eufy" if children else "Recordings unavailable",
@@ -172,7 +169,7 @@ class EufyRecordingMediaSource(MediaSource):
                 if event_id:
                     return row
                 children.append(row)
-            name = runtime.cameras[camera]["name"] + " · " + DISCLOSURE
+            name = DISCLOSURE
             state = page["refresh"]["state"]
             if state in ("deferred", "failed", "rate_limited"):
                 name += " · cached; refresh " + state
@@ -191,7 +188,22 @@ class EufyRecordingMediaSource(MediaSource):
                     if state == "scheduled"
                     else " · no cached events; use Refresh"
                 )
-            return directory(item.identifier, name, children=children)
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=item.identifier,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type="",
+                    title=name,
+                    can_play=False,
+                    can_expand=False,
+                )
+            )
+            return directory(
+                item.identifier,
+                runtime.cameras[camera]["name"].strip(),
+                children=children,
+            )
         except (RecordingsError, KeyError, ValueError):
             message = "Recordings unavailable"
             raise BrowseError(

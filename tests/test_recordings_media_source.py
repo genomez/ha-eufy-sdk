@@ -58,9 +58,12 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.runtime.client.rpc.assert_awaited_once_with(
             "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
         )
-        self.assertIn(DISCLOSURE, result.title)
+        self.assertIn(DISCLOSURE, result.children[-1].title)
+        self.assertEqual(
+            result.title, self.runtime.cameras[fixture.CAMERA]["name"].strip()
+        )
         row = result.children[0]
-        self.assertTrue(row.title.startswith("2026-11-04 12:00:00 · Event 7 · 10 s"))
+        self.assertTrue(row.title.startswith("2026-11-04 12:00:00 · 10 s"))
         self.assertIn("May no longer be on HomeBase", row.title)
         self.assertFalse(row.can_play)
         self.assertTrue(row.can_expand)
@@ -118,9 +121,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
         )
-        self.assertIn("cached; refresh failed", result.title)
-        self.assertIn("truncated", result.title)
-        self.assertIn("use Refresh", result.title)
+        self.assertIn("cached; refresh failed", result.children[-1].title)
+        self.assertIn("truncated", result.children[-1].title)
+        self.assertIn("use Refresh", result.children[-1].title)
 
     async def test_deep_link_exact_empty_content_type_and_rename_stability(self):
         path = navigation_path(fixture.SCOPE, fixture.CAMERA)
@@ -150,9 +153,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
             "durationSeconds": None,
         }
         result = title(unknown)
-        self.assertTrue(
-            result.startswith("2026-11-01 01:30:00 · Event 7 · duration unknown")
-        )
+        self.assertTrue(result.startswith("2026-11-01 01:30:00 · duration unknown"))
         self.assertIn("Chicago time ambiguous", result)
         unknown.update(sourceStartLocal=None, timeStatus="unknown_format")
         self.assertTrue(title(unknown).startswith("Time unknown"))

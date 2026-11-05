@@ -151,7 +151,7 @@ def cameras(value: Any, scope: str) -> dict:
     data = envelope(value)
     require(data.get("scopeId") == scope)
     rows = data.get("cameras")
-    require(isinstance(rows, list) and len(rows) == 5)
+    require(isinstance(rows, list) and 1 <= len(rows) <= 2000)
     result = []
     for row in rows:
         require(isinstance(row, dict) and row.get("scopeId") == scope)
@@ -169,7 +169,7 @@ def cameras(value: Any, scope: str) -> dict:
                 "name": name,
             }
         )
-    require(len({row["cameraId"] for row in result}) == 5)
+    require(len({row["cameraId"] for row in result}) == len(result))
     return {"version": 1, "scopeId": scope, "cameras": result}
 
 
@@ -383,3 +383,56 @@ def cover(value: Any, camera: str, event_id: str) -> dict:
         )
         require(result["bytes"] > 0)
     return result
+
+
+def diagnostics(value: Any) -> dict:
+    """Project only counts, display names, fixed statuses and masked time shapes."""
+    require(isinstance(value, dict))
+    cameras = value.get("rowsKeptPerCamera")
+    require(isinstance(cameras, list) and len(cameras) <= 2000)
+    kept = []
+    for row in cameras:
+        require(isinstance(row, dict))
+        name = row.get("name")
+        require(
+            isinstance(name, str)
+            and 1 <= len(name) <= 128
+            and all(ord(c) >= 32 and not 127 <= ord(c) <= 159 for c in name)
+        )
+        kept.append({"name": name.strip(), "rows": number(row.get("rows"))})
+    rejected = value.get("rejected")
+    times = value.get("timeStatus")
+    covers = value.get("coverCache")
+    require(all(isinstance(row, dict) for row in (rejected, times, covers)))
+    shapes = value.get("unknownStartTimeShapes")
+    require(isinstance(shapes, list) and len(shapes) <= 32)
+    masked = []
+    for row in shapes:
+        require(isinstance(row, dict))
+        shape = row.get("shape")
+        require(
+            isinstance(shape, str)
+            and re.fullmatch(r"[9a :/.+?\-]{0,32}", shape) is not None
+        )
+        masked.append({"shape": shape, "count": number(row.get("count"))})
+    return {
+        "rowsKeptPerCamera": kept,
+        "rejected": {
+            key: number(rejected.get(key))
+            for key in ("not_in_scope", "bad_record_id", "bad_start_time", "other")
+        },
+        "identity_conflict": number(value.get("identity_conflict")),
+        "timeStatus": {
+            key: number(times.get(key))
+            for key in ("valid", "unknown_format", "ambiguous", "invalid")
+        },
+        "pagingStatus": choice(
+            value.get("pagingStatus"), ("unverified", "working", "unsupported_stopped")
+        ),
+        "lastPageCount": number(value.get("lastPageCount"), maximum=20),
+        "lastCatalogTime": time_ms(value.get("lastCatalogTime"), nullable=True),
+        "coverCache": {
+            key: number(covers.get(key)) for key in ("files", "bytes", "pending")
+        },
+        "unknownStartTimeShapes": masked,
+    }

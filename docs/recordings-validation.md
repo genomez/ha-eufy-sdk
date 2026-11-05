@@ -50,3 +50,28 @@ The implementation splits recording transport wrappers into `recordings_api.py`
 (mixed into the existing API client) to keep the established control paths small.
 The unchanged hello capability uses `pageSize:20`; amended catalog replies use
 `truncated` and at most 100 events, with no cursor or transfer grant fields.
+
+
+## Follow-up 3o-r2 offline validation
+
+2026-11-05: The full suite using the established interpreter passed 960 tests
+and 1,200 subtests, with no failures. Command (from this repository root):
+
+```powershell
+& 'C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe' -B tools/run_offline_tests.py
+```
+
+The regression coverage accepts a growing unique camera roster, retains stable
+folder identities, verifies trimmed folder titles with history notices in an
+information child, and omits event type from the date-first event title. The
+optional cached `recordings.diagnostics` RPC is projected into HA diagnostics
+with only counts, display names, fixed statuses and masked time shapes. Raw
+canaries and unmasked/oversized shapes are rejected or omitted. Opaque folder
+links are retained under `recordings.folders`. An older bridge without that
+RPC keeps the folder links.
+
+Changed Python files passed the same environment's `python -m ruff check` and
+`python -m ruff format --check`. Full log:
+`C:/Dev/eufy-s1-rectest-20261102/artifacts/recordings-3o-r2-ha-full.log`.
+No live HA, camera, station, SSH, cloud, credentials or private capture was read.
+Frontend rendering and live paging remain separate lead acceptance checks.

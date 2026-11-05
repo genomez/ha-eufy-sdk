@@ -36,6 +36,10 @@ class RecordingsApi:
         except Exception:  # noqa: BLE001 - suppress untrusted bridge errors
             raise models.RecordingsError from None
 
+    async def recordings_diagnostics(self) -> dict:
+        """Read sanitized cached counters without admitting any station work."""
+        return models.diagnostics(await self._recordings_rpc("recordings.diagnostics"))
+
     async def recordings_cameras(self) -> dict:
         """Read the enrolled camera list without refreshing inventory."""
         payload = await self._recordings_rpc("recordings.cameras")

@@ -150,7 +150,7 @@ class PrivacyTests(unittest.IsolatedAsyncioTestCase):
         result = await diagnostics.async_get_config_entry_diagnostics(
             Mock(), SimpleNamespace(runtime_data=data)
         )
-        links = result["recordings"]
+        links = result["recordings"]["folders"]
         self.assertEqual(len(links), 5)
         self.assertEqual(
             links[0],
@@ -161,6 +161,45 @@ class PrivacyTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("Synthetic camera", json.dumps(links))
         self.assertNotIn("eventId", json.dumps(links))
+
+    async def test_sanitized_bridge_diagnostics_are_cache_only(self):
+        runtime = await fixture.runtime()
+        self.addCleanup(runtime.close)
+        value = {
+            "rowsKeptPerCamera": [
+                {"name": "Synthetic camera", "rows": 12, "sn": CANARY}
+            ],
+            "rejected": {
+                "not_in_scope": 3,
+                "bad_record_id": 1,
+                "bad_start_time": 2,
+                "other": 0,
+            },
+            "identity_conflict": 1,
+            "timeStatus": {
+                "valid": 10,
+                "unknown_format": 1,
+                "ambiguous": 0,
+                "invalid": 1,
+            },
+            "pagingStatus": "unsupported_stopped",
+            "lastPageCount": 20,
+            "lastCatalogTime": 1793901600000,
+            "coverCache": {"files": 2, "bytes": 100, "pending": 0},
+            "unknownStartTimeShapes": [{"shape": "9999-99-99 99:99:99", "count": 1}],
+            "raw": CANARY,
+        }
+        runtime.client.rpc.return_value = {"ok": True, "recordings": value}
+        result = await runtime.client.recordings_diagnostics()
+        runtime.client.rpc.assert_awaited_once_with("recordings.diagnostics", timeout=3)
+        self.assertEqual(
+            result["rowsKeptPerCamera"], [{"name": "Synthetic camera", "rows": 12}]
+        )
+        self.assertNotIn(CANARY, json.dumps(result))
+        for bad in (CANARY, "9" * 33, "9999\n"):
+            value["unknownStartTimeShapes"][0]["shape"] = bad
+            with self.assertRaises(models.RecordingsError):
+                models.diagnostics(value)
 
     async def test_recordings_event_dispatch_precedes_bus_and_entities_unchanged(self):
         setup = setup_fixture.SetupEventTests()
