@@ -126,7 +126,7 @@ def capability(value: Any) -> dict | None:
         require(value.get("timezone") == TIMEZONE)
         for key, expected in (
             ("stationWindow", 20),
-            ("pageSize", 20),
+            ("pageSize", 100),
             ("coverBudget", 4),
         ):
             require(type(value.get(key)) is int and value[key] == expected)

@@ -30,7 +30,7 @@ def capability() -> dict:
         "scopeId": SCOPE,
         "timezone": TIMEZONE,
         "stationWindow": 20,
-        "pageSize": 20,
+        "pageSize": 100,
         "coverBudget": 4,
     }
 
