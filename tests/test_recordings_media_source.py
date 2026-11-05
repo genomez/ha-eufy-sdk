@@ -243,6 +243,8 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 )
         for duration, expected in (
             (59, "59 s"),
+            (59.6, "59.6 s"),
+            (60.4, "1 min"),
             (60, "1 min"),
             (78, "1 min 18 s"),
             (120, "2 min"),

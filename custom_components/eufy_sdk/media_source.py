@@ -121,10 +121,9 @@ def title(event: dict, *, detail: bool = False) -> str:
 
 def duration_text(duration: float) -> str:
     """Return seconds under a minute, otherwise whole minutes plus seconds."""
-    seconds = round(duration)
-    if seconds < 60:
-        return f"{duration:g} s" if duration < 60 else "1 min"
-    minutes, rest = divmod(seconds, 60)
+    if duration < 60:
+        return f"{duration:g} s"
+    minutes, rest = divmod(round(duration), 60)
     return f"{minutes} min" + (f" {rest} s" if rest else "")
 
 
