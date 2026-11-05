@@ -107,16 +107,25 @@ def title(event: dict, *, detail: bool = False) -> str:
         and math.isfinite(duration)
         and 0 <= duration <= 86400
     ):
-        result += f" · {duration:g} s"
+        result += " · " + duration_text(duration)
     if detail and event["timeStatus"] != "valid":
         result += " · Chicago time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
         result += " · UTC " + event["startedAtUtc"]
     if detail:
         result += " · Browse only — video unavailable"
-    if event["stationPresence"] == "not_in_latest_window":
+    if detail and event["stationPresence"] == "not_in_latest_window":
         result += " · May no longer be on HomeBase"
     return result
+
+
+def duration_text(duration: float) -> str:
+    """Return seconds under a minute, otherwise whole minutes plus seconds."""
+    seconds = round(duration)
+    if seconds < 60:
+        return f"{duration:g} s" if duration < 60 else "1 min"
+    minutes, rest = divmod(seconds, 60)
+    return f"{minutes} min" + (f" {rest} s" if rest else "")
 
 
 def directory(

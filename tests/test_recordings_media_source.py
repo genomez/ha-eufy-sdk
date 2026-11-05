@@ -81,7 +81,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         )
         row = result.children[0]
         self.assertTrue(row.title.startswith("12:00 PM · Nov 4 · 10 s"))
-        self.assertIn("May no longer be on HomeBase", row.title)
+        self.assertNotIn("May no longer be on HomeBase", row.title)
         self.assertFalse(row.can_play)
         self.assertTrue(row.can_expand)
         self.assertTrue(row.thumbnail.startswith("/api/eufy_sdk/recordings/"))
@@ -99,6 +99,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.children, [])
         self.assertIn("UTC 2026-11-04T18:00:00Z", result.title)
+        self.assertIn("May no longer be on HomeBase", result.title)
         self.assertFalse(result.can_play)
         self.assertTrue(result.thumbnail)
 
@@ -239,6 +240,18 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     title({**unknown_event(), "durationSeconds": duration}),
                     "Time unknown",
+                )
+        for duration, expected in (
+            (59, "59 s"),
+            (60, "1 min"),
+            (78, "1 min 18 s"),
+            (120, "2 min"),
+            (3599, "59 min 59 s"),
+        ):
+            with self.subTest(duration=duration):
+                self.assertEqual(
+                    title({**unknown_event(), "durationSeconds": duration}),
+                    f"Time unknown · {expected}",
                 )
         for duration, expected in ((0, "0"), (2.5, "2.5")):
             with self.subTest(duration=duration):
