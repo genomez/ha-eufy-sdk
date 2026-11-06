@@ -1,10 +1,12 @@
-# ruff: noqa: PLR2004 - HTTP success status
-"""Recordings RPC and fixed-origin, bounded cover transport."""
+# ruff: noqa: PLR2004 - HTTP success status and protocol bounds
+"""Recordings RPC and fixed-origin cover and clip transport."""
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
+from contextlib import asynccontextmanager
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -15,11 +17,12 @@ from yarl import URL
 from . import recordings_models as models
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from typing import Any
 
 
 class RecordingsApi:
-    """Add browse-only wrappers to the existing bridge connection."""
+    """Add recording wrappers to the existing bridge connection."""
 
     recordings_capability: dict | None = None
 
@@ -82,6 +85,66 @@ class RecordingsApi:
             mode="request_if_admitted" if request_if_admitted else "cache_only",
         )
         return models.cover(payload, camera_id, event_id)
+
+    async def _recordings_clip(
+        self, command: str, camera_id: str, event_id: str
+    ) -> dict:
+        """Keep playback opt-in and use only validated opaque identities."""
+        models.require((self.recordings_capability or {}).get("playback") is True)
+        payload = await self._recordings_rpc(
+            command,
+            cameraId=models.opaque_id(camera_id, "c"),
+            eventId=models.opaque_id(event_id, "e"),
+        )
+        return models.clip(payload)
+
+    async def recordings_clip_prepare(self, camera_id: str, event_id: str) -> dict:
+        """Idempotently request a saved clip under the bridge's live-view policy."""
+        return await self._recordings_clip(
+            "recordings.clip_prepare", camera_id, event_id
+        )
+
+    async def recordings_clip_status(self, camera_id: str, event_id: str) -> dict:
+        """Read clip progress without starting a replacement job."""
+        return await self._recordings_clip(
+            "recordings.clip_status", camera_id, event_id
+        )
+
+    async def recordings_clip_cancel(self, camera_id: str, event_id: str) -> dict:
+        """Expose explicit cancellation, never use it when a viewer disconnects."""
+        return await self._recordings_clip(
+            "recordings.clip_cancel", camera_id, event_id
+        )
+
+    @asynccontextmanager
+    async def open_recordings_clip(
+        self, camera_id: str, event_id: str, byte_range: str | None = None
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        """Open a fixed-origin stream under the same session/auth policy as covers."""
+        models.require((self.recordings_capability or {}).get("playback") is True)
+        models.opaque_id(camera_id, "c")
+        models.opaque_id(event_id, "e")
+        if byte_range is not None:
+            models.require(
+                len(byte_range) <= 128
+                and re.fullmatch(r"bytes=(?:[0-9]+-[0-9]*|-[0-9]+)", byte_range)
+                is not None
+            )
+        origin = URL(self._url).with_scheme("http").origin()
+        url = origin / "recordings" / "v1" / "clips" / camera_id / (event_id + ".mp4")
+        try:
+            async with self._session.get(
+                url,
+                headers={"Range": byte_range} if byte_range is not None else {},
+                allow_redirects=False,
+                auto_decompress=False,
+                timeout=aiohttp.ClientTimeout(
+                    total=None, sock_connect=10, sock_read=30
+                ),
+            ) as response:
+                yield response
+        except (aiohttp.ClientError, OSError, TimeoutError):
+            raise models.RecordingsError from None
 
     async def fetch_recordings_cover(
         self, camera_id: str, event_id: str, ready: dict

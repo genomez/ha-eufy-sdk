@@ -1,5 +1,5 @@
 # ruff: noqa: PLR2004 - fixed resource bounds from the v1 contract
-"""Entry-owned browse interests and bounded ephemeral cover delivery."""
+"""Entry-owned browse interests and bounded ephemeral recording delivery."""
 
 from __future__ import annotations
 
@@ -16,10 +16,23 @@ if TYPE_CHECKING:
 WAIT_SECONDS = 10
 CACHE_SECONDS = 60
 CACHE_BYTES = 16 * 1024 * 1024
+CLIP_POLL_SECONDS = 2
+CLIP_NOTICE_SECONDS = 0.5
+CLIP_GRACE_SECONDS = 60
+CLIP_UNKNOWN_SECONDS = 120
+
+
+class ClipUnavailableError(RecordingsError):
+    """Carry only an allowlisted playback failure code."""
+
+    def __init__(self, reason: str) -> None:
+        """Keep arbitrary bridge errors out of user messages."""
+        super().__init__()
+        self.reason = reason
 
 
 class RecordingRuntime:
-    """Never poll, prefetch, publish entities, or persist recording metadata."""
+    """Keep recording work on demand, entry-owned and ephemeral."""
 
     def __init__(self, client: EufySdkApiClient) -> None:
         """Bind one entry to the existing WS lifetime."""
@@ -35,6 +48,7 @@ class RecordingRuntime:
         )
         self.jobs: dict[tuple[str, str], asyncio.Task] = {}
         self.wakeups: dict[tuple[str, str], asyncio.Event] = {}
+        self.clip_wakeups: set[tuple[str, asyncio.Event]] = set()
         self.admitted: set[tuple[str, str]] = set()
         self.waiters = 0
         self.generation = 0
@@ -43,6 +57,8 @@ class RecordingRuntime:
     def reset(self) -> None:
         """Invalidate every old completion and release all waiters."""
         self.generation += 1
+        for _, wakeup in self.clip_wakeups:
+            wakeup.set()
         for job in self.jobs.values():
             job.cancel()
         self.jobs.clear()
@@ -88,6 +104,83 @@ class RecordingRuntime:
             self.scope = scope
         self.cameras = {row["cameraId"]: row for row in result["cameras"]}
         return list(self.cameras.values())
+
+    def playback_supported(self) -> bool:
+        """Old bridges and a disabled bridge playback switch remain browse-only."""
+        return (
+            self.available_scope() is not None
+            and (self.client.recordings_capability or {}).get("playback") is True
+        )
+
+    def validate_clip(self, camera: str, event_id: str) -> None:
+        """Apply the same enrollment and retained-event checks as the cover view."""
+        opaque_id(camera, "c")
+        opaque_id(event_id, "e")
+        require(self.playback_supported() and camera in self.cameras)
+        require(event_id in self.events.get(camera, {}))
+
+    async def prepare_clip(self, camera: str, event_id: str) -> dict:
+        """Resolve one viewer with notices plus bounded polling, without a child job."""
+        require(self.playback_supported())
+        require(len(self.clip_wakeups) < 8)
+        generation = self.generation
+        scope = self.scope
+        # A focused browse validates enrollment and event membership even for a
+        # direct media URI which has not previously been browsed in this process.
+        page = await self.browse(camera, event_id)
+        require(
+            self.playback_supported()
+            and scope == self.scope
+            and generation == self.generation
+        )
+        duration = page["events"][0]["durationSeconds"]
+        expected = duration if duration is not None else CLIP_UNKNOWN_SECONDS
+        wakeup = asyncio.Event()
+        waiter = (camera, wakeup)
+        require(len(self.clip_wakeups) < 8)
+        self.clip_wakeups.add(waiter)
+        try:
+            started = time.monotonic()
+            async with asyncio.timeout(expected + CLIP_GRACE_SECONDS) as deadline:
+                reply = await self.client.recordings_clip_prepare(camera, event_id)
+                while True:
+                    require(
+                        self.playback_supported()
+                        and scope == self.scope
+                        and generation == self.generation
+                    )
+                    # Anchor extensions to the original start so repeated notices
+                    # cannot keep a stuck job alive indefinitely.
+                    reported = reply["progress"]["expectedMs"] or reply["durationMs"]
+                    if reported is not None:
+                        expected = max(expected, reported / 1000)
+                        deadline.reschedule(started + expected + CLIP_GRACE_SECONDS)
+                    if reply["state"] == "ready":
+                        return reply
+                    if reply["state"] in ("failed", "refused", "cancelled", "idle"):
+                        raise ClipUnavailableError(reply["reason"])
+                    checked = time.monotonic()
+                    try:
+                        async with asyncio.timeout(CLIP_POLL_SECONDS):
+                            await wakeup.wait()
+                    except TimeoutError:
+                        pass
+                    # Coalesce rapid progress notices, retaining a two-second
+                    # fallback even when the bridge omits change notifications.
+                    delay = CLIP_NOTICE_SECONDS - (time.monotonic() - checked)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                    wakeup.clear()
+                    require(
+                        self.playback_supported()
+                        and scope == self.scope
+                        and generation == self.generation
+                    )
+                    reply = await self.client.recordings_clip_status(camera, event_id)
+        finally:
+            # Cancellation removes only this waiter. The shared bridge job must
+            # have its own bounded expiry, since another viewer may still need it.
+            self.clip_wakeups.discard(waiter)
 
     async def browse(self, camera: str, event_id: str | None = None) -> dict:
         """Make exactly one metadata RPC for an authenticated folder browse."""
@@ -137,7 +230,10 @@ class RecordingRuntime:
             camera = value.get("cameraId")
             if camera is not None:
                 opaque_id(camera, "c")
-            require(value.get("reason") in ("catalog", "cover", "eviction", "disabled"))
+            require(
+                value.get("reason")
+                in ("catalog", "cover", "clip", "eviction", "disabled")
+            )
         except RecordingsError:
             return
         if value["reason"] == "disabled":
@@ -146,6 +242,9 @@ class RecordingRuntime:
             return
         for key, wakeup in self.wakeups.items():
             if camera is None or key[0] == camera:
+                wakeup.set()
+        for clip_camera, wakeup in self.clip_wakeups:
+            if camera is None or clip_camera == camera:
                 wakeup.set()
 
     async def cover(

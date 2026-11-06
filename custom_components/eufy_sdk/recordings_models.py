@@ -130,9 +130,14 @@ def capability(value: Any) -> dict | None:
             ("coverBudget", 4),
         ):
             require(type(value.get(key)) is int and value[key] == expected)
-        return {"scopeId": opaque_id(value.get("scopeId"), "s")}
+        result = {"scopeId": opaque_id(value.get("scopeId"), "s")}
+        # This flag is advertised only when the bridge playback switch is on.
+        if value.get("playback") is True:
+            result["playback"] = True
     except RecordingsError:
         return None
+    else:
+        return result
 
 
 def envelope(value: Any) -> dict:
@@ -383,6 +388,59 @@ def cover(value: Any, camera: str, event_id: str) -> dict:
         )
         require(result["bytes"] > 0)
     return result
+
+
+def clip(value: Any) -> dict:
+    """Project clip status without retaining transport selectors or wire text."""
+    require(isinstance(value, dict))
+    no_selectors(value)
+    row = value.get("clip")
+    require(isinstance(row, dict))
+    no_selectors(row)
+    fields(row, ("state", "reason", "progress", "durationMs", "bytes", "expiresAtMs"))
+    progress = row["progress"]
+    require(isinstance(progress, dict))
+    no_selectors(progress)
+    fields(progress, ("pulledMs", "expectedMs"))
+    return {
+        "state": choice(
+            row["state"],
+            (
+                "idle",
+                "queued",
+                "pulling",
+                "converting",
+                "ready",
+                "failed",
+                "refused",
+                "cancelled",
+            ),
+        ),
+        "reason": choice(
+            row["reason"],
+            (
+                "none",
+                "live_view",
+                "busy",
+                "owner_unavailable",
+                "not_found",
+                "too_long",
+                "storage",
+                "convert_failed",
+                "station_error",
+                "cleanup_uncertain",
+            ),
+        ),
+        "progress": {
+            "pulledMs": number(progress["pulledMs"], maximum=86400000),
+            "expectedMs": number(
+                progress["expectedMs"], nullable=True, maximum=86400000
+            ),
+        },
+        "durationMs": number(row["durationMs"], nullable=True, maximum=86400000),
+        "bytes": number(row["bytes"], nullable=True),
+        "expiresAtMs": time_ms(row["expiresAtMs"], nullable=True),
+    }
 
 
 def diagnostics(value: Any) -> dict:

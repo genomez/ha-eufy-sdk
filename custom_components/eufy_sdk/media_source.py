@@ -1,24 +1,30 @@
 # ruff: noqa: PLR2004 - fixed media path grammar
-"""Browse-only Home Assistant media source for bridge recording metadata."""
+"""Home Assistant recording browser with opt-in saved clip playback."""
 
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+from homeassistant.components.http.auth import async_sign_path
 from homeassistant.components.media_player import BrowseError, MediaClass
-from homeassistant.components.media_source import BrowseMediaSource, MediaSource
+from homeassistant.components.media_source import (
+    BrowseMediaSource,
+    MediaSource,
+    PlayMedia,
+)
 from homeassistant.components.media_source.error import Unresolvable
 from homeassistant.config_entries import ConfigEntryState
 
 from .const import DOMAIN
+from .recordings import ClipUnavailableError
 from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
 
 if TYPE_CHECKING:
-    from homeassistant.components.media_source import MediaSourceItem, PlayMedia
+    from homeassistant.components.media_source import MediaSourceItem
     from homeassistant.core import HomeAssistant
 
     from .recordings import RecordingRuntime
@@ -87,7 +93,7 @@ def find_runtime(hass: HomeAssistant, scope: str) -> RecordingRuntime:
     return matches[0]
 
 
-def title(event: dict, *, detail: bool = False) -> str:
+def title(event: dict, *, detail: bool = False, playback: bool = False) -> str:
     """Show station-local time first with fixed English display labels."""
     if event["timeStatus"] == "valid" and event["startedAtLocal"] is not None:
         local = datetime.fromisoformat(event["startedAtLocal"]).astimezone(
@@ -112,7 +118,7 @@ def title(event: dict, *, detail: bool = False) -> str:
         result += " · Chicago time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
         result += " · UTC " + event["startedAtUtc"]
-    if detail:
+    if detail and not playback:
         result += " · Browse only — video unavailable"
     if detail and event["stationPresence"] == "not_in_latest_window":
         result += " · May no longer be on HomeBase"
@@ -167,7 +173,7 @@ async def async_get_media_source(hass: HomeAssistant) -> EufyRecordingMediaSourc
 
 
 class EufyRecordingMediaSource(MediaSource):
-    """Render metadata only, with authenticated relative thumbnail URLs."""
+    """Render metadata and resolve saved clips through authenticated HA URLs."""
 
     name = "Eufy"
 
@@ -176,12 +182,32 @@ class EufyRecordingMediaSource(MediaSource):
         super().__init__(DOMAIN)
         self.hass = hass
 
-    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:  # noqa: ARG002 - HA provider signature
-        """Reject even forged direct resolve calls without transport activity."""
-        message = "Browse only — video unavailable"
-        raise Unresolvable(
-            message, translation_domain=DOMAIN, translation_key="recordings_browse_only"
-        )
+    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
+        """Wait for a complete clip before handing the frontend a signed path."""
+        try:
+            scope, camera, event_id = parse_identifier(item.identifier)
+            require(event_id is not None)
+            runtime = find_runtime(self.hass, scope)
+            if not runtime.playback_supported():
+                reason = "browse_only"
+                raise playback_error(reason)
+            ready = await runtime.prepare_clip(camera, event_id)
+            # Permit seeking/reloading for at least 15 minutes, or clip length
+            # plus five minutes for longer recordings. Bridge expiry still wins.
+            lifetime = max(900, (ready["durationMs"] or 0) / 1000 + 300)
+            path = f"/api/{DOMAIN}/recordings/{scope}/{camera}/{event_id}/clip.mp4"
+            return PlayMedia(
+                async_sign_path(self.hass, path, timedelta(seconds=lifetime)),
+                "video/mp4",
+            )
+        except ClipUnavailableError as err:
+            raise playback_error(err.reason) from None
+        except TimeoutError:
+            reason = "timeout"
+            raise playback_error(reason) from None
+        except (RecordingsError, KeyError, ValueError):
+            reason = "failed"
+            raise playback_error(reason) from None
 
     async def async_browse_media(self, item: MediaSourceItem) -> BrowseMediaSource:
         """Browse one camera or one information folder without prefetching."""
@@ -201,6 +227,7 @@ class EufyRecordingMediaSource(MediaSource):
             unknown_time = item.identifier.endswith("/u")
             runtime = find_runtime(self.hass, scope)
             page = await runtime.browse(camera, event_id)
+            playback = runtime.playback_supported()
             unknown_events = [
                 event for event in page["events"] if event["timeStatus"] != "valid"
             ]
@@ -222,10 +249,15 @@ class EufyRecordingMediaSource(MediaSource):
                     thumbnail += "?v=" + event["coverRevision"]
                 row = directory(
                     identifier,
-                    title(event, detail=event_id is not None),
+                    title(event, detail=event_id is not None, playback=playback),
                     children=[] if event_id else None,
                     thumbnail=thumbnail,
                 )
+                if playback:
+                    row.can_play = True
+                    row.can_expand = False
+                    row.media_class = MediaClass.VIDEO
+                    row.media_content_type = "video/mp4"
                 if event_id:
                     return row
                 children.append(row)
@@ -247,3 +279,24 @@ class EufyRecordingMediaSource(MediaSource):
                 translation_domain=DOMAIN,
                 translation_key="recordings_unavailable",
             ) from None
+
+
+def playback_error(reason: str) -> Unresolvable:
+    """Map fixed protocol reasons to short, translatable messages."""
+    messages = {
+        "browse_only": "Browse only — video unavailable",
+        "live_view": "Live view is on — try again after it ends",
+        "not_found": "Recording is no longer on the HomeBase",
+        "busy": "HomeBase is busy — try again shortly",
+        "owner_unavailable": "HomeBase is unavailable — try again shortly",
+        "too_long": "Recording is too long to prepare",
+        "timeout": "Video is still preparing — try again shortly",
+        "failed": "Couldn't prepare the video",
+    }
+    key = reason if reason in messages else "failed"
+    return Unresolvable(
+        messages[key],
+        translation_domain=DOMAIN,
+        translation_key="recordings_"
+        + ("browse_only" if key == "browse_only" else "clip_" + key),
+    )

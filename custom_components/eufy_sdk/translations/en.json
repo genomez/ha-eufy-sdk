@@ -203,6 +203,27 @@
     },
     "recordings_unavailable": {
       "message": "Recordings unavailable"
+    },
+    "recordings_clip_live_view": {
+      "message": "Live view is on — try again after it ends"
+    },
+    "recordings_clip_not_found": {
+      "message": "Recording is no longer on the HomeBase"
+    },
+    "recordings_clip_busy": {
+      "message": "HomeBase is busy — try again shortly"
+    },
+    "recordings_clip_owner_unavailable": {
+      "message": "HomeBase is unavailable — try again shortly"
+    },
+    "recordings_clip_too_long": {
+      "message": "Recording is too long to prepare"
+    },
+    "recordings_clip_timeout": {
+      "message": "Video is still preparing — try again shortly"
+    },
+    "recordings_clip_failed": {
+      "message": "Couldn't prepare the video"
     }
   },
   "device_automation": {

@@ -239,5 +239,9 @@ class CoverTests(unittest.IsolatedAsyncioTestCase):
         hass.async_add_executor_job = AsyncMock(return_value=self.placeholder)
         await async_register_view(hass)
         await async_register_view(hass)
-        hass.http.register_view.assert_called_once()
+        self.assertEqual(hass.http.register_view.call_count, 2)
+        self.assertEqual(
+            [call.args[0].name for call in hass.http.register_view.call_args_list],
+            ["api:eufy_sdk:recordings:cover", "api:eufy_sdk:recordings:clip"],
+        )
         self.assertTrue(self.placeholder.startswith(b"\x89PNG\r\n\x1a\n"))
