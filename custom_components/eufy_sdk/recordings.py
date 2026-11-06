@@ -41,7 +41,7 @@ class RecordingRuntime:
         self.scope: str | None = None
         self.cameras: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
-        self.events: dict[str, OrderedDict[str, None]] = {}
+        self.events: dict[str, OrderedDict[str, bool]] = {}
         self.interests: dict[str, tuple[str, float, frozenset[str]]] = {}
         self.cache: OrderedDict[tuple[str, str], tuple[float, bytes, str | None]] = (
             OrderedDict()
@@ -117,7 +117,7 @@ class RecordingRuntime:
         opaque_id(camera, "c")
         opaque_id(event_id, "e")
         require(self.playback_supported() and camera in self.cameras)
-        require(event_id in self.events.get(camera, {}))
+        require(self.events.get(camera, {}).get(event_id) is True)
 
     async def prepare_clip(self, camera: str, event_id: str) -> dict:
         """Resolve one viewer with notices plus bounded polling, without a child job."""
@@ -133,7 +133,11 @@ class RecordingRuntime:
             and scope == self.scope
             and generation == self.generation
         )
-        duration = page["events"][0]["durationSeconds"]
+        event = page["events"][0]
+        if not event["playable"]:
+            reason = "browse_only"
+            raise ClipUnavailableError(reason)
+        duration = event["durationSeconds"]
         expected = duration if duration is not None else CLIP_UNKNOWN_SECONDS
         wakeup = asyncio.Event()
         waiter = (camera, wakeup)
@@ -197,14 +201,14 @@ class RecordingRuntime:
         if event_id is None:
             self.pages[camera] = page
             self.events[camera] = OrderedDict(
-                (row["eventId"], None) for row in page["events"]
+                (row["eventId"], row["playable"]) for row in page["events"]
             )
         else:
             require(
                 len(page["events"]) == 1 and page["events"][0]["eventId"] == event_id
             )
             known = self.events.setdefault(camera, OrderedDict())
-            known[event_id] = None
+            known[event_id] = page["events"][0]["playable"]
             known.move_to_end(event_id)
             while len(known) > 100:
                 known.popitem(last=False)

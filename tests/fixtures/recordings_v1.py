@@ -21,11 +21,11 @@ EVENT = "e_" + "E" * 22
 OTHER = "e_" + "F" * 22
 
 
-def capability() -> dict:
-    """Advertise the unchanged additive capability fields."""
-    return {
+def capability(*, playback: bool | None = None) -> dict:
+    """Mirror recordings.mjs base(); omit playback for a legacy bridge."""
+    result = {
         "version": 1,
-        "browseOnly": True,
+        "browseOnly": playback is not True,
         "enabled": True,
         "scopeId": SCOPE,
         "timezone": TIMEZONE,
@@ -33,6 +33,9 @@ def capability() -> dict:
         "pageSize": 100,
         "coverBudget": 4,
     }
+    if playback is not None:
+        result["playback"] = playback
+    return result
 
 
 def cameras() -> dict:
@@ -51,8 +54,8 @@ def cameras() -> dict:
     }
 
 
-def event(event_id: str = EVENT) -> dict:
-    """Return a retained event with qualified Chicago and UTC time."""
+def event(event_id: str = EVENT, *, playable: bool = False) -> dict:
+    """Mirror publicRecording(): playable reflects private event authority."""
     return {
         "eventId": event_id,
         "cameraId": CAMERA,
@@ -72,7 +75,7 @@ def event(event_id: str = EVENT) -> dict:
         "stationPresence": "not_in_latest_window",
         "coverState": "not_requested",
         "coverRevision": None,
-        "playable": False,
+        "playable": playable,
     }
 
 
@@ -134,12 +137,12 @@ def client() -> EufySdkApiClient:
     return api
 
 
-async def runtime() -> RecordingRuntime:
+async def runtime(*, playable: bool = False) -> RecordingRuntime:
     """Return a browsed runtime with no actual I/O."""
     api = client()
     api.rpc.side_effect = [
         {"ok": True, "recordings": cameras()},
-        {"ok": True, "recordings": page()},
+        {"ok": True, "recordings": page([event(playable=playable)])},
     ]
     result = RecordingRuntime(api)
     await result.list_cameras()

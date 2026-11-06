@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -17,6 +19,7 @@ from homeassistant.components.media_source import (
     PlayMedia,
 )
 from homeassistant.components.media_source.error import Unresolvable
+from homeassistant.components.websocket_api import current_connection
 from homeassistant.config_entries import ConfigEntryState
 
 from .const import DOMAIN
@@ -24,7 +27,10 @@ from .recordings import ClipUnavailableError
 from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from homeassistant.components.media_source import MediaSourceItem
+    from homeassistant.components.websocket_api.connection import MessageHandler
     from homeassistant.core import HomeAssistant
 
     from .recordings import RecordingRuntime
@@ -172,6 +178,52 @@ async def async_get_media_source(hass: HomeAssistant) -> EufyRecordingMediaSourc
     return EufyRecordingMediaSource(hass)
 
 
+@contextmanager
+def viewer_wait() -> Iterator[None]:
+    """Bind a pending frontend resolve to its connection and next navigation."""
+    connection = current_connection.get()
+    if connection is None:
+        # Service callers retain normal task cancellation and the bounded wait.
+        yield
+        return
+    task = asyncio.current_task()
+    require(task is not None)
+    subscription = object()
+    original_handlers = connection.handlers
+    handlers = original_handlers.copy()
+
+    def restore_handlers() -> None:
+        if connection.handlers is handlers:
+            connection.handlers = original_handlers
+
+    def cancel() -> None:
+        # Never cancel the shared bridge job: another connection may need it.
+        task.cancel()
+
+    def navigation_handler(handler: MessageHandler) -> MessageHandler:
+        def navigate(hass, active, message) -> None:  # noqa: ANN001 - HA handler signature
+            cancel()
+            restore_handlers()
+            handler(hass, active, message)
+
+        return navigate
+
+    # HA keeps async websocket responders alive after disconnect, and navigation
+    # to another provider never calls this media source. Intercept only the next
+    # media browse/resolve on this connection, preserving HA's command schemas.
+    for command in ("media_source/browse_media", "media_source/resolve_media"):
+        if command in handlers:
+            handler, schema = handlers[command]
+            handlers[command] = (navigation_handler(handler), schema)
+    connection.handlers = handlers
+    connection.subscriptions[subscription] = cancel
+    try:
+        yield
+    finally:
+        connection.subscriptions.pop(subscription, None)
+        restore_handlers()
+
+
 class EufyRecordingMediaSource(MediaSource):
     """Render metadata and resolve saved clips through authenticated HA URLs."""
 
@@ -191,7 +243,8 @@ class EufyRecordingMediaSource(MediaSource):
             if not runtime.playback_supported():
                 reason = "browse_only"
                 raise playback_error(reason)
-            ready = await runtime.prepare_clip(camera, event_id)
+            with viewer_wait():
+                ready = await runtime.prepare_clip(camera, event_id)
             # Permit seeking/reloading for at least 15 minutes, or clip length
             # plus five minutes for longer recordings. Bridge expiry still wins.
             lifetime = max(900, (ready["durationMs"] or 0) / 1000 + 300)
@@ -247,13 +300,14 @@ class EufyRecordingMediaSource(MediaSource):
                 )
                 if event["coverRevision"] is not None:
                     thumbnail += "?v=" + event["coverRevision"]
+                playable = playback and event["playable"]
                 row = directory(
                     identifier,
-                    title(event, detail=event_id is not None, playback=playback),
+                    title(event, detail=event_id is not None, playback=playable),
                     children=[] if event_id else None,
                     thumbnail=thumbnail,
                 )
-                if playback:
+                if playable:
                     row.can_play = True
                     row.can_expand = False
                     row.media_class = MediaClass.VIDEO
@@ -283,6 +337,8 @@ class EufyRecordingMediaSource(MediaSource):
 
 def playback_error(reason: str) -> Unresolvable:
     """Map fixed protocol reasons to short, translatable messages."""
+    if reason == "disabled":
+        reason = "browse_only"
     messages = {
         "browse_only": "Browse only — video unavailable",
         "live_view": "Live view is on — try again after it ends",

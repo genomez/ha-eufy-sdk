@@ -59,7 +59,7 @@ class ContractTests(unittest.TestCase):
             {"durationSeconds": float("inf")},
             {"durationSeconds": True},
             {"eventId": "../event"},
-            {"playable": True},
+            {"playable": "true"},
             {"sourceStartLocal": "2026-02-31 12:00:00"},
             {"timeStatus": "ambiguous"},
             {"eventType": {"code": 65536}},

@@ -4,20 +4,31 @@ import json
 import unittest
 from copy import deepcopy
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 from fixtures import recordings_v1 as fixture
+from homeassistant.components import websocket_api
 from homeassistant.components.http import auth
 from homeassistant.components.media_player import MediaClass
+from homeassistant.components.media_source.const import MEDIA_SOURCE_DATA
 from homeassistant.components.media_source.error import Unresolvable
+from homeassistant.components.media_source.http import (
+    websocket_browse_media,
+    websocket_resolve_media,
+)
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.http import KEY_HASS, request_handler_factory
 
 from custom_components.eufy_sdk import recordings
 from custom_components.eufy_sdk import recordings_models as models
-from custom_components.eufy_sdk.media_source import EufyRecordingMediaSource
+from custom_components.eufy_sdk.media_source import (
+    EufyRecordingMediaSource,
+    playback_error,
+)
 from custom_components.eufy_sdk.recordings_http import EufyRecordingClipView
 
 IDENTIFIER = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/e/{fixture.EVENT}"
@@ -26,6 +37,7 @@ PATH = (
     f"{fixture.EVENT}/clip.mp4"
 )
 CANARY = "synthetic-private-canary"
+WS_CONFIG_DIR = str(Path(".offline/ws-playback").resolve())
 
 
 def clip(state="ready", reason="none", expected=10000):
@@ -42,9 +54,11 @@ def clip(state="ready", reason="none", expected=10000):
     }
 
 
-class PlaybackTests(unittest.IsolatedAsyncioTestCase):
+class PlaybackFixture(unittest.IsolatedAsyncioTestCase):
+    initial_playable = True
+
     async def asyncSetUp(self):
-        self.runtime = await fixture.runtime()
+        self.runtime = await fixture.runtime(playable=self.initial_playable)
         self.addCleanup(self.runtime.close)
         self.client = self.runtime.client
         self.client.recordings_capability["playback"] = True
@@ -56,7 +70,10 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
         self.hass.is_stopping = False
         self.source = EufyRecordingMediaSource(self.hass)
         self.view = EufyRecordingClipView()
-        self.client.rpc.return_value = {"ok": True, "recordings": fixture.page()}
+        self.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([fixture.event(playable=True)]),
+        }
         self.client.recordings_clip_prepare = AsyncMock(
             return_value=models.clip(clip())
         )
@@ -67,6 +84,8 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
             SimpleNamespace(identifier=identifier)
         )
 
+
+class PlaybackTests(PlaybackFixture):
     async def test_playable_rows_detail_and_browse_only_fallback(self):
         for playback in (True, False, None, "true"):
             with self.subTest(playback=playback):
@@ -88,6 +107,35 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
                     SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
                 )
                 self.assertIs(page.children[0].can_play, playback is True)
+
+    async def test_event_authority_and_feature_both_gate_browse_and_resolve(self):
+        for playback, playable in (
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ):
+            with self.subTest(playback=playback, playable=playable):
+                self.client.recordings_capability["playback"] = playback
+                self.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.page([fixture.event(playable=playable)]),
+                }
+                row = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=IDENTIFIER)
+                )
+                self.assertIs(row.can_play, playback and playable)
+                self.assertIs(row.can_expand, not (playback and playable))
+                self.assertEqual(
+                    "Browse only" in row.title, not (playback and playable)
+                )
+                self.client.recordings_clip_prepare.reset_mock()
+                if playback and playable:
+                    self.assertEqual((await self.resolve()).mime_type, "video/mp4")
+                else:
+                    with self.assertRaisesRegex(Unresolvable, "Browse only"):
+                        await self.resolve()
+                    self.client.recordings_clip_prepare.assert_not_awaited()
 
     async def test_prepare_ready_returns_real_signed_relative_url(self):
         result = await self.resolve()
@@ -182,7 +230,9 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_duration_has_three_minutes_and_poll_errors_are_private(self):
         self.client.rpc.return_value = {
             "ok": True,
-            "recordings": fixture.page([{**fixture.event(), "durationSeconds": None}]),
+            "recordings": fixture.page(
+                [{**fixture.event(playable=True), "durationSeconds": None}]
+            ),
         }
         self.client.recordings_clip_prepare.return_value = models.clip(
             clip("converting", expected=None)
@@ -202,7 +252,9 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
     async def test_timeout_is_bounded_and_translated(self):
         self.client.rpc.return_value = {
             "ok": True,
-            "recordings": fixture.page([{**fixture.event(), "durationSeconds": 0}]),
+            "recordings": fixture.page(
+                [{**fixture.event(playable=True), "durationSeconds": 0}]
+            ),
         }
         self.client.recordings_clip_prepare.return_value = models.clip(
             clip("pulling", expected=0)
@@ -298,7 +350,7 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
         del self.client.recordings_clip_prepare
         del self.client.recordings_clip_status
         self.client.rpc.side_effect = [
-            {"ok": True, "recordings": fixture.page()},
+            {"ok": True, "recordings": fixture.page([fixture.event(playable=True)])},
             {"ok": True, "recordings": clip("converting")},
             {"ok": True, "recordings": clip()},
         ]
@@ -429,6 +481,13 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await self.get(self.request(headers={"Range": value}))
         self.client.recordings_capability["playback"] = False
+        with self.assertRaises(web.HTTPNotFound):
+            await self.get()
+        self.client._session.get.assert_not_called()
+
+    async def test_browse_only_event_cannot_open_cached_clip(self):
+        self.client.rpc.return_value = {"ok": True, "recordings": fixture.page()}
+        await self.runtime.browse(fixture.CAMERA)
         with self.assertRaises(web.HTTPNotFound):
             await self.get()
         self.client._session.get.assert_not_called()
@@ -580,6 +639,41 @@ class ClipContractTests(unittest.IsolatedAsyncioTestCase):
             await client.recordings_clip_prepare("raw-serial", fixture.EVENT)
         client.rpc.assert_not_awaited()
 
+    def test_bridge_capability_combinations_and_legacy_browse_only(self):
+        for playback in (True, False):
+            with self.subTest(playback=playback):
+                wire = fixture.capability(playback=playback)
+                self.assertIs(wire["browseOnly"], not playback)
+                projected = models.capability(wire)
+                self.assertIsNotNone(projected)
+                self.assertEqual(projected["scopeId"], fixture.SCOPE)
+                self.assertIs(projected.get("playback", False), playback)
+        self.assertEqual(
+            models.capability(fixture.capability()), {"scopeId": fixture.SCOPE}
+        )
+
+    def test_bridge_catalog_retains_event_playback_authority(self):
+        for playable in (True, False):
+            with self.subTest(playable=playable):
+                page = models.catalog(
+                    fixture.page([fixture.event(playable=playable)]),
+                    fixture.SCOPE,
+                    fixture.CAMERA,
+                )
+                self.assertIs(page["events"][0]["playable"], playable)
+        for invalid in (None, 0, 1, "true"):
+            with (
+                self.subTest(invalid=invalid),
+                self.assertRaises(models.RecordingsError),
+            ):
+                models.event({**fixture.event(), "playable": invalid}, fixture.CAMERA)
+
+    def test_disabled_clip_reason_uses_browse_only_message(self):
+        reply = models.clip(clip("refused", "disabled"))
+        error = playback_error(reply["reason"])
+        self.assertEqual(str(error), "Browse only — video unavailable")
+        self.assertEqual(error.translation_key, "recordings_browse_only")
+
     def test_capability_switch_is_strict_and_additive(self):
         for value in (None, False, "true", 1):
             self.assertNotIn(
@@ -587,7 +681,7 @@ class ClipContractTests(unittest.IsolatedAsyncioTestCase):
                 models.capability({**fixture.capability(), "playback": value}),
             )
         self.assertTrue(
-            models.capability({**fixture.capability(), "playback": True})["playback"]
+            models.capability(fixture.capability(playback=True))["playback"]
         )
 
     def test_status_projection_rejects_untrusted_fields_and_keeps_errors_private(self):
@@ -610,3 +704,147 @@ class ClipContractTests(unittest.IsolatedAsyncioTestCase):
             ):
                 models.clip(value)
             self.assertNotIn(CANARY, str(caught.exception))
+
+
+class WebsocketPlaybackTests(PlaybackFixture):
+    """Exercise the installed HA dispatcher, handlers and background tasks offline."""
+
+    initial_playable = False
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.ws_hass = HomeAssistant(WS_CONFIG_DIR)
+        self.addCleanup(self.ws_hass.import_executor.shutdown, wait=False)
+        self.ws_hass.config_entries = self.hass.config_entries
+        self.ws_hass.data.update(self.hass.data)
+        self.ws_hass.data["media_source"] = {}
+        self.ws_hass.data[MEDIA_SOURCE_DATA] = {
+            "eufy_sdk": EufyRecordingMediaSource(self.ws_hass)
+        }
+        websocket_api.async_register_command(self.ws_hass, websocket_browse_media)
+        websocket_api.async_register_command(self.ws_hass, websocket_resolve_media)
+        self.original_handlers = self.ws_hass.data["websocket_api"]
+        self.addCleanup(websocket_api.current_connection.set, None)
+        self.addAsyncCleanup(self.cancel_background)
+        # Isolate viewer ownership from wire-model regressions: this is the real
+        # runtime's validated catalog boundary, not a replacement prepare loop.
+        self.client.recordings_catalog = AsyncMock(
+            return_value=fixture.page([fixture.event(playable=True)])
+        )
+        self.client.recordings_clip_prepare.return_value = models.clip(clip("pulling"))
+        self.client.recordings_clip_status.return_value = models.clip(clip("pulling"))
+        self.client.recordings_clip_cancel = AsyncMock()
+
+    async def cancel_background(self):
+        tasks = list(self.ws_hass._background_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    def connection(self):
+        messages = []
+        connection = websocket_api.ActiveConnection(
+            Mock(),
+            self.ws_hass,
+            messages.append,
+            Mock(name="synthetic-user"),
+            None,
+            None,
+        )
+        return connection, messages
+
+    def dispatch(
+        self, connection, msg_id, command="resolve_media", identifier=IDENTIFIER
+    ):
+        token = websocket_api.current_connection.set(connection)
+        try:
+            connection.async_handle(
+                {
+                    "id": msg_id,
+                    "type": "media_source/" + command,
+                    "media_content_id": "media-source://eufy_sdk/" + identifier,
+                }
+            )
+        finally:
+            websocket_api.current_connection.reset(token)
+
+    async def test_real_ha_websocket_close_releases_admission_and_stops_polling(self):
+        with patch.object(recordings, "CLIP_POLL_SECONDS", 0.005):
+            for _ in range(9):
+                connection, messages = self.connection()
+                self.dispatch(connection, 1)
+                await asyncio.sleep(0)
+                self.assertEqual(len(self.runtime.clip_wakeups), 1)
+                self.assertFalse(messages)
+                connection.async_handle_close()
+                await asyncio.sleep(0)
+                self.assertFalse(self.runtime.clip_wakeups)
+                self.assertFalse(connection.subscriptions)
+                self.assertIs(connection.handlers, self.original_handlers)
+                await asyncio.gather(
+                    *list(self.ws_hass._background_tasks), return_exceptions=True
+                )
+            polls = self.client.recordings_clip_status.await_count
+            await asyncio.sleep(0.015)
+            self.assertEqual(self.client.recordings_clip_status.await_count, polls)
+            self.assertFalse(self.ws_hass._background_tasks)
+            self.client.recordings_clip_status.assert_not_awaited()
+            self.client.recordings_clip_cancel.assert_not_awaited()
+
+    async def test_real_ha_navigation_cancels_only_that_connection(self):
+        first, first_messages = self.connection()
+        second, second_messages = self.connection()
+        with (
+            patch.object(recordings, "CLIP_POLL_SECONDS", 3600),
+            patch.object(recordings, "CLIP_NOTICE_SECONDS", 0),
+        ):
+            self.dispatch(first, 1)
+            self.dispatch(second, 1)
+            await asyncio.sleep(0)
+            self.assertEqual(len(self.runtime.clip_wakeups), 2)
+            # Navigate to the global source list, which never calls our browse.
+            token = websocket_api.current_connection.set(first)
+            try:
+                first.async_handle(
+                    {
+                        "id": 2,
+                        "type": "media_source/browse_media",
+                        "media_content_id": "media-source://",
+                    }
+                )
+            finally:
+                websocket_api.current_connection.reset(token)
+            await asyncio.sleep(0)
+            self.assertEqual(len(self.runtime.clip_wakeups), 1)
+            self.assertFalse(first.subscriptions)
+            self.assertIs(first.handlers, self.original_handlers)
+            self.assertEqual(len(first_messages), 1)
+            self.client.recordings_clip_status.return_value = models.clip(clip())
+            for _, wakeup in self.runtime.clip_wakeups:
+                wakeup.set()
+            await asyncio.gather(
+                *list(self.ws_hass._background_tasks), return_exceptions=True
+            )
+            self.assertEqual(
+                json.loads(second_messages[0])["result"]["mime_type"], "video/mp4"
+            )
+        self.assertFalse(self.runtime.clip_wakeups)
+        self.assertFalse(second.subscriptions)
+        self.assertIs(second.handlers, self.original_handlers)
+        self.client.recordings_clip_cancel.assert_not_awaited()
+
+    async def test_real_ha_new_resolve_replaces_only_its_previous_wait(self):
+        connection, messages = self.connection()
+        with patch.object(recordings, "CLIP_POLL_SECONDS", 3600):
+            self.dispatch(connection, 1)
+            await asyncio.sleep(0)
+            self.dispatch(connection, 2)
+            await asyncio.sleep(0)
+            self.assertEqual(len(self.runtime.clip_wakeups), 1)
+            self.assertFalse(messages)
+            self.assertEqual(len(connection.subscriptions), 1)
+            connection.async_handle_close()
+            await asyncio.sleep(0)
+            self.assertFalse(self.runtime.clip_wakeups)
+            self.client.recordings_clip_status.assert_not_awaited()
+            self.client.recordings_clip_cancel.assert_not_awaited()

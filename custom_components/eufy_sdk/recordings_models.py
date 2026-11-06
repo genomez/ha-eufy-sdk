@@ -122,7 +122,9 @@ def capability(value: Any) -> dict | None:
     try:
         require(isinstance(value, dict))
         require(type(value.get("version")) is int and value["version"] == 1)
-        require(value.get("browseOnly") is True and value.get("enabled") is True)
+        playback = value.get("playback") is True
+        require(value.get("enabled") is True)
+        require(value.get("browseOnly") is (not playback))
         require(value.get("timezone") == TIMEZONE)
         for key, expected in (
             ("stationWindow", 20),
@@ -132,7 +134,7 @@ def capability(value: Any) -> dict | None:
             require(type(value.get(key)) is int and value[key] == expected)
         result = {"scopeId": opaque_id(value.get("scopeId"), "s")}
         # This flag is advertised only when the bridge playback switch is on.
-        if value.get("playback") is True:
+        if playback:
             result["playback"] = True
     except RecordingsError:
         return None
@@ -192,12 +194,12 @@ def event(value: Any, camera: str) -> dict:
     """Allowlist an event without retaining selectors or vendor strings."""
     require(isinstance(value, dict) and value.get("cameraId") == camera)
     no_selectors(value)
-    require(value.get("playable") is False and value.get("timezone") == TIMEZONE)
+    require(value.get("timezone") == TIMEZONE)
     fields(value, ("startedAtMs", "endedAtMs", "durationSeconds"))
     result = {
         "eventId": opaque_id(value.get("eventId"), "e"),
         "cameraId": camera,
-        "playable": False,
+        "playable": flag(value.get("playable")),
         "timezone": TIMEZONE,
     }
     for key in ("startedAtMs", "endedAtMs"):
@@ -429,6 +431,7 @@ def clip(value: Any) -> dict:
                 "convert_failed",
                 "station_error",
                 "cleanup_uncertain",
+                "disabled",
             ),
         ),
         "progress": {
