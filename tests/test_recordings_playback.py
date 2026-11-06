@@ -46,9 +46,11 @@ def clip(state="ready", reason="none", expected=10000):
         "clip": {
             "state": state,
             "reason": reason,
-            "progress": {"pulledMs": 0, "expectedMs": expected},
-            "durationMs": expected,
-            "bytes": 12 if state == "ready" else None,
+            # Mirror the bridge: unknown values are numeric 0 in progress, the
+            # duration is set only once ready, and bytes are 0 until then.
+            "progress": {"pulledMs": 0, "expectedMs": expected or 0},
+            "durationMs": expected if state == "ready" else None,
+            "bytes": 12 if state == "ready" else 0,
             "expiresAtMs": 1794000000000 if state == "ready" else None,
         }
     }
@@ -800,7 +802,8 @@ class WebsocketPlaybackTests(PlaybackFixture):
         ):
             self.dispatch(first, 1)
             self.dispatch(second, 1)
-            await asyncio.sleep(0)
+            for _ in range(5):
+                await asyncio.sleep(0)
             self.assertEqual(len(self.runtime.clip_wakeups), 2)
             # Navigate to the global source list, which never calls our browse.
             token = websocket_api.current_connection.set(first)
@@ -814,7 +817,8 @@ class WebsocketPlaybackTests(PlaybackFixture):
                 )
             finally:
                 websocket_api.current_connection.reset(token)
-            await asyncio.sleep(0)
+            for _ in range(5):
+                await asyncio.sleep(0)
             self.assertEqual(len(self.runtime.clip_wakeups), 1)
             self.assertFalse(first.subscriptions)
             self.assertIs(first.handlers, self.original_handlers)
@@ -833,18 +837,42 @@ class WebsocketPlaybackTests(PlaybackFixture):
         self.assertIs(second.handlers, self.original_handlers)
         self.client.recordings_clip_cancel.assert_not_awaited()
 
+    async def test_real_ha_replacement_at_capacity_is_admitted(self):
+        with patch.object(recordings, "CLIP_POLL_SECONDS", 3600):
+            pairs = [self.connection() for _ in range(8)]
+            for number, (connection, _messages) in enumerate(pairs, start=1):
+                self.dispatch(connection, number)
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertEqual(len(self.runtime.clip_wakeups), 8)
+            connection, messages = pairs[0]
+            self.dispatch(connection, 100)
+            for _ in range(10):
+                await asyncio.sleep(0)
+            # The replacement waits in place of its predecessor: no refusal.
+            self.assertEqual(len(self.runtime.clip_wakeups), 8)
+            self.assertFalse(messages)
+            for other, _messages in pairs:
+                other.async_handle_close()
+            for _ in range(5):
+                await asyncio.sleep(0)
+            self.assertFalse(self.runtime.clip_wakeups)
+
     async def test_real_ha_new_resolve_replaces_only_its_previous_wait(self):
         connection, messages = self.connection()
         with patch.object(recordings, "CLIP_POLL_SECONDS", 3600):
             self.dispatch(connection, 1)
-            await asyncio.sleep(0)
+            for _ in range(5):
+                await asyncio.sleep(0)
             self.dispatch(connection, 2)
-            await asyncio.sleep(0)
+            for _ in range(5):
+                await asyncio.sleep(0)
             self.assertEqual(len(self.runtime.clip_wakeups), 1)
             self.assertFalse(messages)
             self.assertEqual(len(connection.subscriptions), 1)
             connection.async_handle_close()
-            await asyncio.sleep(0)
+            for _ in range(5):
+                await asyncio.sleep(0)
             self.assertFalse(self.runtime.clip_wakeups)
             self.client.recordings_clip_status.assert_not_awaited()
             self.client.recordings_clip_cancel.assert_not_awaited()

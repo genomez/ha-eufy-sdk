@@ -204,7 +204,17 @@ def viewer_wait() -> Iterator[None]:
         def navigate(hass, active, message) -> None:  # noqa: ANN001 - HA handler signature
             cancel()
             restore_handlers()
-            handler(hass, active, message)
+            if task.done():
+                handler(hass, active, message)
+                return
+
+            async def after_cleanup() -> None:
+                # Let the cancelled wait release its admission slot first, so a
+                # replacement resolve is not refused while the pool looks full.
+                await asyncio.wait({task})
+                handler(hass, active, message)
+
+            hass.async_create_task(after_cleanup(), eager_start=False)
 
         return navigate
 
