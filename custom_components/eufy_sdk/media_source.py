@@ -8,7 +8,7 @@ import logging
 import math
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -87,6 +87,7 @@ MONTHS = (
     "Nov",
     "Dec",
 )
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 
 def folder_id(scope: str, camera: str) -> str:
@@ -111,9 +112,32 @@ def parse_identifier(identifier: str) -> tuple[str, str, str | None]:
         # The fixed category needs no identity beyond the opaque camera path.
         require(parts[4] == "u")
     if len(parts) == 6:
-        require(parts[4] == "e")
-        event = opaque_id(parts[5], "e")
+        if parts[4] == "d":
+            require(date.fromisoformat(parts[5]).isoformat() == parts[5])
+        else:
+            require(parts[4] == "e")
+            event = opaque_id(parts[5], "e")
     return scope, camera, event
+
+
+def event_day(event: dict) -> date | None:
+    """Group valid timestamps by station-local calendar date, including DST."""
+    if event["timeStatus"] != "valid" or event["startedAtLocal"] is None:
+        return None
+    return (
+        datetime.fromisoformat(event["startedAtLocal"])
+        .astimezone(ZoneInfo(TIMEZONE))
+        .date()
+    )
+
+
+def day_title(day: date, today: date) -> str:
+    """Use calendar days rather than elapsed hours for relative labels."""
+    if day == today:
+        return "Today"
+    if day == today - timedelta(days=1):
+        return "Yesterday"
+    return f"{WEEKDAYS[day.weekday()]}, {MONTHS[day.month - 1]} {day.day}"
 
 
 def runtimes(hass: HomeAssistant) -> list[RecordingRuntime]:
@@ -144,10 +168,9 @@ def title(event: dict, *, detail: bool = False, playback: bool = False) -> str:
             ZoneInfo(TIMEZONE)
         )
         period = "AM" if local.hour < 12 else "PM"
-        start = (
-            f"{local.hour % 12 or 12}:{local.minute:02d} {period}"
-            f" · {MONTHS[local.month - 1]} {local.day}"
-        )
+        start = f"{local.hour % 12 or 12}:{local.minute:02d} {period}"
+        if detail:
+            start += f" · {MONTHS[local.month - 1]} {local.day}"
     else:
         start = "Time unknown"
     duration = event["durationSeconds"]
@@ -158,6 +181,8 @@ def title(event: dict, *, detail: bool = False, playback: bool = False) -> str:
         and 0 <= duration <= 86400
     ):
         result += " · " + duration_text(duration)
+    else:
+        result += " · duration unknown"
     if detail and event["timeStatus"] != "valid":
         result += " · Chicago time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
@@ -370,7 +395,7 @@ class EufyRecordingMediaSource(MediaSource):
             raise playback_error(reason) from None
 
     async def async_browse_media(self, item: MediaSourceItem) -> BrowseMediaSource:
-        """Browse one camera or one information folder without prefetching."""
+        """Derive day folders and clips from one camera catalog page."""
         try:
             if not item.identifier:
                 children = []
@@ -385,6 +410,8 @@ class EufyRecordingMediaSource(MediaSource):
                 )
             scope, camera, event_id = parse_identifier(item.identifier)
             unknown_time = item.identifier.endswith("/u")
+            parts = item.identifier.split("/")
+            day = date.fromisoformat(parts[5]) if parts[4:5] == ["d"] else None
             runtime = find_runtime(self.hass, scope)
             page = await runtime.browse(camera, event_id)
             playback = runtime.playback_supported()
@@ -396,20 +423,32 @@ class EufyRecordingMediaSource(MediaSource):
                 if event.get("recordingAvailable", True)
                 and (event_id is not None or (playback and event["playable"]))
             ]
-            if event_id is not None:
+            require(event_id is None or bool(events))
+            today = datetime.now(ZoneInfo(TIMEZONE)).date()
+            if event_id is None:
+                groups = {}
+                for event in events:
+                    groups.setdefault(event_day(event), []).append(event)
+                if day is None and not unknown_time:
+                    base = f"s/{scope}/c/{camera}"
+                    children = [
+                        directory(f"{base}/d/{key.isoformat()}", day_title(key, today))
+                        for key in sorted(
+                            (key for key in groups if key is not None), reverse=True
+                        )
+                    ]
+                    if None in groups:
+                        children.append(directory(f"{base}/u", "Time unknown"))
+                    return directory(
+                        item.identifier,
+                        runtime.cameras[camera]["name"].strip()
+                        + folder_status(page, empty=not children),
+                        children=children,
+                    )
+                events = groups.get(day, [])
                 require(bool(events))
-            unknown_events = [
-                event for event in events if event["timeStatus"] != "valid"
-            ]
-            if unknown_time:
-                require(bool(unknown_events))
             children = []
             for event in events:
-                if (
-                    event_id is None
-                    and (event["timeStatus"] != "valid") != unknown_time
-                ):
-                    continue
                 identifier = f"s/{scope}/c/{camera}/e/{event['eventId']}"
                 thumbnail = (
                     f"/api/{DOMAIN}/recordings/{scope}/{camera}/"
@@ -432,15 +471,9 @@ class EufyRecordingMediaSource(MediaSource):
                 if event_id:
                     return row
                 children.append(row)
-            unknown_title = f"Time unknown ({len(unknown_events)})"
-            if unknown_events and not unknown_time:
-                children.append(directory(f"s/{scope}/c/{camera}/u", unknown_title))
             return directory(
                 item.identifier,
-                unknown_title
-                if unknown_time
-                else runtime.cameras[camera]["name"].strip()
-                + folder_status(page, empty=not children),
+                "Time unknown" if unknown_time else day_title(day, today),
                 children=children,
             )
         except (RecordingsError, KeyError, ValueError) as err:

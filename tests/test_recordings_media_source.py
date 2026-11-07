@@ -1,9 +1,10 @@
 # ruff: noqa: ANN201, D100, D101, D102, INP001, PT009, PT027
 import unittest
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import unquote
+from zoneinfo import ZoneInfo
 
 from fixtures import recordings_v1 as fixture
 from homeassistant.components.media_player import BrowseError
@@ -16,9 +17,23 @@ from custom_components.eufy_sdk.media_source import (
     parse_identifier,
     title,
 )
-from custom_components.eufy_sdk.recordings_models import DISCLOSURE
+from custom_components.eufy_sdk.recordings_models import DISCLOSURE, TIMEZONE
 
 MEDIA_LOGGER = "custom_components.eufy_sdk.media_source"
+
+
+def timed_event(letter: str, timestamp: str):
+    """Keep all wire timestamps consistent around midnight and DST changes."""
+    utc = datetime.fromisoformat(timestamp).astimezone(UTC)
+    local = utc.astimezone(ZoneInfo(TIMEZONE))
+    return {
+        **fixture.event("e_" + letter * 22, playable=True),
+        "startedAtMs": int(utc.timestamp() * 1000),
+        "endedAtMs": int(utc.timestamp() * 1000) + 10000,
+        "startedAtUtc": utc.isoformat().replace("+00:00", "Z"),
+        "startedAtLocal": local.isoformat(),
+        "sourceStartLocal": local.strftime("%Y-%m-%d %H:%M:%S"),
+    }
 
 
 def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format"):
@@ -36,6 +51,145 @@ def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format")
 
 
 class MediaTests(unittest.IsolatedAsyncioTestCase):
+    async def test_days_group_local_midnight_and_both_dst_transitions(self):
+        cases = (
+            (
+                ("2026-11-08T05:59:00Z", "2026-11-08T06:00:00Z"),
+                ("2026-11-08", "2026-11-07"),
+            ),
+            (
+                ("2026-03-08T07:59:00Z", "2026-03-08T08:00:00Z"),
+                ("2026-03-08",),
+            ),
+            (
+                ("2026-11-01T06:30:00Z", "2026-11-01T07:30:00Z"),
+                ("2026-11-01",),
+            ),
+        )
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        for timestamps, dates in cases:
+            with self.subTest(dates=dates):
+                older, newer = [
+                    timed_event(letter, timestamp)
+                    for letter, timestamp in zip("HI", timestamps, strict=True)
+                ]
+                self.runtime.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.page([older, newer]),
+                }
+                self.runtime.client.rpc.reset_mock()
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base)
+                )
+                self.assertEqual(
+                    [
+                        row.media_content_id.rsplit("/", 1)[-1]
+                        for row in result.children
+                    ],
+                    list(dates),
+                )
+                self.runtime.client.rpc.assert_awaited_once_with(
+                    "recordings.catalog",
+                    timeout=3,
+                    cameraId=fixture.CAMERA,
+                    refresh="if_due",
+                )
+                day = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base + "/d/" + dates[0])
+                )
+                expected = [newer, older] if len(dates) == 1 else [newer]
+                self.assertEqual(
+                    [row.media_content_id.rsplit("/", 1)[-1] for row in day.children],
+                    [row["eventId"] for row in expected],
+                )
+                self.assertTrue(all("Nov" not in row.title for row in day.children))
+                if len(dates) == 1 and dates[0] == "2026-11-01":
+                    self.assertEqual(
+                        [row.title for row in day.children], ["1:30 AM · 10 s"] * 2
+                    )
+
+    async def test_today_yesterday_labels_use_current_chicago_calendar(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        for now in (
+            "2026-11-07T00:10:00-06:00",
+            "2026-03-09T00:10:00-05:00",
+            "2026-11-02T00:10:00-06:00",
+            "2027-01-01T00:10:00-06:00",
+            "2026-11-08T02:10:00+00:00",
+        ):
+            current = datetime.fromisoformat(now).astimezone(ZoneInfo(TIMEZONE))
+
+            class FixedNow(datetime):
+                current_time = current
+
+                @classmethod
+                def now(cls, tz: tzinfo | None = None) -> datetime:
+                    return cls.current_time.astimezone(tz)
+
+            rows = [
+                timed_event(letter, (current - timedelta(days=offset)).isoformat())
+                for offset, letter in enumerate("HIJ")
+            ]
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": fixture.page(rows),
+            }
+            with (
+                self.subTest(now=now),
+                patch("custom_components.eufy_sdk.media_source.datetime", FixedNow),
+            ):
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base)
+                )
+                self.assertEqual(
+                    [row.title for row in result.children[:2]], ["Today", "Yesterday"]
+                )
+                if now.startswith("2026-11-07"):
+                    self.assertEqual(result.children[2].title, "Thu, Nov 5")
+                yesterday = result.children[1].media_content_id.removeprefix(
+                    "media-source://eufy_sdk/"
+                )
+                day = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=yesterday)
+                )
+                self.assertEqual(day.title, "Yesterday")
+
+    async def test_hidden_or_unplayable_only_days_are_never_shown(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        rows = [
+            {**timed_event("H", "2026-11-07T18:00:00Z"), "recordingAvailable": False},
+            {**timed_event("I", "2026-11-06T18:00:00Z"), "playable": False},
+            timed_event("J", "2026-11-05T18:00:00Z"),
+        ]
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page(rows),
+        }
+        result = await self.source.async_browse_media(SimpleNamespace(identifier=base))
+        self.assertEqual(len(result.children), 1)
+        self.assertTrue(result.children[0].media_content_id.endswith("/d/2026-11-05"))
+        for day in ("2026-11-07", "2026-11-06", "2026-11-04"):
+            with self.subTest(day=day), self.assertRaises(BrowseError):
+                await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base + "/d/" + day)
+                )
+
+    async def test_day_paths_reject_noncanonical_or_forged_dates_without_rpc(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/d/"
+        for day in (
+            "20261107",
+            "2026-W45-6",
+            "2026-11-7",
+            "2026-02-30",
+            "2026-11-07?x",
+            "2026-11-07/e/" + fixture.EVENT,
+        ):
+            with self.subTest(day=day), self.assertRaises(BrowseError):
+                await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base + day)
+                )
+        self.runtime.client.rpc.assert_not_awaited()
+
     async def test_unavailable_rows_do_not_affect_children_or_unknown_folder_count(
         self,
     ):
@@ -58,11 +212,11 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
         result = await self.source.async_browse_media(SimpleNamespace(identifier=base))
         self.assertEqual(len(result.children), 2)
-        self.assertEqual(result.children[-1].title, "Time unknown (1)")
+        self.assertEqual(result.children[-1].title, "Time unknown")
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=base + "/u")
         )
-        self.assertEqual(result.title, "Time unknown (1)")
+        self.assertEqual(result.title, "Time unknown")
         self.assertEqual(len(result.children), 1)
         self.assertTrue(result.children[0].thumbnail.endswith("?v=cover_2"))
 
@@ -127,8 +281,21 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result.title, self.runtime.cameras[fixture.CAMERA]["name"].strip()
         )
+        folder = result.children[0]
+        self.assertTrue(folder.media_content_id.endswith("/d/2026-11-04"))
+        self.assertTrue(folder.can_expand)
+        self.assertFalse(folder.can_play)
+        self.runtime.client.rpc.reset_mock()
+        result = await self.source.async_browse_media(
+            SimpleNamespace(
+                identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/d/2026-11-04"
+            )
+        )
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
+        )
         row = result.children[0]
-        self.assertTrue(row.title.startswith("12:00 PM · Nov 4 · 10 s"))
+        self.assertTrue(row.title.startswith("12:00 PM · 10 s"))
         self.assertNotIn("May no longer be on HomeBase", row.title)
         self.assertTrue(row.can_play)
         self.assertFalse(row.can_expand)
@@ -152,7 +319,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.thumbnail)
 
     async def test_rebrowse_changes_thumbnail_when_pending_cover_becomes_ready(self):
-        item = SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        item = SimpleNamespace(
+            identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/d/2026-11-04"
+        )
         self.runtime.client.rpc.return_value = {
             "ok": True,
             "recordings": fixture.page([fixture.event(playable=True)]),
@@ -277,15 +446,15 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_time_first_titles_preserve_station_wall_time(self):
         cases = (
-            ("2026-11-05T11:32:04-06:00", "11:32 AM · Nov 5 · 24 s"),
-            ("2026-11-05T00:07:00-06:00", "12:07 AM · Nov 5 · 24 s"),
-            ("2026-11-05T12:07:00-06:00", "12:07 PM · Nov 5 · 24 s"),
-            ("2026-11-05T23:09:00-06:00", "11:09 PM · Nov 5 · 24 s"),
-            ("2026-07-05T09:03:00-05:00", "9:03 AM · Jul 5 · 24 s"),
-            ("2026-11-01T01:30:00-05:00", "1:30 AM · Nov 1 · 24 s"),
-            ("2026-11-01T01:30:00-06:00", "1:30 AM · Nov 1 · 24 s"),
-            ("2026-01-01T00:00:00-06:00", "12:00 AM · Jan 1 · 24 s"),
-            ("2026-12-31T23:59:59-06:00", "11:59 PM · Dec 31 · 24 s"),
+            ("2026-11-05T11:32:04-06:00", "11:32 AM · 24 s"),
+            ("2026-11-05T00:07:00-06:00", "12:07 AM · 24 s"),
+            ("2026-11-05T12:07:00-06:00", "12:07 PM · 24 s"),
+            ("2026-11-05T23:09:00-06:00", "11:09 PM · 24 s"),
+            ("2026-07-05T09:03:00-05:00", "9:03 AM · 24 s"),
+            ("2026-11-01T01:30:00-05:00", "1:30 AM · 24 s"),
+            ("2026-11-01T01:30:00-06:00", "1:30 AM · 24 s"),
+            ("2026-01-01T00:00:00-06:00", "12:00 AM · 24 s"),
+            ("2026-12-31T23:59:59-06:00", "11:59 PM · 24 s"),
         )
         for local, expected in cases:
             with self.subTest(local=local):
@@ -304,9 +473,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
 
         event = {**fixture.event(), "stationPresence": "seen_in_latest_window"}
         with patch("custom_components.eufy_sdk.media_source.datetime", NoStrftime):
-            self.assertEqual(title(event), "12:00 PM · Nov 4 · 10 s")
+            self.assertEqual(title(event), "12:00 PM · 10 s")
 
-    async def test_unknown_and_invalid_duration_omitted(self):
+    async def test_unknown_and_invalid_duration_labelled(self):
         for duration in (None, -1, float("nan"), float("inf"), True, "24", 86401):
             with self.subTest(duration=duration):
                 event = {
@@ -314,10 +483,10 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     "durationSeconds": duration,
                     "stationPresence": "seen_in_latest_window",
                 }
-                self.assertEqual(title(event), "12:00 PM · Nov 4")
+                self.assertEqual(title(event), "12:00 PM · duration unknown")
                 self.assertEqual(
                     title({**unknown_event(), "durationSeconds": duration}),
-                    "Time unknown",
+                    "Time unknown · duration unknown",
                 )
         for duration, expected in (
             (59, "59 s"),
@@ -375,13 +544,10 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
         )
-        self.assertEqual(len(result.children), 3)
-        self.assertEqual(
-            [row.media_content_id.rsplit("/", 1)[-1] for row in result.children[:-1]],
-            [fixture.EVENT, fixture.OTHER],
-        )
+        self.assertEqual(len(result.children), 2)
+        self.assertTrue(result.children[0].media_content_id.endswith("/d/2026-11-04"))
         folder = result.children[-1]
-        self.assertEqual(folder.title, "Time unknown (3)")
+        self.assertEqual(folder.title, "Time unknown")
         self.assertEqual(
             folder.media_content_id, folder_id(fixture.SCOPE, fixture.CAMERA) + "/u"
         )
@@ -409,10 +575,10 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/u")
         )
-        self.assertEqual(result.title, "Time unknown (2)")
+        self.assertEqual(result.title, "Time unknown")
         self.assertEqual(
             [row.title for row in result.children],
-            ["Time unknown", "Time unknown · 10 s"],
+            ["Time unknown · duration unknown", "Time unknown · 10 s"],
         )
         for row, event in zip(result.children, (newer, older), strict=True):
             self.assertEqual(
@@ -440,7 +606,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
         )
-        self.assertEqual([row.title for row in result.children], ["Time unknown (1)"])
+        self.assertEqual([row.title for row in result.children], ["Time unknown"])
 
     async def test_unknown_event_detail_retains_canonical_identifier(self):
         event = {**unknown_event(), "playable": False}

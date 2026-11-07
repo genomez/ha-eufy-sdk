@@ -117,12 +117,31 @@ class PlaybackTests(PlaybackFixture):
             SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
         )
         self.assertEqual(len(page.children), 1)
-        self.assertTrue(page.children[0].media_content_id.endswith(fixture.EVENT))
-        self.assertTrue(page.children[0].can_play)
+        self.assertTrue(page.children[0].media_content_id.endswith("/d/2026-11-04"))
+        self.assertFalse(page.children[0].can_play)
         self.assertEqual(retained["stationPresence"], "not_in_latest_window")
         self.client.rpc.assert_awaited_once_with(
             "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
         )
+        day = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0] + "/d/2026-11-04")
+        )
+        self.assertEqual(len(day.children), 1)
+        self.assertTrue(day.children[0].media_content_id.endswith(fixture.EVENT))
+        self.assertTrue(day.children[0].can_play)
+
+    async def test_day_clip_identifier_resolves_and_keeps_legacy_playback_path(self):
+        day = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0] + "/d/2026-11-04")
+        )
+        identifier = day.children[0].media_content_id.removeprefix(
+            "media-source://eufy_sdk/"
+        )
+        self.assertEqual(identifier, IDENTIFIER)
+        result = await self.resolve(identifier)
+        self.assertEqual(result.mime_type, "video/mp4")
+        self.assertTrue(result.url.startswith(PATH + "?"))
+        self.client.recordings_clip_prepare.assert_awaited_once()
 
     async def test_no_authority_page_has_explicit_empty_state(self):
         self.client.rpc.return_value = {
@@ -255,7 +274,14 @@ class PlaybackTests(PlaybackFixture):
                     SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
                 )
                 if playback is True:
-                    self.assertTrue(page.children[0].can_play)
+                    self.assertTrue(page.children[0].can_expand)
+                    self.assertFalse(page.children[0].can_play)
+                    day = await self.source.async_browse_media(
+                        SimpleNamespace(
+                            identifier=IDENTIFIER.rsplit("/e/", 1)[0] + "/d/2026-11-04"
+                        )
+                    )
+                    self.assertTrue(day.children[0].can_play)
                 else:
                     self.assertEqual(page.children, [])
                     self.assertIn("no playable recordings", page.title)
