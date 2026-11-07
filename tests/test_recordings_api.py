@@ -11,6 +11,24 @@ from custom_components.eufy_sdk.recordings import RecordingRuntime
 
 
 class ContractTests(unittest.TestCase):
+    def test_recording_availability_is_optional_and_strictly_boolean(self):
+        for available in (True, False):
+            row = {**fixture.event(), "recordingAvailable": available}
+            self.assertIs(
+                models.event(row, fixture.CAMERA)["recordingAvailable"], available
+            )
+        self.assertTrue(
+            models.event(fixture.event(), fixture.CAMERA)["recordingAvailable"] is True
+        )
+        for invalid in (None, 0, 1, "false"):
+            with (
+                self.subTest(invalid=invalid),
+                self.assertRaises(models.RecordingsError),
+            ):
+                models.event(
+                    {**fixture.event(), "recordingAvailable": invalid}, fixture.CAMERA
+                )
+
     def test_twenty_cover_budget_accepts_legacy_and_rejects_unbounded_values(self):
         for budget in (4, 20):
             self.assertEqual(

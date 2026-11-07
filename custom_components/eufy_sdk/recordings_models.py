@@ -202,6 +202,7 @@ def event(value: Any, camera: str) -> dict:
         "eventId": opaque_id(value.get("eventId"), "e"),
         "cameraId": camera,
         "playable": flag(value.get("playable")),
+        "recordingAvailable": flag(value.get("recordingAvailable", True)),
         "timezone": TIMEZONE,
     }
     for key in ("startedAtMs", "endedAtMs"):

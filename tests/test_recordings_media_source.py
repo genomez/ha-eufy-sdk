@@ -36,6 +36,51 @@ def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format")
 
 
 class MediaTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unavailable_rows_do_not_affect_children_or_unknown_folder_count(
+        self,
+    ):
+        legacy = {**fixture.event(), "durationSeconds": 3}
+        visible = {
+            **unknown_event(),
+            "recordingAvailable": True,
+            "coverRevision": "cover_2",
+        }
+        rows = [
+            legacy,
+            visible,
+            {**fixture.event("e_" + "H" * 22), "recordingAvailable": False},
+            {**unknown_event("e_" + "I" * 22), "recordingAvailable": False},
+        ]
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page(rows),
+        }
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        result = await self.source.async_browse_media(SimpleNamespace(identifier=base))
+        self.assertEqual(len(result.children), 2)
+        self.assertEqual(result.children[-1].title, "Time unknown (1)")
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=base + "/u")
+        )
+        self.assertEqual(result.title, "Time unknown (1)")
+        self.assertEqual(len(result.children), 1)
+        self.assertTrue(result.children[0].thumbnail.endswith("?v=cover_2"))
+
+    async def test_hidden_only_page_is_empty_and_hidden_detail_is_unavailable(self):
+        hidden = {**fixture.event(), "recordingAvailable": False}
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([hidden]),
+        }
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        result = await self.source.async_browse_media(SimpleNamespace(identifier=base))
+        self.assertEqual(result.children, [])
+        self.assertTrue(result.title.endswith("checking for events"))
+        with self.assertRaises(BrowseError):
+            await self.source.async_browse_media(
+                SimpleNamespace(identifier=base + f"/e/{fixture.EVENT}")
+            )
+
     async def asyncSetUp(self):
         self.runtime = await fixture.runtime()
         self.hass = fixture.hass(self.runtime)

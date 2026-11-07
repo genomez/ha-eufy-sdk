@@ -339,13 +339,20 @@ class EufyRecordingMediaSource(MediaSource):
             runtime = find_runtime(self.hass, scope)
             page = await runtime.browse(camera, event_id)
             playback = runtime.playback_supported()
+            events = [
+                event
+                for event in page["events"]
+                if event.get("recordingAvailable", True)
+            ]
+            if event_id is not None:
+                require(bool(events))
             unknown_events = [
-                event for event in page["events"] if event["timeStatus"] != "valid"
+                event for event in events if event["timeStatus"] != "valid"
             ]
             if unknown_time:
                 require(bool(unknown_events))
             children = []
-            for event in page["events"]:
+            for event in events:
                 if (
                     event_id is None
                     and (event["timeStatus"] != "valid") != unknown_time
