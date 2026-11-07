@@ -87,7 +87,7 @@ class ProgressiveTests(PlaybackFixture):
         self,
     ):
         result = await self.resolve()
-        self.assertEqual(result.mime_type, "application/vnd.apple.mpegurl")
+        self.assertEqual(result.mime_type, "application/x-mpegURL")
         self.assertIn(BASE + "/index.m3u8?", result.url)
         first = await self.playlist()
         self.assertIn("#EXT-X-START:TIME-OFFSET=0", first.text)
@@ -140,7 +140,7 @@ class ProgressiveTests(PlaybackFixture):
         }
         self.client.recordings_playback_command.reset_mock()
         result = await self.resolve()
-        self.assertEqual(result.mime_type, "application/vnd.apple.mpegurl")
+        self.assertEqual(result.mime_type, "application/x-mpegURL")
         self.assertEqual(list(self.runtime.playbacks), [SESSION])
         self.assertEqual(self.runtime.playback_opening, 0)
         self.assertEqual(
@@ -233,7 +233,7 @@ class ProgressiveTests(PlaybackFixture):
         self.reply = models.playback(playback("complete", count=2))
         self.client.recordings_playback_open.return_value = self.reply
         result = await self.resolve()
-        self.assertEqual(result.mime_type, "application/vnd.apple.mpegurl")
+        self.assertEqual(result.mime_type, "application/x-mpegURL")
         response = await self.playlist()
         self.assertIn("#EXT-X-ENDLIST", response.text)
         app = web.Application()

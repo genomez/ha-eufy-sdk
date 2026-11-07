@@ -284,9 +284,11 @@ class EufyRecordingMediaSource(MediaSource):
                         f"playback/{reply['sessionId']}/{reply['generation']}/index.m3u8"
                     )
                     lifetime = max(1, reply["hardExpiresAtMs"] / 1000 - time.time())
+                    # The stock play dialog selects its HLS player only for this
+                    # exact type; the playlist response keeps the registered type.
                     return PlayMedia(
                         async_sign_path(self.hass, path, timedelta(seconds=lifetime)),
-                        "application/vnd.apple.mpegurl",
+                        "application/x-mpegURL",
                     )
                 ready = (
                     playback["clip"]
