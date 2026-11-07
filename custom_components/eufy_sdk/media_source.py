@@ -31,16 +31,37 @@ from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
 _LOGGER = logging.getLogger(__name__)
 
 
+# Shared field validators: report the caller's line (it names the field), then helper.
+_VALIDATOR_HELPERS = frozenset(
+    {
+        "require",
+        "number",
+        "opaque_id",
+        "token",
+        "time_ms",
+        "choice",
+        "flag",
+        "fields",
+        "timestamp",
+    }
+)
+
+
 def failure_site(err: BaseException) -> str:
     """Name the innermost integration function and line that failed; never values."""
     site = "unknown"
+    helper = None
     tb = err.__traceback__
     while tb is not None:
         code = tb.tb_frame.f_code
         if "eufy_sdk" in code.co_filename and code.co_name != "require":
-            site = f"{code.co_name}:{tb.tb_lineno}"
+            if code.co_name in _VALIDATOR_HELPERS:
+                helper = code.co_name
+            else:
+                site = f"{code.co_name}:{tb.tb_lineno}"
+                helper = None
         tb = tb.tb_next
-    return site
+    return f"{site} via {helper}" if helper else site
 
 
 if TYPE_CHECKING:
