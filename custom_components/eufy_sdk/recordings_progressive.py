@@ -115,13 +115,18 @@ class ProgressiveRuntime:
             if not handed_off:
                 await self._release_playback(session["reply"])
 
-    def validate_playback(self, session: dict) -> None:
+    def validate_playback(self, session: dict, *, idle_ok: bool = False) -> None:
         """Check enrollment, scope, local generation, hard lifetime and idle expiry."""
+        limit = (
+            session["deadline"]
+            if idle_ok
+            else min(session["deadline"], session["idle"])
+        )
         require(
             self.progressive_supported()
             and self.available_scope() == session["scope"]
             and self.generation == session["generation"]
-            and time.monotonic() < min(session["deadline"], session["idle"])
+            and time.monotonic() < limit
         )
         reply = session["reply"]
         self.validate_clip(reply["cameraId"], reply["eventId"])
@@ -132,7 +137,9 @@ class ProgressiveRuntime:
         """Renew only an existing finite lease on authenticated HTTP activity."""
         session = self.playbacks.get(session_id)
         require(session is not None)
-        self.validate_playback(session)
+        # Idle expiry is local: capture may have completed meanwhile, so ask first.
+        idle_expired = time.monotonic() >= session["idle"]
+        self.validate_playback(session, idle_ok=True)
         old = session["reply"]
         require(
             old["cameraId"] == camera
@@ -140,11 +147,13 @@ class ProgressiveRuntime:
             and old["generation"] == generation
         )
         async with session["lock"]:
-            if time.monotonic() - session.get("checked", 0) >= 0.5:
+            if idle_expired or time.monotonic() - session.get("checked", 0) >= 0.5:
                 reply = await self.client.recordings_playback_command(
                     "renew", session["reply"]
                 )
-                self.validate_playback(session)
+                self.validate_playback(session, idle_ok=True)
+                # Unfinished captures stay expired; only completed history revives.
+                require(not idle_expired or reply["delivery"] == "complete")
                 require(reply["segments"][: len(old["segments"])] == old["segments"])
                 require(reply["delivery"] in ("playable", "complete"))
                 if old["delivery"] == "complete":

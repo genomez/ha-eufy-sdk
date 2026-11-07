@@ -193,6 +193,40 @@ class ProgressiveTests(PlaybackFixture):
                     await self.playlist()
                 self.client.recordings_clip_prepare.assert_not_awaited()
 
+    async def test_completion_during_long_pause_is_checked_before_retiring(self):
+        await self.resolve()
+        session = self.runtime.playbacks[SESSION]
+        first = await self.playlist()
+        self.assertNotIn("#EXT-X-ENDLIST", first.text)
+        finished = models.playback(playback("complete", state="ready", count=10))
+        finished["hardExpiresAtMs"] = self.reply["hardExpiresAtMs"]
+        self.reply = finished
+        paused = time.monotonic() + 120
+        self.client.recordings_playback_command.reset_mock()
+        with patch(
+            "custom_components.eufy_sdk.recordings_progressive.time.monotonic",
+            return_value=paused,
+        ):
+            resumed = await self.playlist()
+        self.assertIn("#EXT-X-ENDLIST", resumed.text)
+        self.assertEqual(
+            self.client.recordings_playback_command.call_args.args[0], "renew"
+        )
+        self.assertEqual(session["idle"], session["deadline"])
+
+    async def test_unfinished_capture_still_expires_after_idle(self):
+        await self.resolve()
+        await self.playlist()
+        paused = time.monotonic() + 120
+        with (
+            patch(
+                "custom_components.eufy_sdk.recordings_progressive.time.monotonic",
+                return_value=paused,
+            ),
+            self.assertRaises(web.HTTPGone),
+        ):
+            await self.playlist()
+
     async def test_short_complete_hls_and_head_metadata_do_not_require_a_segment_fetch(
         self,
     ):
@@ -273,7 +307,11 @@ class ProgressiveTests(PlaybackFixture):
         self.client.recordings_playback_command.reset_mock()
         with self.assertRaises(web.HTTPGone):
             await self.playlist()
-        self.client.recordings_playback_command.assert_not_awaited()
+        # An idle, unfinished capture asks the bridge once and still expires.
+        self.client.recordings_playback_command.assert_awaited_once()
+        self.assertEqual(
+            self.client.recordings_playback_command.call_args.args[0], "renew"
+        )
         session["idle"] = time.monotonic() + 30
         with self.assertRaises(models.RecordingsError):
             await self.runtime.playback_session(
