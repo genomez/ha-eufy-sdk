@@ -53,9 +53,19 @@ class EufyRecordingCoverView(HomeAssistantView):
                 headers={**HEADERS, "Retry-After": "60"},
             )
         data, event_time = result
-        headers = {**HEADERS, "X-Eufy-Image-Sha256": hashlib.sha256(data).hexdigest()}
+        digest = hashlib.sha256(data).hexdigest()
+        etag = f'"{digest}"'
+        headers = {
+            **HEADERS,
+            "Cache-Control": "private, max-age=86400",
+            "ETag": etag,
+            "X-Eufy-Image-Sha256": digest,
+        }
         if event_time is not None:
             headers["X-Eufy-Event-Time"] = event_time
+        validators = request.headers.get("If-None-Match", "").split(",")
+        if any(value.strip().removeprefix("W/") in (etag, "*") for value in validators):
+            return web.Response(status=HTTPStatus.NOT_MODIFIED, headers=headers)
         return web.Response(body=data, content_type="image/jpeg", headers=headers)
 
 

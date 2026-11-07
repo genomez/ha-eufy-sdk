@@ -13,8 +13,10 @@ from .recordings_models import RecordingsError, opaque_id, require, token
 if TYPE_CHECKING:
     from .api import EufySdkApiClient
 
-WAIT_SECONDS = 10
-CACHE_SECONDS = 60
+WAIT_SECONDS = 20
+COVER_POLL_SECONDS = 0.5
+COVER_WAITERS = 64
+CACHE_SECONDS = 24 * 60 * 60
 CACHE_BYTES = 16 * 1024 * 1024
 CLIP_POLL_SECONDS = 2
 CLIP_NOTICE_SECONDS = 0.5
@@ -71,6 +73,7 @@ class RecordingRuntime:
         self.clip_wakeups: set[tuple[str, asyncio.Event]] = set()
         self.admitted: set[tuple[str, str]] = set()
         self.waiters = 0
+        self.cover_calls = asyncio.Semaphore(4)
         self.generation = 0
         self._remove_listener = client.add_disconnect_listener(self.reset)
 
@@ -275,17 +278,21 @@ class RecordingRuntime:
         self, camera: str, event_id: str
     ) -> tuple[bytes, str | None] | None:
         """Deduplicate authenticated proxy calls with fixed memory/work bounds."""
-        require(self.available_scope() is not None and camera in self.cameras)
-        require(event_id in self.events.get(camera, {}))
-        require(self.waiters < 8)
+        opaque_id(camera, "c")
+        opaque_id(event_id, "e")
+        require(self.available_scope() is not None)
+        require(not self.cameras or camera in self.cameras)
         key = (camera, event_id)
         cached = self.cache.get(key)
         if cached is not None and time.monotonic() - cached[0] < CACHE_SECONDS:
             self.cache.move_to_end(key)
             return cached[1:]
         self.cache.pop(key, None)
+        if self.waiters >= COVER_WAITERS:
+            return None
         if key not in self.jobs:
-            require(len(self.jobs) < 4)
+            if len(self.jobs) >= COVER_WAITERS:
+                return None
             self.jobs[key] = asyncio.create_task(self._cover(key, self.generation))
 
             def finished(job: asyncio.Task) -> None:
@@ -316,37 +323,55 @@ class RecordingRuntime:
         self.wakeups[key] = wakeup
         try:
             async with asyncio.timeout(WAIT_SECONDS):
-                interest = self.interests.get(camera)
-                admit = (
-                    interest is not None
-                    and interest[1] > time.monotonic()
-                    and event_id in interest[2]
-                    and key not in self.admitted
-                )
-                if admit:
-                    self.admitted.add(key)
-                reply = await self.client.recordings_cover(
-                    camera,
-                    event_id,
-                    browse_id=interest[0] if admit else None,
-                    request_if_admitted=admit,
-                )
-                while reply["state"] == "pending":
-                    await wakeup.wait()
+                first = True
+                while True:
+                    # Pending station reads never hold a bridge delivery slot.
+                    async with self.cover_calls:
+                        require(
+                            scope == self.available_scope()
+                            and generation == self.generation
+                        )
+                        if camera not in self.cameras:
+                            await self.list_cameras()
+                        require(camera in self.cameras)
+                        interest = self.interests.get(camera)
+                        admit = (
+                            first
+                            and event_id in self.events.get(camera, {})
+                            and interest is not None
+                            and interest[1] > time.monotonic()
+                            and event_id in interest[2]
+                            and key not in self.admitted
+                        )
+                        if admit:
+                            self.admitted.add(key)
+                        reply = await self.client.recordings_cover(
+                            camera,
+                            event_id,
+                            browse_id=interest[0] if admit else None,
+                            request_if_admitted=admit,
+                        )
+                        first = False
+                        if reply["state"] == "ready":
+                            result = await self.client.fetch_recordings_cover(
+                                camera, event_id, reply
+                            )
+                            break
+                    if reply["state"] != "pending":
+                        return None
+                    try:
+                        async with asyncio.timeout(COVER_POLL_SECONDS):
+                            await wakeup.wait()
+                    except TimeoutError:
+                        pass
                     wakeup.clear()
-                    reply = await self.client.recordings_cover(camera, event_id)
-                if reply["state"] != "ready":
-                    return None
-                result = await self.client.fetch_recordings_cover(
-                    camera, event_id, reply
-                )
                 require(
                     scope == self.available_scope() and generation == self.generation
                 )
                 self.cache[key] = (time.monotonic(), *result)
                 self.cache.move_to_end(key)
                 while (
-                    len(self.cache) > 32
+                    len(self.cache) > 256
                     or sum(len(row[1]) for row in self.cache.values()) > CACHE_BYTES
                 ):
                     self.cache.popitem(last=False)

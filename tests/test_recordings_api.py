@@ -11,6 +11,31 @@ from custom_components.eufy_sdk.recordings import RecordingRuntime
 
 
 class ContractTests(unittest.TestCase):
+    def test_twenty_cover_budget_accepts_legacy_and_rejects_unbounded_values(self):
+        for budget in (4, 20):
+            self.assertEqual(
+                models.capability({**fixture.capability(), "coverBudget": budget}),
+                {"scopeId": fixture.SCOPE},
+            )
+        for budget in (True, 0, 21):
+            self.assertIsNone(
+                models.capability({**fixture.capability(), "coverBudget": budget})
+            )
+        rows = [fixture.event("e_" + str(index).zfill(22)) for index in range(21)]
+        page = fixture.page(rows)
+        page["coverEligibleEventIds"] = [row["eventId"] for row in rows[:20]]
+        self.assertEqual(
+            len(
+                models.catalog(page, fixture.SCOPE, fixture.CAMERA)[
+                    "coverEligibleEventIds"
+                ]
+            ),
+            20,
+        )
+        page["coverEligibleEventIds"].append(rows[-1]["eventId"])
+        with self.assertRaises(models.RecordingsError):
+            models.catalog(page, fixture.SCOPE, fixture.CAMERA)
+
     def test_missing_nullable_fields_and_mismatched_event_times_are_rejected(self):
         for field in ("startedAtMs", "endedAtMs", "durationSeconds", "coverRevision"):
             row = fixture.event()

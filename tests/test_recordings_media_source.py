@@ -105,6 +105,22 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.can_play)
         self.assertTrue(result.thumbnail)
 
+    async def test_rebrowse_changes_thumbnail_when_pending_cover_becomes_ready(self):
+        item = SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page(),
+        }
+        before = (await self.source.async_browse_media(item)).children[0].thumbnail
+        ready = {**fixture.event(), "coverState": "cached", "coverRevision": "cover_2"}
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([ready]),
+        }
+        after = (await self.source.async_browse_media(item)).children[0].thumbnail
+        self.assertNotEqual(before, after)
+        self.assertEqual(after, before + "?v=cover_2")
+
     async def test_resolve_always_fails_with_zero_bridge_calls(self):
         for identifier in (
             "",
