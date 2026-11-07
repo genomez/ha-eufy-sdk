@@ -451,6 +451,18 @@ class ProgressiveTests(PlaybackFixture):
             self.assertFalse(call.kwargs["auto_decompress"])
             context.__aexit__.assert_awaited_once()
 
+    def test_playable_threshold_is_the_bridge_choice_above_one_second(self):
+        # The bridge owns the configurable threshold (1-6 s); HA keeps only the floor.
+        for count in (1, 3, 6):
+            with self.subTest(count=count):
+                self.assertEqual(
+                    len(models.playback(playback(count=count))["segments"]), count
+                )
+        wire = playback(count=1)
+        wire["playback"]["segments"][0]["durationMs"] = 999
+        with self.assertRaises(models.RecordingsError):
+            models.playback(wire)
+
     def test_inventory_and_capability_validation(self):
         for change in ("url", "size", "duration", "order", "short", "false_complete"):
             wire = playback()
@@ -464,7 +476,7 @@ class ProgressiveTests(PlaybackFixture):
             elif change == "order":
                 row["segments"][0]["sequence"] = 1
             elif change == "short":
-                row["segments"] = row["segments"][:5]
+                row["segments"] = []
             else:
                 row["delivery"] = "complete"
             with self.subTest(change=change), self.assertRaises(models.RecordingsError):

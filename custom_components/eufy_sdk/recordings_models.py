@@ -221,7 +221,8 @@ def playback(value: Any) -> dict:
         start += duration
     require(start <= 3_600_000)
     if result["delivery"] == "playable":
-        require(start >= 6000)
+        # The bridge applies its configured 1-6 s threshold; HA keeps the floor.
+        require(start >= 1000)
     if result["delivery"] == "complete":
         require(start > 0 and result["capture"] == "verified_eof")
     return result
