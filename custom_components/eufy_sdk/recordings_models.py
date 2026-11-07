@@ -132,7 +132,7 @@ def capability(value: Any) -> dict | None:
         ):
             require(type(value.get(key)) is int and value[key] == expected)
         require(
-            type(value.get("coverBudget")) is int and value["coverBudget"] in (4, 20)
+            type(value.get("coverBudget")) is int and 1 <= value["coverBudget"] <= 100
         )
         result = {"scopeId": opaque_id(value.get("scopeId"), "s")}
         # This flag is advertised only when the bridge playback switch is on.
@@ -369,7 +369,7 @@ def catalog(value: Any, scope: str, camera: str) -> dict:
     ids = {row["eventId"] for row in rows}
     require(len(ids) == len(rows))
     eligible = data.get("coverEligibleEventIds")
-    require(isinstance(eligible, list) and len(eligible) <= 20)
+    require(isinstance(eligible, list) and len(eligible) <= 100)
     require(all(opaque_id(item, "e") in ids for item in eligible))
     require(len(set(eligible)) == len(eligible))
     require((data["browseId"] is None) == (data["browseExpiresAtMs"] is None))

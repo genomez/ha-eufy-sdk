@@ -1109,7 +1109,7 @@ class EufySdkApiClient(RecordingsApi):
                 await self.connect()
             except EufySdkApiClientCommunicationError:
                 await asyncio.sleep(delay)
-                delay = min(delay * 2, 60)
+                delay = min(delay * 2, 5)
             else:
                 # Back up after a drop — let the coordinator recover entities now, not
                 # at the next poll.

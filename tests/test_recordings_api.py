@@ -29,30 +29,42 @@ class ContractTests(unittest.TestCase):
                     {**fixture.event(), "recordingAvailable": invalid}, fixture.CAMERA
                 )
 
-    def test_twenty_cover_budget_accepts_legacy_and_rejects_unbounded_values(self):
-        for budget in (4, 20):
+    def test_cover_budget_accepts_legacy_and_hundred_and_rejects_larger_values(self):
+        for budget in (4, 20, 21, 100):
             self.assertEqual(
                 models.capability({**fixture.capability(), "coverBudget": budget}),
                 {"scopeId": fixture.SCOPE},
             )
-        for budget in (True, 0, 21):
+        for budget in (True, False, 0, -1, 101, 100.0, "100"):
             self.assertIsNone(
                 models.capability({**fixture.capability(), "coverBudget": budget})
             )
-        rows = [fixture.event("e_" + str(index).zfill(22)) for index in range(21)]
+
+    def test_eligible_list_accepts_twenty_and_hundred_and_rejects_larger_lists(self):
+        rows = [fixture.event("e_" + str(index).zfill(22)) for index in range(100)]
         page = fixture.page(rows)
-        page["coverEligibleEventIds"] = [row["eventId"] for row in rows[:20]]
-        self.assertEqual(
-            len(
-                models.catalog(page, fixture.SCOPE, fixture.CAMERA)[
-                    "coverEligibleEventIds"
-                ]
-            ),
-            20,
-        )
-        page["coverEligibleEventIds"].append(rows[-1]["eventId"])
+        for count in (20, 100):
+            page["coverEligibleEventIds"] = [row["eventId"] for row in rows[:count]]
+            self.assertEqual(
+                len(
+                    models.catalog(page, fixture.SCOPE, fixture.CAMERA)[
+                        "coverEligibleEventIds"
+                    ]
+                ),
+                count,
+            )
+        page["coverEligibleEventIds"].append(rows[0]["eventId"])
         with self.assertRaises(models.RecordingsError):
             models.catalog(page, fixture.SCOPE, fixture.CAMERA)
+
+    def test_eligible_list_still_requires_unique_members_of_the_page(self):
+        for eligible in ([fixture.EVENT, fixture.EVENT], [fixture.OTHER]):
+            with self.assertRaises(models.RecordingsError):
+                models.catalog(
+                    {**fixture.page(), "coverEligibleEventIds": eligible},
+                    fixture.SCOPE,
+                    fixture.CAMERA,
+                )
 
     def test_missing_nullable_fields_and_mismatched_event_times_are_rejected(self):
         for field in ("startedAtMs", "endedAtMs", "durationSeconds", "coverRevision"):

@@ -143,6 +143,7 @@ class LightCorrection:
         self.start_unsub = None
         self.stopped = False
         self.notice_kind: str | None = None
+        self.notice_bell_kind: str | None = None
         self.notice_kinds: set[str] = set()
         self.notice_problem = False
         self.notice_pending: dict | None = None
@@ -242,6 +243,7 @@ class LightCorrection:
                         )
                         self.safety_off = saved.get("safety_off") is True
                 self.notice_kind = saved.get("notice_kind")
+                self.notice_bell_kind = saved.get("notice_bell_kind")
                 kinds = saved.get("notice_kinds", [])
                 if isinstance(kinds, list):
                     self.notice_kinds = {kind for kind in kinds if kind in NOTICE_KINDS}
@@ -319,10 +321,20 @@ class LightCorrection:
                     "attempts": self.attempts if self.pending is False else 0,
                     "safety_off": self.safety_off,
                     "notice_kind": self.notice_kind,
+                    "notice_bell_kind": self.notice_bell_kind,
                     "notice_kinds": sorted(self.notice_kinds),
                     "notice_problem": self.notice_problem,
-                    "notice_pending": self.notice_pending,
-                    "notice_queue": list(self.notice_queue),
+                    "notice_pending": {
+                        key: value
+                        for key, value in self.notice_pending.items()
+                        if key != "retry_due"
+                    }
+                    if self.notice_pending is not None
+                    else None,
+                    "notice_queue": [
+                        {key: value for key, value in row.items() if key != "retry_due"}
+                        for row in self.notice_queue
+                    ],
                     "off_stuck": self.off_stuck,
                     "observation": {"value": self.observed, "at": self.observed_at},
                 },
@@ -1139,11 +1151,25 @@ class LightCorrection:
 
     def _deliver_pending(self) -> None:
         if (
-            self.notice_task is None
-            and self.notice_pending is not None
-            and self.loaded
-            and monotonic() >= self.notice_retry_due
+            self.notice_task is not None
+            or self.notice_pending is None
+            or not self.loaded
+            or not self.enabled
+            or self._stopping()
         ):
+            return
+        # Reuse the policy tick and retry schedule per notice. A waiting retry
+        # yields to ready notices, which retain their queue order.
+        notices = [self.notice_pending, *self.notice_queue]
+        now = monotonic()
+        selected = next(
+            (row for row in notices if row.get("retry_due", 0.0) <= now),
+            min(notices, key=lambda row: row.get("retry_due", 0.0)),
+        )
+        self.notice_pending = selected
+        self.notice_queue = deque(row for row in notices if row is not selected)
+        self.notice_retry_due = selected.get("retry_due", 0.0)
+        if now >= self.notice_retry_due:
             self.notice_task = self.entity.hass.async_create_task(self._deliver())
 
     def _publish_notice(self, notice: dict) -> tuple[str, str, str]:
@@ -1194,6 +1220,10 @@ class LightCorrection:
             title = f"Floodlight: {name}"
         tag = f"eufy_floodlight_safety_{identity}"
         bell_tag = f"{tag}_{kind.replace('_restored', '_gap')}" if gap else tag
+        if kind in PHONE_KINDS and (
+            not notice.get("emitted") or self.notice_bell_kind is None
+        ):
+            self.notice_bell_kind = kind
         if not notice.get("emitted"):
             if restored:
                 persistent_notification.async_dismiss(self.entity.hass, bell_tag)
@@ -1251,6 +1281,14 @@ class LightCorrection:
                     },
                     blocking=True,
                 )
+            if (
+                notice.get("phone_attempts", 0) > len(NOTICE_RETRY_DELAYS) + 1
+                and self.notice_pending is notice
+                and self.notice_bell_kind == kind
+            ):
+                persistent_notification.async_create(
+                    self.entity.hass, message, title=title, notification_id=tag
+                )
             notice.pop("phone_attempts", None)
             if self.notice_pending is notice:
                 self.notice_retry_due = 0.0
@@ -1262,8 +1300,11 @@ class LightCorrection:
             self._record("notify_failed", reason="service_unavailable")
             if self.notice_pending is notice:
                 attempts = notice.get("phone_attempts", 0)
-                if phone_attempt and attempts >= len(NOTICE_RETRY_DELAYS) + 1:
-                    self._record("notify_gave_up", attempts=attempts)
+                if (
+                    phone_attempt
+                    and attempts >= len(NOTICE_RETRY_DELAYS) + 1
+                    and self.notice_bell_kind == kind
+                ):
                     # Update the existing bell without repeating the notice event.
                     try:
                         persistent_notification.async_create(
@@ -1272,22 +1313,19 @@ class LightCorrection:
                             title=title,
                             notification_id=tag,
                         )
-                    except Exception:  # noqa: BLE001 - keep the phone cap if HA fails
+                    except Exception:  # noqa: BLE001 - preserve the pending retry
                         self._record("notice_unavailable")
-                    self.notice_retry_due = 0.0
-                    self.notice_pending = (
-                        self.notice_queue.popleft() if self.notice_queue else None
-                    )
-                else:
-                    delay = NOTICE_RETRY_DELAYS[
-                        min(max(0, attempts - 1), len(NOTICE_RETRY_DELAYS) - 1)
-                    ]
-                    self.notice_retry_due = monotonic() + delay
+                delay = NOTICE_RETRY_DELAYS[
+                    min(max(0, attempts - 1), len(NOTICE_RETRY_DELAYS) - 1)
+                ]
+                notice["retry_due"] = self.notice_retry_due = monotonic() + delay
+                if self.notice_queue:
+                    self.notice_pending = self.notice_queue.popleft()
+                    self.notice_queue.append(notice)
             self._save()
         finally:
             self.notice_task = None
-            if self.notice_pending is not notice:
-                self._deliver_pending()
+            self._deliver_pending()
 
     def stop(self, state: str) -> None:
         """Revoke unsent authority without touching the existing display timers."""
