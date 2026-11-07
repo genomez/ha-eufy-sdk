@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -261,7 +262,7 @@ class EufyRecordingMediaSource(MediaSource):
         self.hass = hass
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
-        """Wait for a complete clip before handing the frontend a signed path."""
+        """Resolve qualified buffered HLS or the existing completed MP4 path."""
         try:
             scope, camera, event_id = parse_identifier(item.identifier)
             require(event_id is not None)
@@ -270,7 +271,28 @@ class EufyRecordingMediaSource(MediaSource):
                 reason = "browse_only"
                 raise playback_error(reason)
             with viewer_wait():
-                ready = await runtime.prepare_clip(camera, event_id)
+                playback = (
+                    await runtime.open_playback(camera, event_id)
+                    if runtime.progressive_supported()
+                    else None
+                )
+                if playback is not None and playback["format"] == "hls":
+                    session = playback["session"]
+                    reply = session["reply"]
+                    path = (
+                        f"/api/{DOMAIN}/recordings/{scope}/{camera}/{event_id}/"
+                        f"playback/{reply['sessionId']}/{reply['generation']}/index.m3u8"
+                    )
+                    lifetime = max(1, reply["hardExpiresAtMs"] / 1000 - time.time())
+                    return PlayMedia(
+                        async_sign_path(self.hass, path, timedelta(seconds=lifetime)),
+                        "application/vnd.apple.mpegurl",
+                    )
+                ready = (
+                    playback["clip"]
+                    if playback is not None
+                    else await runtime.prepare_clip(camera, event_id)
+                )
             # Permit seeking/reloading for at least 15 minutes, or clip length
             # plus five minutes for longer recordings. Bridge expiry still wins.
             lifetime = max(900, (ready["durationMs"] or 0) / 1000 + 300)

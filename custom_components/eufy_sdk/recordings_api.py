@@ -116,6 +116,86 @@ class RecordingsApi:
             "recordings.clip_cancel", camera_id, event_id
         )
 
+    async def recordings_playback_open(
+        self, camera_id: str, event_id: str, request_key: str
+    ) -> dict:
+        """Open one viewer lease only when the additive capability is present."""
+        models.require(
+            (self.recordings_capability or {}).get("progressivePlayback") is True
+        )
+        models.require(re.fullmatch(r"[A-Za-z0-9_-]{16,64}", request_key) is not None)
+        result = models.playback(
+            await self._recordings_rpc(
+                "recordings.playback_open",
+                cameraId=models.opaque_id(camera_id, "c"),
+                eventId=models.opaque_id(event_id, "e"),
+                requestKey=request_key,
+            )
+        )
+        models.require(
+            result["cameraId"] == camera_id and result["eventId"] == event_id
+        )
+        return result
+
+    async def recordings_playback_command(self, command: str, playback: dict) -> dict:
+        """Session commands never admit or replace a station job."""
+        models.choice(command, ("status", "renew", "release"))
+        payload = await self._recordings_rpc(
+            "recordings.playback_" + command,
+            cameraId=models.opaque_id(playback["cameraId"], "c"),
+            eventId=models.opaque_id(playback["eventId"], "e"),
+            sessionId=models.opaque_id(playback["sessionId"], "p"),
+            generation=models.token(playback["generation"]),
+        )
+        if command == "release":
+            models.require(models.envelope(payload).get("released") is True)
+            return {}
+        result = models.playback(payload)
+        for key in (
+            "sessionId",
+            "generation",
+            "cameraId",
+            "eventId",
+            "hardExpiresAtMs",
+        ):
+            models.require(result[key] == playback[key])
+        return result
+
+    @asynccontextmanager
+    async def open_recordings_segment(
+        self, playback: dict, sequence: int
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        """Proxy only the fixed-origin, session-bound completed TS asset route."""
+        models.require(
+            (self.recordings_capability or {}).get("progressivePlayback") is True
+        )
+        session = models.opaque_id(playback["sessionId"], "p")
+        generation = models.token(playback["generation"])
+        models.require(re.fullmatch(r"[a-f0-9-]{36}", generation) is not None)
+        models.number(sequence, maximum=3599)
+        origin = URL(self._url).with_scheme("http").origin()
+        url = (
+            origin
+            / "recordings"
+            / "v1"
+            / "playback"
+            / session
+            / generation
+            / (str(sequence) + ".ts")
+        )
+        try:
+            async with self._session.get(
+                url,
+                allow_redirects=False,
+                auto_decompress=False,
+                timeout=aiohttp.ClientTimeout(
+                    total=None, sock_connect=10, sock_read=30
+                ),
+            ) as response:
+                yield response
+        except (aiohttp.ClientError, OSError, TimeoutError):
+            raise models.RecordingsError from None
+
     @asynccontextmanager
     async def open_recordings_clip(
         self, camera_id: str, event_id: str, byte_range: str | None = None

@@ -5,12 +5,15 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
+import time
+from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http.auth import async_sign_path
 from homeassistant.helpers.http import KEY_HASS
 
 from .media_source import find_runtime
@@ -161,6 +164,155 @@ class EufyRecordingClipView(HomeAssistantView):
             ) from None
 
 
+class EufyRecordingPlaylistView(HomeAssistantView):
+    """Path-bound HA signatures authenticate the playlist and each child separately."""
+
+    url = (
+        "/api/eufy_sdk/recordings/{scope_id}/{camera_id}/{event_id}/"
+        "playback/{session_id}/{generation}/index.m3u8"
+    )
+    name = "api:eufy_sdk:recordings:playlist"
+    requires_auth = True
+
+    async def get(  # noqa: PLR0913 - authenticated route components
+        self,
+        request: web.Request,
+        scope_id: str,
+        camera_id: str,
+        event_id: str,
+        session_id: str,
+        generation: str,
+    ) -> web.Response:
+        """Build an EVENT history from validated descriptors, never upstream text."""
+        try:
+            opaque_id(scope_id, "s")
+            opaque_id(camera_id, "c")
+            opaque_id(event_id, "e")
+            opaque_id(session_id, "p")
+            runtime = find_runtime(request.app[KEY_HASS], scope_id)
+            session = await runtime.playback_session(
+                camera_id, event_id, session_id, generation
+            )
+            reply = session["reply"]
+            lines = [
+                "#EXTM3U",
+                "#EXT-X-VERSION:6",
+                "#EXT-X-TARGETDURATION:2",
+                "#EXT-X-MEDIA-SEQUENCE:0",
+                "#EXT-X-PLAYLIST-TYPE:EVENT",
+                "#EXT-X-START:TIME-OFFSET=0",
+            ]
+            for asset in reply["segments"]:
+                sequence = asset["sequence"]
+                if sequence not in session["signed"]:
+                    path = (
+                        f"/api/eufy_sdk/recordings/{scope_id}/{camera_id}/{event_id}/"
+                        f"playback/{session_id}/{generation}/{sequence}.ts"
+                    )
+                    lifetime = reply["hardExpiresAtMs"] / 1000 - time.time()
+                    require(lifetime > 0)
+                    session["signed"][sequence] = async_sign_path(
+                        request.app[KEY_HASS], path, timedelta(seconds=lifetime)
+                    )
+                lines.extend(
+                    (
+                        f"#EXTINF:{asset['durationMs'] / 1000:.3f},",
+                        session["signed"][sequence],
+                    )
+                )
+            if reply["delivery"] == "complete":
+                lines.append("#EXT-X-ENDLIST")
+            manifest = "\n".join(lines) + "\n"
+            require(len(manifest.encode()) <= 2 * 1024**2)
+            return web.Response(
+                text=manifest,
+                content_type="application/vnd.apple.mpegurl",
+                headers=HEADERS,
+            )
+        except RecordingsError:
+            raise web.HTTPGone(text="Recording unavailable", headers=HEADERS) from None
+
+    head = get
+
+
+class EufyRecordingSegmentView(HomeAssistantView):
+    """Only independently authenticated members of the active inventory are proxied."""
+
+    url = (
+        "/api/eufy_sdk/recordings/{scope_id}/{camera_id}/{event_id}/"
+        "playback/{session_id}/{generation}/{sequence}.ts"
+    )
+    name = "api:eufy_sdk:recordings:segment"
+    requires_auth = True
+
+    async def get(  # noqa: PLR0913 - authenticated route components
+        self,
+        request: web.Request,
+        scope_id: str,
+        camera_id: str,
+        event_id: str,
+        session_id: str,
+        generation: str,
+        sequence: str,
+    ) -> web.StreamResponse:
+        """Keep fixed length framing and fail closed on a truncated segment."""
+        response = None
+        try:
+            opaque_id(scope_id, "s")
+            opaque_id(session_id, "p")
+            require(re.fullmatch(r"(?:0|[1-9][0-9]{0,3})", sequence) is not None)
+            runtime = find_runtime(request.app[KEY_HASS], scope_id)
+            session = await runtime.playback_session(
+                camera_id, event_id, session_id, generation
+            )
+            reply = session["reply"]
+            index = int(sequence)
+            require(index < len(reply["segments"]))
+            asset = reply["segments"][index]
+            if request.method == "HEAD":
+                return web.Response(
+                    headers={
+                        **HEADERS,
+                        "Content-Type": "video/mp2t",
+                        "Content-Length": str(asset["bytes"]),
+                    }
+                )
+            async with runtime.client.open_recordings_segment(reply, index) as upstream:
+                runtime.validate_playback(session)
+                require(
+                    upstream.status == HTTPStatus.OK
+                    and upstream.headers.get("Content-Type", "").split(";")[0]
+                    == "video/mp2t"
+                    and upstream.headers.get("Content-Length") == str(asset["bytes"])
+                    and upstream.headers.get("Content-Encoding", "identity")
+                    == "identity"
+                )
+                response = web.StreamResponse(
+                    headers={
+                        **HEADERS,
+                        "Content-Type": "video/mp2t",
+                        "Content-Length": str(asset["bytes"]),
+                    }
+                )
+                await response.prepare(request)
+                sent = 0
+                async for chunk in upstream.content.iter_chunked(65536):
+                    runtime.validate_playback(session)
+                    sent += len(chunk)
+                    require(sent <= asset["bytes"])
+                    await response.write(chunk)
+                require(sent == asset["bytes"])
+                await response.write_eof()
+                return response
+        except RecordingsError:
+            if response is not None and response.prepared:
+                response.force_close()
+                return response
+            raise web.HTTPGone(text="Recording unavailable", headers=HEADERS) from None
+
+    head = get
+
+
 async def async_register_view(hass: HomeAssistant) -> None:
     """Register one shared route per HA process."""
     key = "eufy_sdk_recordings_view"
@@ -173,4 +325,6 @@ async def async_register_view(hass: HomeAssistant) -> None:
         )
         hass.http.register_view(EufyRecordingCoverView(placeholder))
         hass.http.register_view(EufyRecordingClipView())
+        hass.http.register_view(EufyRecordingPlaylistView())
+        hass.http.register_view(EufyRecordingSegmentView())
         hass.data[key] = True

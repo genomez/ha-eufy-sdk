@@ -9,6 +9,7 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING
 
 from .recordings_models import RecordingsError, opaque_id, require, token
+from .recordings_progressive import ProgressiveRuntime
 
 if TYPE_CHECKING:
     from .api import EufySdkApiClient
@@ -53,12 +54,13 @@ class ClipUnavailableError(RecordingsError):
         self.reason = reason
 
 
-class RecordingRuntime:
+class RecordingRuntime(ProgressiveRuntime):
     """Keep recording work on demand, entry-owned and ephemeral."""
 
     def __init__(self, client: EufySdkApiClient) -> None:
         """Bind one entry to the existing WS lifetime."""
         self.client = client
+        self.init_playback()
         self.closed = False
         self.scope: str | None = None
         self.cameras: dict[str, dict] = {}
@@ -79,6 +81,7 @@ class RecordingRuntime:
 
     def reset(self) -> None:
         """Invalidate every old completion and release all waiters."""
+        self.reset_playback()
         self.generation += 1
         for _, wakeup in self.clip_wakeups:
             wakeup.set()

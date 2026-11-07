@@ -138,6 +138,8 @@ def capability(value: Any) -> dict | None:
         # This flag is advertised only when the bridge playback switch is on.
         if playback:
             result["playback"] = True
+            if value.get("progressivePlayback") is True:
+                result["progressivePlayback"] = True
     except RecordingsError:
         return None
     else:
@@ -153,6 +155,76 @@ def envelope(value: Any) -> dict:
     )
     no_selectors(value)
     return value
+
+
+def playback(value: Any) -> dict:
+    """Project a bounded, contiguous immutable segment inventory without URLs."""
+    data = envelope(value).get("playback")
+    require(isinstance(data, dict))
+    no_selectors(data)
+    result = {
+        "sessionId": opaque_id(data.get("sessionId"), "p"),
+        "generation": token(data.get("generation")),
+        "cameraId": opaque_id(data.get("cameraId"), "c"),
+        "eventId": opaque_id(data.get("eventId"), "e"),
+        "hardExpiresAtMs": time_ms(data.get("hardExpiresAtMs")),
+        "capture": choice(
+            data.get("capture"), ("queued", "pulling", "verified_eof", "failed")
+        ),
+        "delivery": choice(
+            data.get("delivery"), ("warming", "playable", "complete", "unavailable")
+        ),
+        "cache": choice(data.get("cache"), ("absent", "finalizing", "ready", "failed")),
+        "cleanup": choice(data.get("cleanup"), ("pending", "settled", "uncertain")),
+        "clip": clip({"clip": data.get("clip")}),
+    }
+    require(re.fullmatch(r"[a-f0-9-]{36}", result["generation"]) is not None)
+    reason = data.get("reason")
+    choice(
+        reason,
+        (
+            "none",
+            "live_view",
+            "busy",
+            "owner_unavailable",
+            "not_found",
+            "too_long",
+            "storage",
+            "convert_failed",
+            "station_error",
+            "cleanup_uncertain",
+            "experiment_only",
+            "disabled",
+        ),
+    )
+    result["reason"] = reason
+    segments = data.get("segments")
+    require(isinstance(segments, list) and len(segments) <= 3600)
+    result["segments"] = []
+    start = 0
+    for index, asset in enumerate(segments):
+        require(isinstance(asset, dict))
+        no_selectors(asset)
+        sequence = number(asset.get("sequence"), maximum=3599)
+        require(sequence == index and number(asset.get("startMs")) == start)
+        duration = number(asset.get("durationMs"), maximum=2000)
+        size = number(asset.get("bytes"), maximum=16 * 1024**2)
+        require(duration > 0 and size > 0)
+        result["segments"].append(
+            {
+                "sequence": sequence,
+                "startMs": start,
+                "durationMs": duration,
+                "bytes": size,
+            }
+        )
+        start += duration
+    require(start <= 3_600_000)
+    if result["delivery"] == "playable":
+        require(start >= 6000)
+    if result["delivery"] == "complete":
+        require(start > 0 and result["capture"] == "verified_eof")
+    return result
 
 
 def cameras(value: Any, scope: str) -> dict:
