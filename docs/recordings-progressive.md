@@ -18,8 +18,18 @@ Sessions bind the integration's scope and runtime generation, camera/event,
 bridge job generation and hard expiry. Bridge-side expiry also handles HA loss.
 Reset/unload releases local sessions best-effort. Pending resolve cancellation
 releases that viewer alone. Authenticated media reads renew a 30-second idle
-fallback lease. An expired local session fails closed and must be resolved again.
-Pausing or buffering without further HTTP requests may expire a presentation.
+fallback lease while capture is unfinished. Once ENDLIST is available, HA and the
+bridge retain the same signed playlist, segment history and lease until the
+original hard expiry (at least 15 minutes, or clip duration plus 450 seconds from
+open). Buffered playback and paused seeking can reuse those URLs without HTTP
+heartbeats or another capture. The bridge also protects a clip that finishes
+between requests. This includes verified HLS whose MP4 remux failed.
+
+Keeping the original HLS history avoids depending on Android WebView or desktop
+hls.js accepting an MP4 redirect in place of a TS segment. Hard expiry, entry
+revocation and reset/unload still fail closed; after hard expiry, resolve again
+to use the completed MP4 cache if available. No expired identity is revived.
+Expired local entries are pruned before the 32-presentation admission limit.
 
 This is backend transport support for the stock media dialog. It cannot observe
 every dialog close or guarantee the frontend starts at zero, disables live-edge
@@ -35,8 +45,10 @@ remain required. Include 2x delivery, 1x retry, arrival pauses, rapid reopen,
 two viewers, idle/background expiry, live preemption, failure, signed child auth
 and instant cached-MP4 seek/replay. No deployment or device access occurred.
 
-The inherited manual-package manifest/tooling describes an older pinned archive
-and was already stale at the starting revision. This source candidate does not
-refresh that archive. Reconcile its runtime allowlist and hashes before building
-a manual installation artifact; normal repository installation includes the new
-runtime module.
+The inherited manual-package manifest/tooling was already stale at the starting
+revision. Inspection found eight missing runtime members (including the new
+progressive module), 14 changed runtime hashes, and an experimental.11 archive
+pin against the experimental.12 runtime manifest. Missing allowlist members are
+therefore not the only cause; no allowlist-only repair or archive repin is made
+in this review fix. Reconcile the complete package metadata before building a
+manual installation artifact. Normal repository installation includes the module.

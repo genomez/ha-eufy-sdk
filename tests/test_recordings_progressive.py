@@ -132,6 +132,67 @@ class ProgressiveTests(PlaybackFixture):
         self.client.recordings_clip_prepare.assert_awaited_once()
         self.client.recordings_playback_open.assert_not_awaited()
 
+    async def test_full_expired_table_is_pruned_before_admission(self):
+        await self.resolve()
+        session = self.runtime.playbacks.pop(SESSION)
+        self.runtime.playbacks = {
+            str(index): {**session, "idle": 0} for index in range(32)
+        }
+        self.client.recordings_playback_command.reset_mock()
+        result = await self.resolve()
+        self.assertEqual(result.mime_type, "application/vnd.apple.mpegurl")
+        self.assertEqual(list(self.runtime.playbacks), [SESSION])
+        self.assertEqual(self.runtime.playback_opening, 0)
+        self.assertEqual(
+            [
+                call.args[0]
+                for call in self.client.recordings_playback_command.await_args_list
+            ],
+            ["release"] * 32,
+        )
+
+    async def test_completed_history_survives_buffering_and_paused_seek(self):
+        for initial in ("playable", "complete"):
+            with self.subTest(initial=initial):
+                self.reply = models.playback(playback(initial))
+                self.client.recordings_playback_open.return_value = self.reply
+                await self.resolve()
+                self.reply = models.playback(playback("complete", state="ready"))
+                session = self.runtime.playbacks[SESSION]
+                session["checked"] = 0
+                completed = await self.playlist()
+                self.assertIn("#EXT-X-ENDLIST", completed.text)
+                children = session["signed"].copy()
+                paused = time.monotonic() + 120
+                with patch(
+                    "custom_components.eufy_sdk.recordings_progressive.time.monotonic",
+                    return_value=paused,
+                ):
+                    replay = await self.playlist()
+                    self.assertEqual(replay.text, completed.text)
+                    self.assertEqual(session["signed"], children)
+                    app = web.Application()
+                    app[KEY_HASS] = self.hass
+                    seek = await EufyRecordingSegmentView().head(
+                        make_mocked_request("HEAD", BASE + "/0.ts", app=app),
+                        fixture.SCOPE,
+                        fixture.CAMERA,
+                        fixture.EVENT,
+                        SESSION,
+                        GENERATION,
+                        "0",
+                    )
+                    self.assertEqual(seek.headers["Content-Length"], "6")
+                with (
+                    patch(
+                        "custom_components.eufy_sdk.recordings_progressive.time.monotonic",
+                        return_value=session["deadline"],
+                    ),
+                    self.assertRaises(web.HTTPGone),
+                ):
+                    await self.playlist()
+                self.client.recordings_clip_prepare.assert_not_awaited()
+
     async def test_short_complete_hls_and_head_metadata_do_not_require_a_segment_fetch(
         self,
     ):

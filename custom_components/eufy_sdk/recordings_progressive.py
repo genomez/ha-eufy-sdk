@@ -11,6 +11,13 @@ from uuid import uuid4
 from .recordings_models import RecordingsError, require
 
 
+def _idle_deadline(session: dict) -> float:
+    """Retain immutable ENDLIST history until the signed presentation expires."""
+    if session["reply"]["delivery"] == "complete":
+        return session["deadline"]
+    return min(session["deadline"], time.monotonic() + 30)
+
+
 class ProgressiveRuntime:
     """Keep signed history stable and never renew a revoked entry generation."""
 
@@ -48,6 +55,10 @@ class ProgressiveRuntime:
 
     async def open_playback(self, camera: str, event_id: str) -> dict | None:
         """Return a real buffered presentation, or None for complete-file fallback."""
+        for identity, session in list(self.playbacks.items()):
+            if time.monotonic() >= min(session["deadline"], session["idle"]):
+                self.playbacks.pop(identity, None)
+                await self._release_playback(session["reply"])
         require(
             self.playback_opening < 8
             and len(self.playbacks) + self.playback_opening < 32
@@ -67,10 +78,6 @@ class ProgressiveRuntime:
         if duration is None or not 0 < duration <= 3600:
             return None
         scope, generation = self.scope, self.generation
-        for identity, session in list(self.playbacks.items()):
-            if time.monotonic() >= session["idle"]:
-                self.playbacks.pop(identity, None)
-                await self._release_playback(session["reply"])
         require(len(self.playbacks) < 32)
         reply = await self.client.recordings_playback_open(
             camera, event_id, uuid4().hex
@@ -93,7 +100,7 @@ class ProgressiveRuntime:
                     if reply["clip"]["state"] == "ready":
                         return {"format": "mp4", "clip": reply["clip"]}
                     if reply["delivery"] in ("playable", "complete"):
-                        session["idle"] = time.monotonic() + 30
+                        session["idle"] = _idle_deadline(session)
                         self.playbacks[reply["sessionId"]] = session
                         handed_off = True
                         return {"format": "hls", "session": session}
@@ -103,7 +110,7 @@ class ProgressiveRuntime:
                         "renew", reply
                     )
                     session["reply"] = reply
-                    session["idle"] = min(session["deadline"], time.monotonic() + 30)
+                    session["idle"] = _idle_deadline(session)
         finally:
             if not handed_off:
                 await self._release_playback(session["reply"])
@@ -147,5 +154,5 @@ class ProgressiveRuntime:
                     )
                 session["reply"] = reply
                 session["checked"] = time.monotonic()
-        session["idle"] = min(session["deadline"], time.monotonic() + 30)
+        session["idle"] = _idle_deadline(session)
         return session
