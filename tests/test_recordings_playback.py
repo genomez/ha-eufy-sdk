@@ -88,6 +88,31 @@ class PlaybackFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class PlaybackTests(PlaybackFixture):
+    async def test_common_playback_failures_log_one_bounded_warning(self):
+        cases = (
+            (recordings.ClipUnavailableError("busy"), "busy"),
+            (recordings.ClipUnavailableError("convert_failed"), "convert_failed"),
+            (recordings.ClipUnavailableError(CANARY), "failed"),
+            (TimeoutError(CANARY), "TimeoutError"),
+        )
+        for error, reason in cases:
+            with (
+                self.subTest(reason=reason),
+                patch.object(self.runtime, "prepare_clip", side_effect=error),
+                self.assertLogs(
+                    "custom_components.eufy_sdk.media_source", "WARNING"
+                ) as logs,
+                self.assertRaises(Unresolvable),
+            ):
+                await self.resolve()
+            self.assertEqual(len(logs.records), 1)
+            self.assertRegex(
+                logs.records[0].getMessage(),
+                rf"^Recording playback failed: {reason} at async_resolve_media:\d+$",
+            )
+            for private in (CANARY, fixture.SCOPE, fixture.CAMERA, fixture.EVENT):
+                self.assertNotIn(private, logs.output[0])
+
     async def test_playable_rows_detail_and_browse_only_fallback(self):
         for playback in (True, False, None, "true"):
             with self.subTest(playback=playback):

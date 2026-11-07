@@ -280,8 +280,35 @@ class EufyRecordingMediaSource(MediaSource):
                 "video/mp4",
             )
         except ClipUnavailableError as err:
+            _LOGGER.warning(
+                "Recording playback failed: %s at %s",
+                err.reason
+                if err.reason
+                in (
+                    "none",
+                    "disabled",
+                    "browse_only",
+                    "live_view",
+                    "not_found",
+                    "busy",
+                    "owner_unavailable",
+                    "too_long",
+                    "timeout",
+                    "failed",
+                    "storage",
+                    "convert_failed",
+                    "station_error",
+                    "cleanup_uncertain",
+                )
+                else "failed",
+                failure_site(err),
+            )
             raise playback_error(err.reason) from None
-        except TimeoutError:
+        except TimeoutError as err:
+            _LOGGER.warning(
+                "Recording playback failed: TimeoutError at %s",
+                failure_site(err),
+            )
             reason = "timeout"
             raise playback_error(reason) from None
         except (RecordingsError, KeyError, ValueError) as err:
