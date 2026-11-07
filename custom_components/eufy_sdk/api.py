@@ -956,7 +956,11 @@ class EufySdkApiClient(RecordingsApi):
                 return
             try:
                 async with asyncio.timeout(15):
-                    self._ws = await self._session.ws_connect(self._url, heartbeat=30)
+                    self._ws = await self._session.ws_connect(
+                        self._url,
+                        heartbeat=30,
+                        headers={"X-Eufy-Client": "ha-integration"},
+                    )
             except (aiohttp.ClientError, TimeoutError, OSError):
                 msg = "bridge_unreachable"
                 raise EufySdkApiClientCommunicationError(msg) from None

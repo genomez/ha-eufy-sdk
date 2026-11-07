@@ -270,6 +270,9 @@ class CameraHealthDisconnectTests(unittest.IsolatedAsyncioTestCase):
         self.client.rpc = AsyncMock(side_effect=reply)
         self.session.ws_connect.return_value = OfflineSocket()
         await self.client._reconnect()
+        self.session.ws_connect.assert_awaited_once_with(
+            self.client._url, heartbeat=30, headers={"X-Eufy-Client": "ha-integration"}
+        )
         await entered.wait()
         self.assert_states("unknown", "unknown")
         self.assertNotIn(

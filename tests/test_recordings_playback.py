@@ -222,14 +222,15 @@ class PlaybackTests(PlaybackFixture):
             ) as extensions,
         ):
             self.assertEqual((await self.resolve()).mime_type, "video/mp4")
-        # The initial event duration gets 60 seconds of headroom; the bridge's
-        # longer estimate extends that same deadline, rather than restarting it.
-        self.assertIn(70, [call.args[0] for call in deadlines.call_args_list])
+        # Extend the original deadline with the full pipeline estimate.
+        self.assertIn(420, [call.args[0] for call in deadlines.call_args_list])
         extended = max(call.args[1] for call in extensions.call_args_list)
-        self.assertAlmostEqual(extended - started, 660, delta=1)
+        self.assertAlmostEqual(extended - started, 5670, delta=1)
         self.client.recordings_clip_status.assert_awaited_once()
 
-    async def test_unknown_duration_has_three_minutes_and_poll_errors_are_private(self):
+    async def test_unknown_duration_has_pipeline_budget_and_poll_errors_are_private(
+        self,
+    ):
         self.client.rpc.return_value = {
             "ok": True,
             "recordings": fixture.page(
@@ -248,8 +249,19 @@ class PlaybackTests(PlaybackFixture):
             self.assertRaisesRegex(Unresolvable, "Couldn't prepare the video"),
         ):
             await self.resolve()
-        self.assertIn(180, [call.args[0] for call in deadlines.call_args_list])
+        self.assertIn(1350, [call.args[0] for call in deadlines.call_args_list])
         self.assertFalse(self.runtime.clip_wakeups)
+
+    def test_pipeline_deadline_covers_stage_bounds_and_caps_extreme_reports(self):
+        for duration in (10, 12, 120, 600):
+            budget = recordings.clip_wait_seconds(duration)
+            self.assertGreaterEqual(
+                budget,
+                150 + 3 * duration + 31 + 60 + max(120, 6 * duration) + 5,
+            )
+        self.assertEqual(
+            recordings.clip_wait_seconds(2**53), recordings.CLIP_MAX_WAIT_SECONDS
+        )
 
     async def test_timeout_is_bounded_and_translated(self):
         self.client.rpc.return_value = {
@@ -262,7 +274,7 @@ class PlaybackTests(PlaybackFixture):
             clip("pulling", expected=0)
         )
         with (
-            patch.object(recordings, "CLIP_GRACE_SECONDS", 0.001),
+            patch.object(recordings, "CLIP_MAX_WAIT_SECONDS", 0.001),
             self.assertRaisesRegex(Unresolvable, "Video is still preparing") as caught,
         ):
             await self.resolve()

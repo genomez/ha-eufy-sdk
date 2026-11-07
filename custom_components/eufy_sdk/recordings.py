@@ -18,8 +18,28 @@ CACHE_SECONDS = 60
 CACHE_BYTES = 16 * 1024 * 1024
 CLIP_POLL_SECONDS = 2
 CLIP_NOTICE_SECONDS = 0.5
-CLIP_GRACE_SECONDS = 60
+CLIP_ADMISSION_SECONDS = 150
+CLIP_GRACE_SECONDS = 120
+CLIP_CONVERSION_MIN_SECONDS = 120
+CLIP_MAX_WAIT_SECONDS = 2_147_483
 CLIP_UNKNOWN_SECONDS = 120
+
+
+def clip_wait_seconds(duration: float) -> float:
+    """
+    Cover admission, three-times-duration pull, conversion watchdog and cleanup.
+
+    Grace covers the SDK's 31-second capture/cleanup reserve, 60-second reconnect
+    and five-second conversion termination escalation. Repeated progress reports
+    remain anchored to the original start, with a fixed timer-sized ceiling.
+    """
+    return min(
+        CLIP_MAX_WAIT_SECONDS,
+        CLIP_ADMISSION_SECONDS
+        + 3 * duration
+        + max(CLIP_CONVERSION_MIN_SECONDS, 6 * duration)
+        + CLIP_GRACE_SECONDS,
+    )
 
 
 class ClipUnavailableError(RecordingsError):
@@ -145,7 +165,7 @@ class RecordingRuntime:
         self.clip_wakeups.add(waiter)
         try:
             started = time.monotonic()
-            async with asyncio.timeout(expected + CLIP_GRACE_SECONDS) as deadline:
+            async with asyncio.timeout(clip_wait_seconds(expected)) as deadline:
                 reply = await self.client.recordings_clip_prepare(camera, event_id)
                 while True:
                     require(
@@ -158,7 +178,7 @@ class RecordingRuntime:
                     reported = reply["progress"]["expectedMs"] or reply["durationMs"]
                     if reported is not None:
                         expected = max(expected, reported / 1000)
-                        deadline.reschedule(started + expected + CLIP_GRACE_SECONDS)
+                        deadline.reschedule(started + clip_wait_seconds(expected))
                     if reply["state"] == "ready":
                         return reply
                     if reply["state"] in ("failed", "refused", "cancelled", "idle"):
