@@ -259,7 +259,7 @@
     "browse_only": "Browse only — video unavailable",
     "unavailable": "Recordings unavailable",
     "refresh": "Catalog refresh requested; use Refresh",
-    "disclosure": "latest 20 station-wide; history incomplete",
+    "disclosure": "latest {stationWindow} station-wide; history incomplete",
     "retained": "May no longer be on HomeBase",
     "unknown_time": "Time unknown",
     "unknown_duration": "duration unknown"

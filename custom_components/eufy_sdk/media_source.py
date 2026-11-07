@@ -210,6 +210,8 @@ def folder_status(page: dict, *, empty: bool) -> str:
             parts.append("checking for events")
     if page["truncated"]:
         parts.append("catalog limited to newest 100")
+    if page["stationWindow"] != 20:
+        parts.append(page["disclosure"])
     return "".join(" · " + part for part in parts)
 
 

@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 TIMEZONE = "America/Chicago"
 DISCLOSURE = "latest 20 station-wide; history incomplete"
+MAX_STATION_WINDOW = 87381
 COVER_CAP = 524288
 ERROR = "Recordings unavailable"
 MAX_TIME_MS = 253402300799999
@@ -88,6 +89,18 @@ def time_ms(value: Any, *, nullable: bool = False) -> int | None:
     return number(value, nullable=nullable, maximum=MAX_TIME_MS)
 
 
+def station_window(value: Any) -> int:
+    """Validate the bridge's packet-bounded station query count."""
+    window = number(value, maximum=MAX_STATION_WINDOW)
+    require(window >= 1)
+    return window
+
+
+def disclosure(window: int) -> str:
+    """Describe the actual station-wide query window."""
+    return f"latest {window} station-wide; history incomplete"
+
+
 def choice(value: Any, options: tuple) -> Any:
     """Accept only a fixed scalar enum."""
     require(isinstance(value, str) and value in options)
@@ -126,11 +139,13 @@ def capability(value: Any) -> dict | None:
         require(value.get("enabled") is True)
         require(value.get("browseOnly") is (not playback))
         require(value.get("timezone") == TIMEZONE)
-        for key, expected in (
-            ("stationWindow", 20),
-            ("pageSize", 100),
-        ):
-            require(type(value.get(key)) is int and value[key] == expected)
+        window = station_window(value.get("stationWindow"))
+        # Legacy bridges omit this additive capability field at the default window.
+        require(
+            value.get("disclosure", DISCLOSURE if window == 20 else None)
+            == disclosure(window)
+        )
+        require(type(value.get("pageSize")) is int and value["pageSize"] == 100)
         require(
             type(value.get("coverBudget")) is int and 1 <= value["coverBudget"] <= 100
         )
@@ -357,11 +372,10 @@ def catalog(value: Any, scope: str, camera: str) -> dict:
         ("lastSuccessfulQueryAtMs", "lastAttemptAtMs", "browseId", "browseExpiresAtMs"),
     )
     require(data.get("scopeId") == scope and data.get("cameraId") == camera)
+    window = station_window(data.get("stationWindow"))
     require(
         data.get("historyIncomplete") is True
-        and type(data.get("stationWindow")) is int
-        and data["stationWindow"] == 20
-        and data.get("disclosure") == DISCLOSURE
+        and data.get("disclosure") == disclosure(window)
     )
     rows = data.get("events")
     require(isinstance(rows, list) and len(rows) <= 100)
@@ -423,8 +437,8 @@ def catalog(value: Any, scope: str, camera: str) -> dict:
         "events": rows,
         "truncated": flag(data.get("truncated")),
         "historyIncomplete": True,
-        "stationWindow": 20,
-        "disclosure": DISCLOSURE,
+        "stationWindow": window,
+        "disclosure": disclosure(window),
         "refresh": refresh,
         "dirty": flag(data.get("dirty")),
         "lastSuccessfulQueryAtMs": time_ms(
@@ -525,6 +539,13 @@ def clip(value: Any) -> dict:
 def diagnostics(value: Any) -> dict:
     """Project only counts, display names, fixed statuses and masked time shapes."""
     require(isinstance(value, dict))
+    window = (
+        station_window(value["stationWindow"])
+        if "stationWindow" in value
+        else MAX_STATION_WINDOW
+    )
+    if "stationWindow" in value:
+        require(value.get("disclosure") == disclosure(window))
     cameras = value.get("rowsKeptPerCamera")
     require(isinstance(cameras, list) and len(cameras) <= 2000)
     kept = []
@@ -566,7 +587,7 @@ def diagnostics(value: Any) -> dict:
         "pagingStatus": choice(
             value.get("pagingStatus"), ("unverified", "working", "unsupported_stopped")
         ),
-        "lastPageCount": number(value.get("lastPageCount"), maximum=20),
+        "lastPageCount": number(value.get("lastPageCount"), maximum=window),
         "lastCatalogTime": time_ms(value.get("lastCatalogTime"), nullable=True),
         "coverCache": {
             key: number(covers.get(key)) for key in ("files", "bytes", "pending")
