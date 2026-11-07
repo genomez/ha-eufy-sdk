@@ -184,9 +184,11 @@ def folder_status(page: dict, *, empty: bool) -> str:
     if state in ("deferred", "failed"):
         parts.append("showing saved list")
     if empty:
-        parts.append("checking for events" if state == "scheduled" else "no events yet")
+        parts.append("no playable recordings")
+        if state == "scheduled":
+            parts.append("checking for events")
     if page["truncated"]:
-        parts.append("newest 100")
+        parts.append("catalog limited to newest 100")
     return "".join(" · " + part for part in parts)
 
 
@@ -363,10 +365,13 @@ class EufyRecordingMediaSource(MediaSource):
             runtime = find_runtime(self.hass, scope)
             page = await runtime.browse(camera, event_id)
             playback = runtime.playback_supported()
+            # The v1 catalog has no playable-only filter or page cursor.
+            # Keep its truncation metadata and focused-event behavior intact.
             events = [
                 event
                 for event in page["events"]
                 if event.get("recordingAvailable", True)
+                and (event_id is not None or (playback and event["playable"]))
             ]
             if event_id is not None:
                 require(bool(events))

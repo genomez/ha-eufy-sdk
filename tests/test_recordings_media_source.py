@@ -24,7 +24,7 @@ MEDIA_LOGGER = "custom_components.eufy_sdk.media_source"
 def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format"):
     """Build an unknown-time event using only synthetic metadata."""
     return {
-        **fixture.event(event_id),
+        **fixture.event(event_id, playable=True),
         "startedAtMs": None,
         "endedAtMs": None,
         "startedAtLocal": None,
@@ -39,7 +39,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
     async def test_unavailable_rows_do_not_affect_children_or_unknown_folder_count(
         self,
     ):
-        legacy = {**fixture.event(), "durationSeconds": 3}
+        legacy = {**fixture.event(playable=True), "durationSeconds": 3}
         visible = {
             **unknown_event(),
             "recordingAvailable": True,
@@ -67,7 +67,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.children[0].thumbnail.endswith("?v=cover_2"))
 
     async def test_hidden_only_page_is_empty_and_hidden_detail_is_unavailable(self):
-        hidden = {**fixture.event(), "recordingAvailable": False}
+        hidden = {**fixture.event(playable=True), "recordingAvailable": False}
         self.runtime.client.rpc.return_value = {
             "ok": True,
             "recordings": fixture.page([hidden]),
@@ -82,7 +82,8 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def asyncSetUp(self):
-        self.runtime = await fixture.runtime()
+        self.runtime = await fixture.runtime(playable=True)
+        self.runtime.client.recordings_capability["playback"] = True
         self.hass = fixture.hass(self.runtime)
         self.source = EufyRecordingMediaSource(self.hass)
         self.addCleanup(self.runtime.close)
@@ -113,7 +114,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
     async def test_camera_browse_one_metadata_rpc_zero_cover_calls(self):
         self.runtime.client.rpc.return_value = {
             "ok": True,
-            "recordings": fixture.page(),
+            "recordings": fixture.page([fixture.event(playable=True)]),
         }
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
@@ -129,8 +130,8 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         row = result.children[0]
         self.assertTrue(row.title.startswith("12:00 PM · Nov 4 · 10 s"))
         self.assertNotIn("May no longer be on HomeBase", row.title)
-        self.assertFalse(row.can_play)
-        self.assertTrue(row.can_expand)
+        self.assertTrue(row.can_play)
+        self.assertFalse(row.can_expand)
         self.assertTrue(row.thumbnail.startswith("/api/eufy_sdk/recordings/"))
         self.assertNotIn("bridge", row.thumbnail)
 
@@ -154,10 +155,14 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         item = SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
         self.runtime.client.rpc.return_value = {
             "ok": True,
-            "recordings": fixture.page(),
+            "recordings": fixture.page([fixture.event(playable=True)]),
         }
         before = (await self.source.async_browse_media(item)).children[0].thumbnail
-        ready = {**fixture.event(), "coverState": "cached", "coverRevision": "cover_2"}
+        ready = {
+            **fixture.event(playable=True),
+            "coverState": "cached",
+            "coverRevision": "cover_2",
+        }
         self.runtime.client.rpc.return_value = {
             "ok": True,
             "recordings": fixture.page([ready]),
@@ -167,6 +172,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(after, before + "?v=cover_2")
 
     async def test_resolve_always_fails_with_zero_bridge_calls(self):
+        self.runtime.client.recordings_capability.pop("playback")
         for identifier in (
             "",
             "https://source.invalid/video.mp4",
@@ -197,11 +203,20 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
     async def test_empty_failed_and_truncated_states(self):
         name = self.runtime.cameras[fixture.CAMERA]["name"].strip()
         expected = {
-            "idle": " · no events yet · newest 100",
-            "scheduled": " · checking for events · newest 100",
-            "deferred": " · showing saved list · no events yet · newest 100",
-            "failed": " · showing saved list · no events yet · newest 100",
-            "rate_limited": " · no events yet · newest 100",
+            "idle": " · no playable recordings · catalog limited to newest 100",
+            "scheduled": (
+                " · no playable recordings · checking for events"
+                " · catalog limited to newest 100"
+            ),
+            "deferred": (
+                " · showing saved list · no playable recordings"
+                " · catalog limited to newest 100"
+            ),
+            "failed": (
+                " · showing saved list · no playable recordings"
+                " · catalog limited to newest 100"
+            ),
+            "rate_limited": " · no playable recordings · catalog limited to newest 100",
         }
         for state in ("idle", "scheduled", "deferred", "failed", "rate_limited"):
             with self.subTest(state=state):
@@ -232,7 +247,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
             ("deferred", " · showing saved list"),
         ):
             with self.subTest(state=state):
-                page = fixture.page()
+                page = fixture.page([fixture.event(playable=True)])
                 page["refresh"]["state"] = state
                 self.runtime.pages.clear()
                 self.runtime.client.rpc.return_value = {"ok": True, "recordings": page}
@@ -337,9 +352,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Browse only", title(event, detail=True))
 
     async def test_unknown_folder_last_and_known_events_newest_first(self):
-        newer = fixture.event()
+        newer = fixture.event(playable=True)
         older = {
-            **fixture.event(fixture.OTHER),
+            **fixture.event(fixture.OTHER, playable=True),
             "startedAtMs": newer["startedAtMs"] - 60000,
             "endedAtMs": newer["endedAtMs"] - 60000,
             "startedAtUtc": "2026-11-04T17:59:00Z",
@@ -389,7 +404,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         }
         self.runtime.client.rpc.return_value = {
             "ok": True,
-            "recordings": fixture.page([older, fixture.event(), newer]),
+            "recordings": fixture.page([older, fixture.event(playable=True), newer]),
         }
         result = await self.source.async_browse_media(
             SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}/u")
@@ -404,9 +419,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 row.media_content_id,
                 folder_id(fixture.SCOPE, fixture.CAMERA) + "/e/" + event["eventId"],
             )
-            self.assertTrue(row.can_expand)
-            self.assertFalse(row.can_play)
-            self.assertEqual(row.media_content_type, "")
+            self.assertFalse(row.can_expand)
+            self.assertTrue(row.can_play)
+            self.assertEqual(row.media_content_type, "video/mp4")
             self.assertIsNone(row.children)
             self.assertEqual(
                 row.thumbnail,
@@ -428,7 +443,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row.title for row in result.children], ["Time unknown (1)"])
 
     async def test_unknown_event_detail_retains_canonical_identifier(self):
-        event = unknown_event()
+        event = {**unknown_event(), "playable": False}
         self.runtime.client.rpc.return_value = {
             "ok": True,
             "recordings": fixture.page([event]),
@@ -453,7 +468,11 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_unknown_folder_absent_route_fails_closed(self):
-        for rows in ([], [fixture.event()]):
+        for rows in (
+            [],
+            [fixture.event(playable=True)],
+            [{**unknown_event(), "playable": False}],
+        ):
             with self.subTest(empty=not rows):
                 self.runtime.client.rpc.return_value = {
                     "ok": True,

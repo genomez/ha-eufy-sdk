@@ -88,6 +88,127 @@ class PlaybackFixture(unittest.IsolatedAsyncioTestCase):
 
 
 class PlaybackTests(PlaybackFixture):
+    async def test_catalog_hides_rows_without_authority_including_unknown_times(self):
+        unknown = {
+            "startedAtMs": None,
+            "endedAtMs": None,
+            "startedAtUtc": None,
+            "startedAtLocal": None,
+            "sourceStartLocal": None,
+        }
+        unknown_rows = [
+            {
+                **fixture.event("e_" + letter * 22),
+                **unknown,
+                "timeStatus": status,
+            }
+            for letter, status in zip(
+                "UVW", ("unknown_format", "ambiguous", "invalid"), strict=True
+            )
+        ]
+        retained = fixture.event(playable=True)
+        self.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page(
+                [fixture.event(fixture.OTHER), *unknown_rows, retained]
+            ),
+        }
+        page = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
+        )
+        self.assertEqual(len(page.children), 1)
+        self.assertTrue(page.children[0].media_content_id.endswith(fixture.EVENT))
+        self.assertTrue(page.children[0].can_play)
+        self.assertEqual(retained["stationPresence"], "not_in_latest_window")
+        self.client.rpc.assert_awaited_once_with(
+            "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
+        )
+
+    async def test_no_authority_page_has_explicit_empty_state(self):
+        self.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([fixture.event()]),
+        }
+        page = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
+        )
+        self.assertEqual(page.children, [])
+        self.assertIn("no playable recordings", page.title)
+
+    async def test_browse_only_capabilities_keep_camera_folders_but_hide_events(self):
+        for playback in (False, None, "true"):
+            with self.subTest(playback=playback):
+                self.client.recordings_capability["playback"] = playback
+                self.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.cameras(),
+                }
+                root = await self.source.async_browse_media(
+                    SimpleNamespace(identifier="")
+                )
+                self.assertEqual(len(root.children), 5)
+                self.assertTrue(all(row.can_expand for row in root.children))
+                self.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.page([fixture.event(playable=True)]),
+                }
+                page = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
+                )
+                self.assertEqual(page.children, [])
+                self.assertIn("no playable recordings", page.title)
+
+    async def test_filtered_full_page_preserves_catalog_limit_and_focus_navigation(
+        self,
+    ):
+        rows = [fixture.event("e_" + f"{index:022d}") for index in range(100)]
+        rows[-1] = fixture.event(playable=True)
+        catalog = fixture.page(rows)
+        catalog["truncated"] = True
+        self.client.rpc.return_value = {"ok": True, "recordings": catalog}
+        page = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
+        )
+        self.assertEqual(len(page.children), 1)
+        self.assertIn("catalog limited to newest 100", page.title)
+        self.assertTrue(self.runtime.pages[fixture.CAMERA]["truncated"])
+        self.assertEqual(len(self.runtime.pages[fixture.CAMERA]["events"]), 100)
+        self.client.rpc.assert_awaited_once_with(
+            "recordings.catalog", timeout=3, cameraId=fixture.CAMERA, refresh="if_due"
+        )
+        self.client.rpc.reset_mock()
+        self.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.page([fixture.event(fixture.OTHER, playable=True)]),
+        }
+        detail = await self.source.async_browse_media(
+            SimpleNamespace(identifier=IDENTIFIER.replace(fixture.EVENT, fixture.OTHER))
+        )
+        self.assertTrue(detail.can_play)
+        self.client.rpc.assert_awaited_once_with(
+            "recordings.catalog",
+            timeout=3,
+            cameraId=fixture.CAMERA,
+            refresh="if_due",
+            focusEventId=fixture.OTHER,
+        )
+
+    async def test_rebrowse_reveals_new_authority_and_hides_disabled_playback(self):
+        item = SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
+        for playable, playback, count in (
+            (False, True, 0),
+            (True, True, 1),
+            (True, False, 0),
+        ):
+            with self.subTest(playable=playable, playback=playback):
+                self.client.recordings_capability["playback"] = playback
+                self.client.rpc.return_value = {
+                    "ok": True,
+                    "recordings": fixture.page([fixture.event(playable=playable)]),
+                }
+                page = await self.source.async_browse_media(item)
+                self.assertEqual(len(page.children), count)
+
     async def test_common_playback_failures_log_one_bounded_warning(self):
         cases = (
             (recordings.ClipUnavailableError("busy"), "busy"),
@@ -133,7 +254,11 @@ class PlaybackTests(PlaybackFixture):
                 page = await self.source.async_browse_media(
                     SimpleNamespace(identifier=IDENTIFIER.rsplit("/e/", 1)[0])
                 )
-                self.assertIs(page.children[0].can_play, playback is True)
+                if playback is True:
+                    self.assertTrue(page.children[0].can_play)
+                else:
+                    self.assertEqual(page.children, [])
+                    self.assertIn("no playable recordings", page.title)
 
     async def test_event_authority_and_feature_both_gate_browse_and_resolve(self):
         for playback, playable in (
