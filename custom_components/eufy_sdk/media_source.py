@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -25,6 +26,21 @@ from homeassistant.config_entries import ConfigEntryState
 from .const import DOMAIN
 from .recordings import ClipUnavailableError
 from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def failure_site(err: BaseException) -> str:
+    """Name the innermost integration function and line that failed; never values."""
+    site = "unknown"
+    tb = err.__traceback__
+    while tb is not None:
+        code = tb.tb_frame.f_code
+        if "eufy_sdk" in code.co_filename and code.co_name != "require":
+            site = f"{code.co_name}:{tb.tb_lineno}"
+        tb = tb.tb_next
+    return site
+
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -268,7 +284,12 @@ class EufyRecordingMediaSource(MediaSource):
         except TimeoutError:
             reason = "timeout"
             raise playback_error(reason) from None
-        except (RecordingsError, KeyError, ValueError):
+        except (RecordingsError, KeyError, ValueError) as err:
+            _LOGGER.warning(
+                "Recording playback failed: %s at %s",
+                type(err).__name__,
+                failure_site(err),
+            )
             reason = "failed"
             raise playback_error(reason) from None
 
@@ -336,7 +357,12 @@ class EufyRecordingMediaSource(MediaSource):
                 + folder_status(page, empty=not children),
                 children=children,
             )
-        except (RecordingsError, KeyError, ValueError):
+        except (RecordingsError, KeyError, ValueError) as err:
+            _LOGGER.warning(
+                "Recordings browse failed: %s at %s",
+                type(err).__name__,
+                failure_site(err),
+            )
             message = "Recordings unavailable"
             raise BrowseError(
                 message,

@@ -18,6 +18,8 @@ from custom_components.eufy_sdk.media_source import (
 )
 from custom_components.eufy_sdk.recordings_models import DISCLOSURE
 
+MEDIA_LOGGER = "custom_components.eufy_sdk.media_source"
+
 
 def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format"):
     """Build an unknown-time event using only synthetic metadata."""
@@ -427,6 +429,23 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     SimpleNamespace(identifier=identifier)
                 )
         self.runtime.client.rpc.assert_not_awaited()
+
+    async def test_browse_failure_logs_site_without_values(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": fixture.cameras(),
+        }
+        identifier = f"s/{fixture.SCOPE}/c/c_{'Z' * 22}/u"
+        with (
+            self.assertLogs(MEDIA_LOGGER, "WARNING") as logs,
+            self.assertRaisesRegex(BrowseError, "^Recordings unavailable$"),
+        ):
+            await self.source.async_browse_media(SimpleNamespace(identifier=identifier))
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("Recordings browse failed: RecordingsError at ", logs.output[0])
+        self.assertNotIn("unknown", logs.output[0])
+        self.assertNotIn("Z" * 22, logs.output[0])
+        self.assertNotIn(fixture.SCOPE, logs.output[0])
 
     async def test_unknown_folder_for_unenrolled_opaque_camera_fails_closed(self):
         self.runtime.client.rpc.return_value = {
