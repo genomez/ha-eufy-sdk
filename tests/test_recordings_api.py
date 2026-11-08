@@ -11,6 +11,30 @@ from custom_components.eufy_sdk.recordings import RecordingRuntime
 
 
 class ContractTests(unittest.TestCase):
+    def test_camera_playback_support_is_optional_and_strictly_boolean(self):
+        for supported in (True, False):
+            page = {**fixture.page(), "playbackSupported": supported}
+            self.assertIs(
+                models.catalog(page, fixture.SCOPE, fixture.CAMERA)[
+                    "playbackSupported"
+                ],
+                supported,
+            )
+        self.assertNotIn(
+            "playbackSupported",
+            models.catalog(fixture.page(), fixture.SCOPE, fixture.CAMERA),
+        )
+        for invalid in (None, 0, 1, "false"):
+            with (
+                self.subTest(invalid=invalid),
+                self.assertRaises(models.RecordingsError),
+            ):
+                models.catalog(
+                    {**fixture.page(), "playbackSupported": invalid},
+                    fixture.SCOPE,
+                    fixture.CAMERA,
+                )
+
     def test_recording_availability_is_optional_and_strictly_boolean(self):
         for available in (True, False):
             row = {**fixture.event(), "recordingAvailable": available}

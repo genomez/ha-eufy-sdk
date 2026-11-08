@@ -53,6 +53,135 @@ def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format")
 
 
 class MediaTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unsupported_camera_has_one_inert_information_item(self):
+        for rows in ([], [fixture.event(playable=False)]):
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": {**fixture.page(rows), "playbackSupported": False},
+            }
+            self.runtime.client.rpc.reset_mock()
+            result = await self.source.async_browse_media(
+                SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+            )
+            self.assertEqual(len(result.children), 1)
+            info = result.children[0]
+            self.assertEqual(info.title, "Playback not yet supported for this camera")
+            self.assertFalse(info.can_play)
+            self.assertFalse(info.can_expand)
+            self.assertEqual(info.media_content_type, "")
+            self.assertIsNone(info.thumbnail)
+            self.assertEqual(info.children, [])
+            self.runtime.client.rpc.assert_awaited_once_with(
+                "recordings.catalog",
+                timeout=3,
+                cameraId=fixture.CAMERA,
+                refresh="if_due",
+            )
+            self.runtime.client.rpc.reset_mock()
+            item = SimpleNamespace(
+                identifier=info.media_content_id.removeprefix(
+                    "media-source://eufy_sdk/"
+                )
+            )
+            with self.assertRaises(BrowseError):
+                await self.source.async_browse_media(item)
+            with self.assertRaises(Unresolvable):
+                await self.source.async_resolve_media(item)
+            self.runtime.client.rpc.assert_not_awaited()
+
+    async def test_supported_empty_camera_has_no_recordings_item(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": {**fixture.page([]), "playbackSupported": True},
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        )
+        self.assertEqual([row.title for row in result.children], ["No recordings yet"])
+        info = result.children[0]
+        self.assertFalse(info.can_play)
+        self.assertFalse(info.can_expand)
+        self.assertIsNone(info.thumbnail)
+        self.runtime.client.rpc.reset_mock()
+        item = SimpleNamespace(
+            identifier=info.media_content_id.removeprefix("media-source://eufy_sdk/")
+        )
+        with self.assertRaises(BrowseError):
+            await self.source.async_browse_media(item)
+        with self.assertRaises(Unresolvable):
+            await self.source.async_resolve_media(item)
+        self.runtime.client.rpc.assert_not_awaited()
+
+    async def test_older_bridge_empty_camera_keeps_existing_behavior(self):
+        for rows in ([], [fixture.event(playable=False)]):
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": fixture.page(rows),
+            }
+            result = await self.source.async_browse_media(
+                SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+            )
+            self.assertEqual(result.children, [])
+
+    async def test_model_policy_change_restores_normal_rows(self):
+        item = SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": {
+                **fixture.page([fixture.event(playable=False)]),
+                "playbackSupported": False,
+            },
+        }
+        self.assertEqual(
+            (await self.source.async_browse_media(item)).children[0].title,
+            "Playback not yet supported for this camera",
+        )
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": {
+                **fixture.page([fixture.event(playable=True)]),
+                "playbackSupported": True,
+            },
+        }
+        result = await self.source.async_browse_media(item)
+        self.assertEqual(len(result.children), 1)
+        self.assertTrue(result.children[0].can_expand)
+        self.assertIn("/d/", result.children[0].media_content_id)
+
+    async def test_supported_camera_with_hidden_rows_is_not_labeled_empty(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": {
+                **fixture.page([fixture.event(playable=False)]),
+                "playbackSupported": True,
+            },
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        )
+        self.assertEqual(result.children, [])
+
+    async def test_excluded_camera_stays_hidden_without_information_item(self):
+        payload = fixture.cameras()
+        payload["cameras"] = [
+            row for row in payload["cameras"] if row["cameraId"] != fixture.CAMERA
+        ]
+        self.runtime.client.rpc.return_value = {"ok": True, "recordings": payload}
+        result = await self.source.async_browse_media(SimpleNamespace(identifier=""))
+        self.assertEqual(len(result.children), 4)
+        self.assertNotIn(
+            folder_id(fixture.SCOPE, fixture.CAMERA),
+            [row.media_content_id for row in result.children],
+        )
+        self.runtime.client.rpc.reset_mock()
+        with self.assertRaises(BrowseError):
+            await self.source.async_browse_media(
+                SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+            )
+        self.runtime.client.rpc.assert_awaited_once_with(
+            "recordings.cameras", timeout=3
+        )
+
     async def test_ha_zone_groups_old_bridge_utc_times_at_midnight_and_dst(self):
         base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
         cases = (

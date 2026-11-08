@@ -225,6 +225,23 @@ def directory(
     )
 
 
+def camera_notice(
+    identifier: str, page: dict, *, playback: bool
+) -> list[BrowseMediaSource]:
+    """Return an inert notice only when the bridge supplies camera model policy."""
+    if page.get("playbackSupported") is False:
+        message = "Playback not yet supported for this camera"
+    elif page.get("playbackSupported") is True and playback and not page["events"]:
+        message = "No recordings yet"
+    else:
+        return []
+    # This inert path is outside the browse/resolve grammar, so even a direct
+    # request fails before any runtime I/O. It has no thumbnail or media type.
+    info = directory(f"{identifier}/info", message, children=[])
+    info.can_expand = False
+    return [info]
+
+
 def folder_status(page: dict, *, empty: bool) -> str:
     """Return a short camera-folder title suffix only when something is off."""
     state = page["refresh"]["state"]
@@ -442,10 +459,11 @@ class EufyRecordingMediaSource(MediaSource):
                     ]
                     if None in groups:
                         children.append(directory(f"{base}/u", "Time unknown"))
+                    children = camera_notice(base, page, playback=playback) or children
                     return directory(
                         item.identifier,
                         runtime.cameras[camera]["name"].strip()
-                        + folder_status(page, empty=not children),
+                        + folder_status(page, empty=not events),
                         children=children,
                     )
                 events = groups.get(day, [])

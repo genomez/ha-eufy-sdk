@@ -441,7 +441,7 @@ def catalog(value: Any, scope: str, camera: str) -> dict:
             row["eventId"],
         )
     )
-    return {
+    result = {
         "version": 1,
         "scopeId": scope,
         "cameraId": camera,
@@ -463,6 +463,9 @@ def catalog(value: Any, scope: str, camera: str) -> dict:
         "browseExpiresAtMs": time_ms(data.get("browseExpiresAtMs"), nullable=True),
         "coverEligibleEventIds": list(eligible),
     }
+    if "playbackSupported" in data:
+        result["playbackSupported"] = flag(data["playbackSupported"])
+    return result
 
 
 def cover(value: Any, camera: str, event_id: str) -> dict:
