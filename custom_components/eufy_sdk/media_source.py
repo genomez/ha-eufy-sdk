@@ -226,13 +226,15 @@ def directory(
 
 
 def camera_notice(
-    identifier: str, page: dict, *, playback: bool
+    identifier: str, page: dict, *, playback: bool, visible: list
 ) -> list[BrowseMediaSource]:
     """Return an inert notice only when the bridge supplies camera model policy."""
     if page.get("playbackSupported") is False:
         message = "Playback not yet supported for this camera"
-    elif page.get("playbackSupported") is True and playback and not page["events"]:
-        message = "No recordings yet"
+    elif page.get("playbackSupported") is True and playback and not visible:
+        message = (
+            "No playable recordings yet" if page["events"] else "No recordings yet"
+        )
     else:
         return []
     # This inert path is outside the browse/resolve grammar, so even a direct
@@ -459,7 +461,10 @@ class EufyRecordingMediaSource(MediaSource):
                     ]
                     if None in groups:
                         children.append(directory(f"{base}/u", "Time unknown"))
-                    children = camera_notice(base, page, playback=playback) or children
+                    children = (
+                        camera_notice(base, page, playback=playback, visible=events)
+                        or children
+                    )
                     return directory(
                         item.identifier,
                         runtime.cameras[camera]["name"].strip()

@@ -112,6 +112,25 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
             await self.source.async_resolve_media(item)
         self.runtime.client.rpc.assert_not_awaited()
 
+    async def test_supported_camera_with_only_unplayable_rows_has_notice(self):
+        self.runtime.client.rpc.return_value = {
+            "ok": True,
+            "recordings": {
+                **fixture.page([fixture.event(playable=False)]),
+                "playbackSupported": True,
+            },
+        }
+        result = await self.source.async_browse_media(
+            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
+        )
+        self.assertEqual(
+            [row.title for row in result.children], ["No playable recordings yet"]
+        )
+        info = result.children[0]
+        self.assertFalse(info.can_play)
+        self.assertFalse(info.can_expand)
+        self.assertIsNone(info.thumbnail)
+
     async def test_older_bridge_empty_camera_keeps_existing_behavior(self):
         for rows in ([], [fixture.event(playable=False)]):
             self.runtime.client.rpc.return_value = {
@@ -147,19 +166,6 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.children), 1)
         self.assertTrue(result.children[0].can_expand)
         self.assertIn("/d/", result.children[0].media_content_id)
-
-    async def test_supported_camera_with_hidden_rows_is_not_labeled_empty(self):
-        self.runtime.client.rpc.return_value = {
-            "ok": True,
-            "recordings": {
-                **fixture.page([fixture.event(playable=False)]),
-                "playbackSupported": True,
-            },
-        }
-        result = await self.source.async_browse_media(
-            SimpleNamespace(identifier=f"s/{fixture.SCOPE}/c/{fixture.CAMERA}")
-        )
-        self.assertEqual(result.children, [])
 
     async def test_excluded_camera_stays_hidden_without_information_item(self):
         payload = fixture.cameras()
