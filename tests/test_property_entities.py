@@ -1,6 +1,7 @@
 # ruff: noqa: ANN201, D100, D101, D102, D107, INP001, PT009
 
 import importlib.util
+import json
 import unittest
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -11,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.eufy_sdk.entity import classify
+from custom_components.eufy_sdk.manifest_reads import normalize_properties
 from custom_components.eufy_sdk.property_entities import (
     async_reconcile_property_entities,
     async_release_presentation_hides,
@@ -107,6 +109,120 @@ class RegistryTests(unittest.TestCase):
             ),
         ):
             async_reconcile_property_entities(self.hass, self.entry)
+
+    def test_source_sdk_bridge_light_policy_survives_normalization_and_registry_reload(
+        self,
+    ):
+        fixture = json.loads(
+            (
+                Path(__file__).parent / "fixtures" / "light_route_manifest.json"
+            ).read_text()
+        )
+        self.assertEqual(len(fixture["cases"]), 8)
+        for case in fixture["cases"]:
+            with self.subTest(model=case["model"], parent=case["parent"]):
+                self.hass.data = {}
+                self.assertTrue(case["reply"]["ok"])
+                specs = normalize_properties(case["reply"])
+                by_name = {spec["name"]: spec for spec in specs}
+                self.assertEqual(classify(by_name["light"]), "switch")
+                self.assertEqual(
+                    by_name["light"].get("boundedStateWrites", False),
+                    case["parent"] != "T8030",
+                )
+                restricted = case["parent"] != "T8030"
+                originals = [
+                    Entry(
+                        entity_id=f"{domain}.{name}",
+                        domain=domain,
+                        unique_id=f"synthetic-camera_{name}",
+                        options={"number": {"precision": 2}},
+                    )
+                    for domain, name in (
+                        ("number", "brightness"),
+                        ("switch", "spotlightEnabled"),
+                        ("number", "colorTemp"),
+                        ("switch", "light"),
+                    )
+                ]
+                registry = Registry(originals)
+                self.entry.runtime_data.coordinator.data = {
+                    "synthetic-camera": {"codec": "camera"}
+                }
+                self.entry.runtime_data.properties = {"synthetic-camera": specs}
+                for _ in range(2):
+                    self.apply(registry)
+                for original in originals:
+                    result = registry.async_get(original.entity_id)
+                    hidden = (
+                        restricted and original.unique_id != "synthetic-camera_light"
+                    )
+                    self.assertEqual(
+                        result.disabled_by,
+                        er.RegistryEntryDisabler.INTEGRATION if hidden else None,
+                    )
+                    self.assertEqual(result.unique_id, original.unique_id)
+                    self.assertEqual(result.options["number"], {"precision": 2})
+                for name in ("brightness", "spotlightEnabled", "colorTemp"):
+                    self.assertEqual(by_name[name]["writable"], not restricted)
+                    if restricted:
+                        self.assertIsNone(classify(by_name[name]))
+                supported = next(
+                    c
+                    for c in fixture["cases"]
+                    if c["model"] == case["model"] and c["parent"] == "T8030"
+                )
+                self.entry.runtime_data.properties = {
+                    "synthetic-camera": normalize_properties(supported["reply"])
+                }
+                self.apply(registry)
+                for original in originals:
+                    self.assertIsNone(
+                        registry.async_get(original.entity_id).disabled_by
+                    )
+
+    def test_legacy_color_temperature_route_retirement_preserves_user_preferences(self):
+        for disabled, marker in (
+            (er.RegistryEntryDisabler.USER, {}),
+            (None, {"opt_out": True}),
+        ):
+            self.hass.data = {}
+            original = Entry(
+                entity_id="number.color_temperature",
+                domain="number",
+                unique_id="station_colorTemp",
+                disabled_by=disabled,
+                options={"eufy_sdk": {"property_presentation_v2": marker}},
+            )
+            registry = Registry([original])
+            self.entry.runtime_data.properties = {
+                "station": [
+                    {
+                        "name": "colorTemp",
+                        "type": "number",
+                        "writeOnly": True,
+                        "unexposed": True,
+                        "writable": False,
+                        "routeRestricted": True,
+                    }
+                ]
+            }
+            self.apply(registry)
+            self.assertEqual(registry.async_get(original.entity_id), original)
+            self.entry.runtime_data.properties = {
+                "station": [
+                    {
+                        "name": "colorTemp",
+                        "type": "number",
+                        "writeOnly": True,
+                        "writable": True,
+                    }
+                ]
+            }
+            self.apply(registry)
+            restored = registry.async_get(original.entity_id)
+            self.assertEqual(restored.disabled_by, original.disabled_by)
+            self.assertEqual(restored.unique_id, original.unique_id)
 
     def test_disables_diagnostic_preserving_identity_options_and_idempotence(self):
         original = Entry(

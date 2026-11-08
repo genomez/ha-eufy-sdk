@@ -50,6 +50,35 @@ def snapshot(value: object = 0) -> dict:
 
 
 class ManifestReadTests(unittest.TestCase):
+    def test_route_restrictions_survive_decoded_metadata(self):
+        for name, value_type in (
+            ("brightness", "number"),
+            ("spotlightEnabled", "bool"),
+        ):
+            original = {
+                "name": name,
+                "type": value_type,
+                "writable": False,
+                "unexposed": True,
+                "routeRestricted": True,
+            }
+            reply = {
+                "properties": [original],
+                "decodedProperties": manifest(
+                    {
+                        "property": name,
+                        "accessor": name,
+                        "type": value_type,
+                        "writable": True,
+                    }
+                ),
+            }
+            source = deepcopy(reply)
+            result = normalize_properties(reply)[0]
+            self.assertFalse(result["writable"])
+            self.assertTrue(result["unexposed"])
+            self.assertEqual(reply, source)
+
     def test_fixture_is_reproducible_from_offline_synthetic_construction(self):
         fixtures = Path(__file__).parent / "fixtures"
         generator = runpy.run_path(str(fixtures / "generate_manifest_readings.py"))

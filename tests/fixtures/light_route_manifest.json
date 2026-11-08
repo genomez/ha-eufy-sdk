@@ -1,0 +1,1063 @@
+{
+  "sourceSha256": {
+    "sdk/src/model/device.ts": "c68e8a2690a2491d947eb05f4f098984478e70ed49c80976b042f67adb1a8dab",
+    "sdk/src/model/capabilities/light.ts": "d28e299550e635d81f321b2d859083d360398bfe0d6d675b6dee280a3e8444b4",
+    "sdk/src/model/capabilities/members.ts": "fd872988852aaa5a001666b380448d91b972a7ea1476cf8b3e7235650a9aa3e1",
+    "sdk/src/model/capabilities/manifest.ts": "01158b6173e5d2da2d894198230acb3bf357722bbb595e47b8ab41910bf4bea5",
+    "bridge/src/device-view.mjs": "d6461b99337370e0f6476e3169f1d04174f767941fba8e8bb193e67172bda3ff",
+    "bridge/src/ws-server.mjs": "a49a77bdce2fe60570bd2cd4cd70be2226cb6bf673d6a9524a1de2401ecd6e27",
+    "bridge/src/bounded-state-writes.mjs": "682d899f694669aeb67e7f1ca71e4e1bbf811bf485a1a189a35167cc7e590f72"
+  },
+  "cases": [
+    {
+      "model": "T8425",
+      "parent": "T9000",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8425",
+      "parent": "T8030",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": true,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": true,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8425",
+      "parent": "throw",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8425",
+      "parent": "missing",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8426",
+      "parent": "T9000",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8426",
+      "parent": "T8030",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": true,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": true,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8426",
+      "parent": "throw",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8426",
+      "parent": "missing",
+      "reply": {
+        "id": 1,
+        "ok": true,
+        "sn": "synthetic-camera",
+        "properties": [
+          {
+            "name": "light",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": true,
+            "boundedStateWrites": true,
+            "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+          },
+          {
+            "name": "brightness",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 1,
+            "max": 100,
+            "writable": false,
+            "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "spotlightEnabled",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": false,
+            "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled).",
+            "unexposed": true,
+            "routeRestricted": true
+          },
+          {
+            "name": "colorTemp",
+            "type": "number",
+            "kind": "scalar",
+            "writable": false,
+            "writeOnly": true,
+            "min": 0,
+            "max": 100,
+            "unexposed": true,
+            "routeRestricted": true
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "light",
+              "accessor": "light",
+              "reads": [
+                {
+                  "accessor": "isOn",
+                  "property": "light",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "accessor": "brightness",
+                  "property": "brightness",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 1,
+                  "max": 100,
+                  "writable": true,
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "accessor": "spotlightEnabled",
+                  "property": "spotlightEnabled",
+                  "type": "bool",
+                  "kind": "boolean",
+                  "writable": true,
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "actions": [
+                {
+                  "name": "set",
+                  "form": "stateful",
+                  "reflects": "isOn",
+                  "args": [{ "name": "isOn", "kind": "boolean" }],
+                  "description": "Light on/off (1400) — lit right now, not a setting: it follows whichever client is streaming. Verified via P2P state readback (3/3); session-scoped behaviour measured live on a T8170."
+                },
+                {
+                  "name": "setBrightness",
+                  "form": "stateful",
+                  "reflects": "brightness",
+                  "args": [
+                    {
+                      "name": "brightness",
+                      "kind": "percent",
+                      "min": 1,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Manual brightness, range 1-100 (1401). Verified live (T8425 + T8124)."
+                },
+                {
+                  "name": "setColorTemp",
+                  "form": "momentary",
+                  "args": [
+                    {
+                      "name": "colorTemp",
+                      "kind": "scalar",
+                      "min": 0,
+                      "max": 100
+                    }
+                  ],
+                  "description": "Colour temperature, 0 (warm) to 100 (cool). Not reported back, so it is write-only."
+                },
+                {
+                  "name": "setEnabled",
+                  "form": "stateful",
+                  "reflects": "spotlightEnabled",
+                  "args": [{ "name": "spotlightEnabled", "kind": "boolean" }],
+                  "description": "The spotlight master switch, distinct from the on/off above — whether the spotlight may light at all. Read verified live on a T8170 (param 1403, direct polarity: 1 = enabled)."
+                }
+              ],
+              "undescribedActions": ["on", "off", "setAutoSpotlight"]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

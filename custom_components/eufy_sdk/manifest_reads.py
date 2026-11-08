@@ -111,6 +111,10 @@ def normalize_properties(reply: dict[str, Any]) -> list[dict[str, Any]]:
         elif name in reads:
             # A flat entity cannot identify which namespaced setter was intended.
             spec["writable"] = False
+        # Route policy is independent of whether a public getter decodes the value.
+        if original.get("routeRestricted") is True:
+            spec["writable"] = False
+            spec["unexposed"] = True
         result.append(spec)
     for name, mapping in reads.items():
         if name not in names and mapping is not None:
