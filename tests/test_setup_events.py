@@ -35,6 +35,9 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
         coordinator = Mock(data={"homebase": {"state": {"armingMode": 1}}})
         coordinator.async_config_entry_first_refresh = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.request_state_refresh = Mock(
+            side_effect=lambda: scheduled.append(coordinator.async_request_refresh())
+        )
 
         client = Mock()
         client.set_poll_ms = AsyncMock()

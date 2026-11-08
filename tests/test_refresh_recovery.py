@@ -361,6 +361,100 @@ class RefreshRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(snapshot == snapshots[0] for snapshot in snapshots))
         self.assertEqual(calls, 1)
 
+    async def test_valueless_invalidation_during_refresh_gets_one_followup(self):
+        for event in ("armingModeChanged", "propertyChanged"):
+            with self.subTest(event=event):
+                await self.check_invalidation_followup(event, count=1)
+
+    async def test_repeated_invalidations_coalesce_into_one_followup(self):
+        await self.check_invalidation_followup("armingModeChanged", count=8)
+
+    async def test_refresh_without_invalidation_has_no_followup(self):
+        await self.check_invalidation_followup("armingModeChanged", count=0)
+
+    async def test_shutdown_during_refresh_cancels_invalidation_followup(self):
+        await self.check_invalidation_followup("armingModeChanged", count=1, stop=True)
+
+    async def check_invalidation_followup(self, event, count, *, stop=False):
+        callbacks = await self.setup_callbacks()
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        before = self.client.list_devices.await_count
+
+        async def held_list():
+            entered.set()
+            await release.wait()
+            return [{"sn": "fixture-device", "state": {"armingMode": 1}}]
+
+        self.client.list_devices.side_effect = held_list
+        task = asyncio.create_task(self.coordinator.async_refresh())
+        await entered.wait()
+        for _ in range(count):
+            callbacks["on_event"](
+                {"event": event, "deviceSn": "fixture-device", "property": "armingMode"}
+            )
+        await self.drain()
+        self.assertEqual(self.client.list_devices.await_count, before + 1)
+        self.assertEqual(self.coordinator._refresh_invalidated, count > 0)
+        if stop:
+            self.coordinator._clear_fast_retry(stop=True)
+        self.client.list_devices.side_effect = None
+        self.client.list_devices.return_value = [
+            {"sn": "fixture-device", "state": {"armingMode": 3}}
+        ]
+        release.set()
+        await task
+        await self.advance(0)
+        expected = 1 + int(count > 0 and not stop)
+        self.assertEqual(self.client.list_devices.await_count, before + expected)
+        await self.advance(60)
+        self.assertEqual(self.client.list_devices.await_count, before + expected)
+        if count > 0 and not stop:
+            self.assertEqual(
+                self.coordinator.data["fixture-device"]["state"]["armingMode"], 3
+            )
+
+    async def test_shutdown_cancels_already_scheduled_invalidation(self):
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        self.assertIsNotNone(self.coordinator._invalidation_refresh_cancel)
+        before = self.client.list_devices.await_count
+        self.coordinator._clear_fast_retry(stop=True)
+        await self.advance(0)
+        self.assertEqual(self.client.list_devices.await_count, before)
+
+    async def test_invalidation_followup_preserves_recovery_start_limit(self):
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def failed_list():
+            entered.set()
+            await release.wait()
+            raise EufySdkApiClientReplyTimeoutError
+
+        self.client.list_devices.side_effect = failed_list
+        before = self.client.list_devices.await_count
+        task = asyncio.create_task(self.coordinator.async_refresh())
+        await entered.wait()
+        self.coordinator.request_state_refresh()
+        release.set()
+        await task
+        await self.advance(0)
+        self.assertEqual(self.client.list_devices.await_count, before + 1)
+        self.assertTrue(self.coordinator._recovery_active)
+        await self.advance(29)
+        self.assertEqual(self.client.list_devices.await_count, before + 1)
+        await self.advance(1)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+
+    async def test_auth_challenge_discards_pending_invalidation(self):
+        self.coordinator._refresh_invalidated = True
+        self.client.auth_status.return_value = {"state": "require_2fa"}
+        with self.assertRaises(ConfigEntryAuthFailed):
+            await self.coordinator._async_update_data()
+        self.assertIsNone(self.coordinator._invalidation_refresh_cancel)
+        self.assertFalse(self.coordinator._refresh_invalidated)
+
     async def test_tolerated_refresh_remains_available_when_throttled(self):
         self.client.list_devices.side_effect = EufySdkApiClientReplyTimeoutError()
         await self.coordinator.async_refresh()

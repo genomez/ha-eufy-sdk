@@ -215,11 +215,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
             if "mode" in evt:
                 apply_arming_mode_event(coordinator, evt)
             elif serial and serial in coordinator.data:
-                entry.async_create_background_task(
-                    hass,
-                    coordinator.async_request_refresh(),
-                    "arming mode refresh",
-                )
+                coordinator.request_state_refresh()
         elif event == "propertiesObserved":
             if apply_observation_event(coordinator, evt):
                 coordinator.request_recovery_refresh()
@@ -235,11 +231,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
                     and isinstance(name, str)
                     and name
                 ):
-                    entry.async_create_background_task(
-                        hass,
-                        coordinator.async_request_refresh(),
-                        "property refresh",
-                    )
+                    coordinator.request_state_refresh()
         elif event == "alarm":
             on_alarm(evt)
         elif event == "ready":
