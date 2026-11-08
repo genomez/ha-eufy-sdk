@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import math
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
@@ -31,11 +34,22 @@ if TYPE_CHECKING:
     from .data import EufySdkConfigEntry
 
 
-# The manifest carries no min/max, so pick a sane range from the value's `kind`.
+# Older manifests and properties without numeric metadata retain these ranges.
+_LOGGER = logging.getLogger(__name__)
 _RANGE_BY_KIND = {"percent": (0, 100), "seconds": (0, 86400), "degrees": (0, 360)}
 _DEFAULT_RANGE = (0, 65535)
 # Kinds with a small, bounded range read better as a slider than a text box.
 _SLIDER_KINDS = {"percent", "degrees"}
+
+
+def _finite_number(value: Any) -> bool:
+    """Accept finite JSON numbers without treating booleans as bounds."""
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 async def async_setup_entry(
@@ -78,12 +92,31 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
         sn: str,
         spec: dict[str, Any],
     ) -> None:
-        """Set unit, a range from the value's kind, and slider-vs-box mode."""
+        """Use the resolved device domain, falling back for older manifests."""
         super().__init__(coordinator, sn, spec)
         if spec.get("unit"):
             self._attr_native_unit_of_measurement = spec["unit"]
         kind = spec.get("kind")
-        low, high = _RANGE_BY_KIND.get(kind, _DEFAULT_RANGE)
+        fallback = _RANGE_BY_KIND.get(kind, _DEFAULT_RANGE)
+        bounds = tuple(spec.get(key) for key in ("min", "max"))
+        low, high = tuple(
+            value if _finite_number(value) else default
+            for value, default in zip(bounds, fallback, strict=True)
+        )
+        step = spec.get("step")
+        missing_step = not _finite_number(step) or step <= 0
+        if missing_step:
+            step = 1
+        if low > high:
+            low, high = fallback
+            bounds = (None, None)
+        if missing_step or any(not _finite_number(value) for value in bounds):
+            _LOGGER.debug(
+                "Numeric metadata missing or invalid for property %s; "
+                "using existing fallback fields",
+                spec["name"],
+            )
+        self._attr_native_step = step
         self._attr_native_min_value = low
         self._attr_native_max_value = high
         # A percentage (brightness, volume) is a slider; open-ended values a box.
@@ -97,6 +130,19 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Write the value (as an int when it's whole, to match the wire)."""
+        if (
+            not _finite_number(value)
+            or value < self.native_min_value
+            or value > self.native_max_value
+        ):
+            message = "Number value is outside the permitted range"
+            raise HomeAssistantError(message)
+        steps = (value - self.native_min_value) / self.native_step
+        if not math.isfinite(steps) or not math.isclose(
+            steps, round(steps), rel_tol=0, abs_tol=1e-8
+        ):
+            message = "Number value does not match the permitted step"
+            raise HomeAssistantError(message)
         await self.write(int(value) if value == int(value) else value)
 
 
