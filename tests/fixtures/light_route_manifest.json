@@ -1,7 +1,7 @@
 {
   "sourceSha256": {
     "sdk/src/model/device.ts": "c68e8a2690a2491d947eb05f4f098984478e70ed49c80976b042f67adb1a8dab",
-    "sdk/src/model/capabilities/light.ts": "d28e299550e635d81f321b2d859083d360398bfe0d6d675b6dee280a3e8444b4",
+    "sdk/src/model/capabilities/light.ts": "0319c5685aab3fcc4a93252daac5bc07ed07dbad36ac959acba094755ef003ab",
     "sdk/src/model/capabilities/members.ts": "fd872988852aaa5a001666b380448d91b972a7ea1476cf8b3e7235650a9aa3e1",
     "sdk/src/model/capabilities/manifest.ts": "01158b6173e5d2da2d894198230acb3bf357722bbb595e47b8ab41910bf4bea5",
     "bridge/src/device-view.mjs": "d6461b99337370e0f6476e3169f1d04174f767941fba8e8bb193e67172bda3ff",
