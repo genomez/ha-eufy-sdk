@@ -551,6 +551,36 @@ class RefreshRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.coordinator._invalidation_refresh_cancel)
         self.assertFalse(self.coordinator._refresh_invalidated)
 
+    async def test_auth_failure_cancels_queued_invalidation_and_allows_reauth(self):
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        self.assertIsNotNone(self.coordinator._invalidation_refresh_cancel)
+        self.client.auth_status.return_value = {"state": "require_2fa"}
+        self.coordinator.config_entry.async_start_reauth_if_available = Mock()
+        await self.coordinator.async_refresh()
+        self.assertFalse(self.coordinator.last_update_success)
+        self.assertIsNone(self.coordinator._invalidation_refresh_cancel)
+        self.assertFalse(self.coordinator._refresh_invalidated)
+        self.assertFalse(self.coordinator._recovery_stopped)
+        before = self.client.auth_status.await_count
+        self.coordinator.async_request_refresh = (
+            EufySdkDataUpdateCoordinator.async_request_refresh.__get__(self.coordinator)
+        )
+        await self.advance(20)
+        self.assertEqual(self.client.auth_status.await_count, before)
+        self.client.auth_status.return_value = {"state": "ok"}
+        self.coordinator.request_state_refresh()
+        await self.advance(0)
+        self.assertEqual(self.client.auth_status.await_count, before + 1)
+        self.assertTrue(self.coordinator.last_update_success)
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        self.assertIsNotNone(self.coordinator._invalidation_refresh_cancel)
+        await self.advance(20)
+        self.assertIsNone(self.coordinator._invalidation_refresh_cancel)
+        self.assertEqual(self.client.auth_status.await_count, before + 3)
+        self.assertTrue(self.coordinator.last_update_success)
+
     async def test_tolerated_refresh_remains_available_when_throttled(self):
         self.client.list_devices.side_effect = EufySdkApiClientReplyTimeoutError()
         await self.coordinator.async_refresh()

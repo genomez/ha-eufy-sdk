@@ -94,6 +94,14 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self.request_state_refresh()
 
     @callback
+    def _clear_invalidation_refresh(self) -> None:
+        """Retire pending invalidation work on authentication failure or unload."""
+        self._refresh_invalidated = False
+        if self._invalidation_refresh_cancel is not None:
+            self._invalidation_refresh_cancel()
+            self._invalidation_refresh_cancel = None
+
+    @callback
     def _schedule_fast_retry(self) -> None:
         """Retry locally with bounded backoff until a complete snapshot succeeds."""
         if self._recovery_stopped:
@@ -144,10 +152,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 setattr(self, name, None)
         self._recovery_stopped = self._recovery_stopped or stop
         if stop:
-            self._refresh_invalidated = False
-            if self._invalidation_refresh_cancel is not None:
-                self._invalidation_refresh_cancel()
-                self._invalidation_refresh_cancel = None
+            self._clear_invalidation_refresh()
         self._recovery_active = False
         self._recovery_step = 0
         self._recovery_event_used = False
@@ -329,7 +334,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             snapshot = await self._read_snapshot()
             self._merge_snapshot_events(snapshot, health_generation, camera_generation)
         except ConfigEntryAuthFailed:
-            self._refresh_invalidated = False
+            self._clear_invalidation_refresh()
             self._clear_fast_retry()
             raise
         except UpdateFailed:
