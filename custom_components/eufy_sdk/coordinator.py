@@ -78,10 +78,12 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     @callback
     def request_state_refresh(self) -> None:
         """Coalesce invalidations and retain one arriving during a snapshot."""
-        if self._recovery_stopped or self._invalidation_refresh_cancel is not None:
+        if self._recovery_stopped:
             return
         if self._refresh_task is not None:
             self._refresh_invalidated = True
+            return
+        if self._invalidation_refresh_cancel is not None:
             return
         self.hass.async_create_task(self.async_request_refresh())
 
@@ -89,8 +91,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     def _invalidation_refresh_fire(self, _now: object) -> None:
         """Request the deferred snapshot through the existing debouncer."""
         self._invalidation_refresh_cancel = None
-        if not self._recovery_stopped:
-            self.hass.async_create_task(self.async_request_refresh())
+        self.request_state_refresh()
 
     @callback
     def _schedule_fast_retry(self) -> None:
@@ -301,9 +302,10 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 self._refresh_task = None
                 if self._refresh_invalidated and not self._recovery_stopped:
                     self._refresh_invalidated = False
-                    self._invalidation_refresh_cancel = async_call_later(
-                        self.hass, 0, self._invalidation_refresh_fire
-                    )
+                    if self._invalidation_refresh_cancel is None:
+                        self._invalidation_refresh_cancel = async_call_later(
+                            self.hass, 0, self._invalidation_refresh_fire
+                        )
 
     async def _async_refresh_snapshot(self) -> dict[str, dict]:
         """Journal concurrent events until the replacement snapshot is ready."""

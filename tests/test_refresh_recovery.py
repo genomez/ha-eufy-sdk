@@ -423,6 +423,102 @@ class RefreshRecoveryTests(unittest.IsolatedAsyncioTestCase):
         await self.advance(0)
         self.assertEqual(self.client.list_devices.await_count, before)
 
+    async def test_pending_followup_retains_later_invalidation_past_debounce(self):
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        self.assertIsNotNone(self.coordinator._invalidation_refresh_cancel)
+        entered, release = asyncio.Event(), asyncio.Event()
+        before = self.client.list_devices.await_count
+
+        async def captured_list():
+            entered.set()
+            await release.wait()
+            return [{"sn": "fixture-device", "state": {"enabled": False}}]
+
+        self.client.list_devices.side_effect = captured_list
+        second = asyncio.create_task(self.coordinator.async_refresh())
+        await entered.wait()
+        self.coordinator.async_request_refresh = (
+            EufySdkDataUpdateCoordinator.async_request_refresh.__get__(self.coordinator)
+        )
+        for _ in range(8):
+            self.coordinator.request_state_refresh()
+        self.assertTrue(self.coordinator._refresh_invalidated)
+        self.assertEqual(sum(not timer.cancelled for timer in self.timers), 1)
+        await self.advance(0)
+        self.assertEqual(self.client.list_devices.await_count, before + 1)
+        await self.advance(11)
+        self.client.list_devices.side_effect = None
+        self.client.list_devices.return_value = [
+            {"sn": "fixture-device", "state": {"enabled": True}}
+        ]
+        release.set()
+        await second
+        await self.advance(20)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+        self.assertTrue(self.coordinator.data["fixture-device"]["state"]["enabled"])
+        self.assertFalse(self.coordinator._refresh_invalidated)
+        self.assertIsNone(self.coordinator._invalidation_refresh_cancel)
+        await self.advance(60)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+
+    async def test_pending_followup_requeues_behind_uninvalidated_snapshot(self):
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        entered, release = asyncio.Event(), asyncio.Event()
+        before = self.client.list_devices.await_count
+
+        async def captured_list():
+            entered.set()
+            await release.wait()
+            return [{"sn": "fixture-device", "state": {"enabled": False}}]
+
+        self.client.list_devices.side_effect = captured_list
+        second = asyncio.create_task(self.coordinator.async_refresh())
+        await entered.wait()
+        self.coordinator.async_request_refresh = (
+            EufySdkDataUpdateCoordinator.async_request_refresh.__get__(self.coordinator)
+        )
+        await self.advance(11)
+        self.assertTrue(self.coordinator._refresh_invalidated)
+        self.client.list_devices.side_effect = None
+        self.client.list_devices.return_value = [
+            {"sn": "fixture-device", "state": {"enabled": True}}
+        ]
+        release.set()
+        await second
+        await self.advance(20)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+        self.assertTrue(self.coordinator.data["fixture-device"]["state"]["enabled"])
+
+    async def test_pending_followup_coalesces_when_snapshot_finishes_first(self):
+        self.coordinator._refresh_invalidated = True
+        await self.coordinator.async_refresh()
+        entered, release = asyncio.Event(), asyncio.Event()
+        before = self.client.list_devices.await_count
+
+        async def captured_list():
+            entered.set()
+            await release.wait()
+            return [{"sn": "fixture-device", "state": {"enabled": False}}]
+
+        self.client.list_devices.side_effect = captured_list
+        second = asyncio.create_task(self.coordinator.async_refresh())
+        await entered.wait()
+        self.coordinator.request_state_refresh()
+        self.client.list_devices.side_effect = None
+        self.client.list_devices.return_value = [
+            {"sn": "fixture-device", "state": {"enabled": True}}
+        ]
+        release.set()
+        await second
+        self.assertEqual(sum(not timer.cancelled for timer in self.timers), 1)
+        await self.advance(0)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+        self.assertTrue(self.coordinator.data["fixture-device"]["state"]["enabled"])
+        await self.advance(60)
+        self.assertEqual(self.client.list_devices.await_count, before + 2)
+
     async def test_invalidation_followup_preserves_recovery_start_limit(self):
         entered = asyncio.Event()
         release = asyncio.Event()
