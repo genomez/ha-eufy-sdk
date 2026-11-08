@@ -1,8 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.12",
-  "status": "publication-prepared-unpublished",
-  "acceptedSourceCommit": "f900c2acedf9e713d26219fe4aeee640608cc28d",
+  "version": "0.3.1-s1.experimental.13",
+  "inputCommit": "f7e53e847a56c9193c7001d9f55e6125abc1d14e",
   "files": {
     ".gitattributes": {
       "bytes": 18,
@@ -16,49 +15,57 @@
       "bytes": 866,
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
+    "BUILD_PROVENANCE.json": {
+      "bytes": 527,
+      "sha256": "0c96e6176cd11738eb52009f77b5f6b4c4ae03ab44a6b9a9a192a9df24de15ac"
+    },
     "CORE_COMPATIBILITY.md": {
       "bytes": 15398,
       "sha256": "bbede9deb02082f50d9a5158e873a2259dca35fb3503660e4b648526d8ab8151"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 54278,
-      "sha256": "6ccb98975f57b334dea810343d49b62d8abbdecd59d3edbc385358b555673dad"
+      "bytes": 54888,
+      "sha256": "1e46a9c7c9dc1b5d0fa4e55afb5ff26041268aecbca3ba1347bcb332052b771f"
     },
     "INSTALL.md": {
-      "bytes": 43112,
-      "sha256": "76f70fd7161ee729fd2eb37e1929ed3bd03760eac6a8ed37a0c35c601de12aa4"
+      "bytes": 43722,
+      "sha256": "3a9d21bf454a496c03b059a654e2dc86b6cc5c9499979472825b3e21cd3fe2e7"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 34684,
-      "sha256": "98a75b71aff065ed35e850e73bbbca0219f0f23deeff19c87212f4fe2b1fdc60"
+      "bytes": 34784,
+      "sha256": "e42358a42aea0743f173df114248c95a890529884549dd8fb664215a043fe960"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 9693,
-      "sha256": "6f5bd7b31b1e64614393ca723e2e03fa68f377858f6112130b8a16910fa0dae6"
+      "bytes": 10769,
+      "sha256": "2f0470e76c3eb19e06b1ecf150f52aa74d4312756892585799b970cc8c47ad9d"
     },
     "LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
+    },
+    "MODIFICATIONS.md": {
+      "bytes": 39118,
+      "sha256": "e6b93fa220a11b7db2fb86c35e49a8b860b1d1dfaa1e7a45ecaf5999bd252392"
     },
     "PREVIEW_SOURCE_MANIFEST.json": {
       "bytes": 14151,
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 1239,
-      "sha256": "9b04fd1924dbc14a3f1559b264dfb66799891e173da43e6a6c28c93616236abd"
+      "bytes": 527,
+      "sha256": "0c96e6176cd11738eb52009f77b5f6b4c4ae03ab44a6b9a9a192a9df24de15ac"
     },
     "README.md": {
-      "bytes": 28414,
-      "sha256": "506c3dcd8aa6b72b5cf5727940a2b066c9c5ae9397364a99f8356d63c4e54ea7"
+      "bytes": 29024,
+      "sha256": "c6d0c0c0ad5bd668805818c86bc589d0069cd00b53db8b2b0a5a9bc35af6bf43"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "custom_components/eufy_sdk/__init__.py": {
-      "bytes": 11992,
-      "sha256": "0be2e56625f92e919000acc638520a359377e4846cf5cb8533ce5747f61e0e91"
+      "bytes": 13798,
+      "sha256": "5c51d2d047bebc415a52ffe406e6a8d77bbb0b24c9d45cde2dcf77576cd95089"
     },
     "custom_components/eufy_sdk/alarm_control_panel.py": {
       "bytes": 4103,
@@ -73,8 +80,8 @@
       "sha256": "6ce511b28d0777fb3f9e71550d887c5fd48976bd5c3c31a6532b03fb3d38d400"
     },
     "custom_components/eufy_sdk/api.py": {
-      "bytes": 64078,
-      "sha256": "76e606fc39655c3be258719af71d68c33c83fc9764183f31dc27d09b4ac40c8e"
+      "bytes": 69937,
+      "sha256": "5cb71072e12793a35d87d78c2d5a2c374f3024836214a019f1e48ef27d5b2494"
     },
     "custom_components/eufy_sdk/arming_sync.py": {
       "bytes": 1436,
@@ -133,32 +140,32 @@
       "sha256": "f997c8e090092d5b7676fd7e13586024adec506ff1ec30fffa44291e7e39e4c4"
     },
     "custom_components/eufy_sdk/config_flow.py": {
-      "bytes": 22312,
-      "sha256": "35483f1e987b8e659e9cebd4ce7ed926d7a840aae835bb7bf0a06a2aae10369a"
+      "bytes": 22551,
+      "sha256": "0585892ad9d10780ff0a5b5ac2df0984cf2acec0c20773f25f1951c83b83b2b8"
     },
     "custom_components/eufy_sdk/const.py": {
-      "bytes": 3062,
-      "sha256": "45bce192dcae643570e424f6a42b403374475101b7b21e1bd8e993ac4b2c547c"
+      "bytes": 3110,
+      "sha256": "afdcf32ee05e9ab186dac42858fc010271a841b8491cab82ea1fb11a676f3df8"
     },
     "custom_components/eufy_sdk/coordinator.py": {
       "bytes": 23242,
       "sha256": "7b4a05613b9faa9f5502b58505683c80607d20c8d4b6445b86708e6f2cec2643"
     },
     "custom_components/eufy_sdk/data.py": {
-      "bytes": 1560,
-      "sha256": "0b03583a1953bf4cc869895ff3373a681aab12a0ec75cf9e04cd60951ee0853c"
+      "bytes": 1653,
+      "sha256": "eabd5ee11c9a8242fcab1357adbe1bdbe43751f9f6241911994d01f7d99d4ff7"
     },
     "custom_components/eufy_sdk/device_trigger.py": {
       "bytes": 4091,
       "sha256": "9b4a149ca8f2611dcd6d84dd0070fc7be17ee43e706683542cd83403f1d9c9b9"
     },
     "custom_components/eufy_sdk/diagnostics.py": {
-      "bytes": 2810,
-      "sha256": "0dc4b4348b3d944add1d4a53d51f40e48bd013b661713db21dea5749a037540b"
+      "bytes": 3831,
+      "sha256": "162d02c4745053651e8ca16900e4954ea263053786d6e2563f74d39e7d547b59"
     },
     "custom_components/eufy_sdk/entity.py": {
-      "bytes": 36646,
-      "sha256": "97f8e52a6ff3ce38f2ceac84d6f9a684a112cd0226a4e69edf1fc2389db9504b"
+      "bytes": 36731,
+      "sha256": "8d938fa5b4775f245c75cc14ab83564540e6b5a43aa79a21f1a3d8f34edb07ae"
     },
     "custom_components/eufy_sdk/event.py": {
       "bytes": 6214,
@@ -181,20 +188,24 @@
       "sha256": "002a62c652ecb9cc45ebe516de3446d8ffa4b0d295fa3c0cb8f7c66f84e88f81"
     },
     "custom_components/eufy_sdk/light_correction.py": {
-      "bytes": 54724,
-      "sha256": "ae0c7693228e7c1cef24d3ee95fd9a49d34094c074d5d59afa6420fc1594b18e"
+      "bytes": 56669,
+      "sha256": "c4c4b48dc61a09c692bfaf328a9d4cf6ff49517e927ad38788b51551583ce43d"
     },
     "custom_components/eufy_sdk/lock.py": {
       "bytes": 3963,
       "sha256": "171be5106a535d8097ba098c39f98e58508045ab351efb019777778f3b8c692a"
     },
     "custom_components/eufy_sdk/manifest.json": {
-      "bytes": 367,
-      "sha256": "01de4bf3f4354fb8a72ed9868cc01ae9501654b68ba33480b63eb07c9b121d5a"
+      "bytes": 411,
+      "sha256": "1263c3ebaf7a5fbb649701445880d07f63c728f2c52c8e35880679e2dec8f667"
     },
     "custom_components/eufy_sdk/manifest_reads.py": {
       "bytes": 5146,
       "sha256": "2ba5310c52188931bbc0bfb52657312a00f798ce4fc8e22113fd09c6deabfb8d"
+    },
+    "custom_components/eufy_sdk/media_source.py": {
+      "bytes": 19659,
+      "sha256": "cf2bad8f83b23329b1fae2b460d336c6fdf1c0af7706ea0e23d5f25f245a7075"
     },
     "custom_components/eufy_sdk/native_webrtc.py": {
       "bytes": 8528,
@@ -223,6 +234,30 @@
     "custom_components/eufy_sdk/pushmap.py": {
       "bytes": 4275,
       "sha256": "f1d3ed5887ec5aa21557880263b4d230a016847a03e09565659b025d8339c7b3"
+    },
+    "custom_components/eufy_sdk/recordings.py": {
+      "bytes": 15925,
+      "sha256": "6e038feb65ff852b874cbb8bdfec0ae5716ff4ba561e6b2e4b65d1aac3a4fafc"
+    },
+    "custom_components/eufy_sdk/recordings_api.py": {
+      "bytes": 11469,
+      "sha256": "7e8ee24d33a9db5918d793bc140e66bb0ba3f0c08f983c0cbba514b162150d00"
+    },
+    "custom_components/eufy_sdk/recordings_http.py": {
+      "bytes": 13689,
+      "sha256": "50bb31d5b7e60f6576ada0d6f7b975072f624df2daba137a63fdce78932be81d"
+    },
+    "custom_components/eufy_sdk/recordings_models.py": {
+      "bytes": 21128,
+      "sha256": "7caf51abb6a061ada21d2a59813fb66857553a908e328c75d73fc45cfb346a7f"
+    },
+    "custom_components/eufy_sdk/recordings_placeholder.png": {
+      "bytes": 78,
+      "sha256": "dd9492f4bc0df374bc6fc998ecce5f4c4ea9ac81f178f4860814e0abbc79bb2e"
+    },
+    "custom_components/eufy_sdk/recordings_progressive.py": {
+      "bytes": 7185,
+      "sha256": "6f39934290cef89b523ea481231a771423fd9d249c5599c1d301097c675a79f7"
     },
     "custom_components/eufy_sdk/repairs.py": {
       "bytes": 1871,
@@ -253,16 +288,16 @@
       "sha256": "7f35ca69c93c68921a91d142e00e75a115f7474c4824c18c0707f95c59d9c2e9"
     },
     "custom_components/eufy_sdk/strings.json": {
-      "bytes": 8594,
-      "sha256": "aa98e49f5721d446e2f563d79d916c6dedeb6cff2520f38f641525525b31933a"
+      "bytes": 9927,
+      "sha256": "2e008de3bf811c501df73292b18e47b9e0ea128ace81d7f10235d31db12c6f40"
     },
     "custom_components/eufy_sdk/switch.py": {
       "bytes": 9664,
       "sha256": "8440465ae6f2621fe8b2c23166a5d0f63651dfcc0cf5fd1fdeca9cc029a4d616"
     },
     "custom_components/eufy_sdk/translations/en.json": {
-      "bytes": 8594,
-      "sha256": "aa98e49f5721d446e2f563d79d916c6dedeb6cff2520f38f641525525b31933a"
+      "bytes": 9927,
+      "sha256": "2e008de3bf811c501df73292b18e47b9e0ea128ace81d7f10235d31db12c6f40"
     },
     "custom_components/eufy_sdk/translations/it.json": {
       "bytes": 7175,
@@ -275,6 +310,22 @@
     "docs/camera-connectivity.md": {
       "bytes": 2459,
       "sha256": "32b02bbb8b2f35a03e0ec2a34e31970ac51c1d851819a8b156652c4cb5346954"
+    },
+    "docs/recordings-playback.md": {
+      "bytes": 4625,
+      "sha256": "e69668136a48e695480e5141c4be390dfc0aefaa982c23427c3f0d10f9ba054c"
+    },
+    "docs/recordings-progressive.md": {
+      "bytes": 3652,
+      "sha256": "f137ad60667ebd7262492896bb12c52acb3a06973678292dc185e3ed235fdec3"
+    },
+    "docs/recordings-validation.md": {
+      "bytes": 4171,
+      "sha256": "d6c89179dd01b5ed900cb7cfecf055b27304b058ee8befc5dbd9a3462f6ff866"
+    },
+    "docs/recordings.md": {
+      "bytes": 4306,
+      "sha256": "02f4a14ad60fa5c41f67d64b953e7baaef453a2ea860a83232d75defa01e2de3"
     },
     "frontend/scoped-webrtc-camera/lifecycle-trace.js": {
       "bytes": 3171,
@@ -324,6 +375,10 @@
       "bytes": 6087,
       "sha256": "903b4f3aa53e6c6dc43f99a32776511ddfbb6b5e380509f890af273eb55e8ae7"
     },
+    "tests/fixtures/recordings_v1.py": {
+      "bytes": 5163,
+      "sha256": "578d45bdc620a5cc7b3a66ac76f7c2f1efbff44b13b331e2e55fd8d8a3d0daac"
+    },
     "tests/test_ack_light_display.py": {
       "bytes": 6335,
       "sha256": "f549118d4f0fd72351a66223cf4ce3b06ee80bda44d66e80798caac78591ad1c"
@@ -354,7 +409,7 @@
     },
     "tests/test_bounded_state_writes.py": {
       "bytes": 27505,
-      "sha256": "2ded592279e810665c689461a5310a0e00f2b485fbd7a1c8afb7dace23671e94"
+      "sha256": "c524e5a0021b27d2cc181f4f5913c897a0573365df55dacecb3326948eeace8f"
     },
     "tests/test_camera_battery_stream.py": {
       "bytes": 7457,
@@ -365,12 +420,16 @@
       "sha256": "fc1dd089184bb2ddb5e0e6c52c077c00a6c6c065c367566ab5cb6a7d3a6c0bfc"
     },
     "tests/test_camera_health_disconnect.py": {
-      "bytes": 12664,
-      "sha256": "74b19109ed8070726255e691744419b59b7a30ba54464de99a73f3bb187fbcf9"
+      "bytes": 12820,
+      "sha256": "f71fc94a0e26a191e32963ce0791242e251bf45d69538e958958c6d04a8e91e9"
     },
     "tests/test_captcha_flow.py": {
       "bytes": 4726,
       "sha256": "ee534ec741446a0678e63321cd6ed88ea319817a5ddc3967e450c0bcb9f2af63"
+    },
+    "tests/test_clock_margin.py": {
+      "bytes": 14437,
+      "sha256": "f5bf65d3fe734d03c07ca4a51b598f1375563eb9f9d57a82e9910c626de45d07"
     },
     "tests/test_command_health.py": {
       "bytes": 11635,
@@ -403,6 +462,10 @@
     "tests/test_event_image_time.py": {
       "bytes": 4927,
       "sha256": "e5b1db3a9a2cee6d4294d2e703b385b055be477ef8b84c76c49b345ff063994f"
+    },
+    "tests/test_failure_site.py": {
+      "bytes": 1339,
+      "sha256": "fa098f74535516dd3a087d0f0c72ba2168b212f7642d523ba75ccf0d72d0b52c"
     },
     "tests/test_firmware_metadata.py": {
       "bytes": 21317,
@@ -469,8 +532,8 @@
       "sha256": "570cb60478aad7df5d824a22df3f3869bb0147edd0d6a0b189bd905286b027e5"
     },
     "tests/test_notify_retry_cap.py": {
-      "bytes": 5886,
-      "sha256": "1b701c6d4614eae275d1faa86651ff320986f8c79a83ab2867c52ec69b432756"
+      "bytes": 10942,
+      "sha256": "b7d9296d40cb8ecca5b3d8dcb780e35d29d74a98014fb4033de3a1968e7c520a"
     },
     "tests/test_observation_receipts.py": {
       "bytes": 2853,
@@ -532,9 +595,45 @@
       "bytes": 18489,
       "sha256": "94db72c1bf6436ef9b1bbd629c31e7d29684b2d9a85087a26b75b93cded3c127"
     },
+    "tests/test_reconnect_backoff.py": {
+      "bytes": 2774,
+      "sha256": "6c746c46210588f003a67527b0d6be31effed283a5e5684b6552462dc5bd8728"
+    },
     "tests/test_recording_mode_name.py": {
       "bytes": 1764,
       "sha256": "adedc0875a46169a66fb57b3d7f425876d17c89232db71ff4019b8acb1241e71"
+    },
+    "tests/test_recordings_api.py": {
+      "bytes": 13116,
+      "sha256": "fd42f27e250d1c41c3edd64bd559832d2ca52f43ee03b211bb00e0e94fd835e7"
+    },
+    "tests/test_recordings_http.py": {
+      "bytes": 16270,
+      "sha256": "3cc4f6aa086c9b3486d27478d67eb296d924dcc5129aef6aaa1015f7e9adabdc"
+    },
+    "tests/test_recordings_lifecycle.py": {
+      "bytes": 5802,
+      "sha256": "6b8fac4959c5b30d8b78dbfba939b8cd8585dd02375ff8475a13e36a81cb7902"
+    },
+    "tests/test_recordings_media_source.py": {
+      "bytes": 34699,
+      "sha256": "32a2650b7ea62403c56208df6c70d3b9226508e50c90a71e61ea7dc06eb95ead"
+    },
+    "tests/test_recordings_playback.py": {
+      "bytes": 45962,
+      "sha256": "abc32b25a231c0950bea3985c1b92ffff403aa7fedf605cda801879edb8e465e"
+    },
+    "tests/test_recordings_privacy.py": {
+      "bytes": 9841,
+      "sha256": "7cdd91d3048fbcd8ecb59717c64abc535f2613fe9ff719a92d39f0801365ca22"
+    },
+    "tests/test_recordings_progressive.py": {
+      "bytes": 20546,
+      "sha256": "e074b526188dd55cb77d37b4f100c335ed42425cf8afc83e3a892fb1f8d43c89"
+    },
+    "tests/test_recordings_wire_contract.py": {
+      "bytes": 8655,
+      "sha256": "ba3d7459fc8a7fb5971876fba1db3f161453322b0f9db38f5bfd24cab84ae492"
     },
     "tests/test_refresh_recovery.py": {
       "bytes": 17690,
@@ -609,8 +708,8 @@
       "sha256": "57cad97e429ed3fbfb0a204a592a8669078954ebb66db5f3ae3d1bf1672a1a4c"
     },
     "tools/build_integration_zip.py": {
-      "bytes": 4160,
-      "sha256": "1d942fbeca8d95a222be3b6a8d9299cb430b120606e47da754d762fe82b43598"
+      "bytes": 4167,
+      "sha256": "25ac3afb38f5976bcfb99aa66cdfff7b4c9f1df6e0a3463990a986fd4676414e"
     },
     "tools/check_refresh_recovery_mutations.py": {
       "bytes": 2376,

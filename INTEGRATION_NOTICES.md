@@ -1,3 +1,7 @@
+Modified for genomez experimental.13, 2026-11-07
+
+See MODIFICATIONS.md for current modified paths.
+
 # S1 experimental.12
 
 Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.

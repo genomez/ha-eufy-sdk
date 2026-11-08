@@ -8,7 +8,7 @@
   "documentation": "https://github.com/genomez/ha-eufy-sdk/blob/s1-experimental/INSTALL.md",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/genomez/ha-eufy-sdk/issues",
-  "version": "0.3.1-s1.experimental.12",
+  "version": "0.3.1-s1.experimental.13",
   "dependencies": [
     "media_source"
   ]
