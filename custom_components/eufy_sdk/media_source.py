@@ -26,7 +26,7 @@ from homeassistant.config_entries import ConfigEntryState
 
 from .const import DOMAIN
 from .recordings import ClipUnavailableError
-from .recordings_models import TIMEZONE, RecordingsError, opaque_id, require
+from .recordings_models import RecordingsError, opaque_id, require
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,13 +120,13 @@ def parse_identifier(identifier: str) -> tuple[str, str, str | None]:
     return scope, camera, event
 
 
-def event_day(event: dict) -> date | None:
-    """Group valid timestamps by station-local calendar date, including DST."""
-    if event["timeStatus"] != "valid" or event["startedAtLocal"] is None:
+def event_day(event: dict, time_zone: str) -> date | None:
+    """Group valid timestamps by Home Assistant calendar date, including DST."""
+    if event["timeStatus"] != "valid" or event["startedAtUtc"] is None:
         return None
     return (
-        datetime.fromisoformat(event["startedAtLocal"])
-        .astimezone(ZoneInfo(TIMEZONE))
+        datetime.fromisoformat(event["startedAtUtc"])
+        .astimezone(ZoneInfo(time_zone))
         .date()
     )
 
@@ -161,11 +161,13 @@ def find_runtime(hass: HomeAssistant, scope: str) -> RecordingRuntime:
     return matches[0]
 
 
-def title(event: dict, *, detail: bool = False, playback: bool = False) -> str:
-    """Show station-local time first with fixed English display labels."""
-    if event["timeStatus"] == "valid" and event["startedAtLocal"] is not None:
-        local = datetime.fromisoformat(event["startedAtLocal"]).astimezone(
-            ZoneInfo(TIMEZONE)
+def title(
+    event: dict, *, time_zone: str, detail: bool = False, playback: bool = False
+) -> str:
+    """Show Home Assistant local time first with fixed English display labels."""
+    if event["timeStatus"] == "valid" and event["startedAtUtc"] is not None:
+        local = datetime.fromisoformat(event["startedAtUtc"]).astimezone(
+            ZoneInfo(time_zone)
         )
         period = "AM" if local.hour < 12 else "PM"
         start = f"{local.hour % 12 or 12}:{local.minute:02d} {period}"
@@ -184,7 +186,7 @@ def title(event: dict, *, detail: bool = False, playback: bool = False) -> str:
     else:
         result += " · duration unknown"
     if detail and event["timeStatus"] != "valid":
-        result += " · Chicago time " + event["timeStatus"].replace("_", " ")
+        result += " · local time " + event["timeStatus"].replace("_", " ")
     if detail and event["startedAtUtc"] is not None:
         result += " · UTC " + event["startedAtUtc"]
     if detail and not playback:
@@ -424,11 +426,12 @@ class EufyRecordingMediaSource(MediaSource):
                 and (event_id is not None or (playback and event["playable"]))
             ]
             require(event_id is None or bool(events))
-            today = datetime.now(ZoneInfo(TIMEZONE)).date()
+            time_zone = self.hass.config.time_zone
+            today = datetime.now(ZoneInfo(time_zone)).date()
             if event_id is None:
                 groups = {}
                 for event in events:
-                    groups.setdefault(event_day(event), []).append(event)
+                    groups.setdefault(event_day(event, time_zone), []).append(event)
                 if day is None and not unknown_time:
                     base = f"s/{scope}/c/{camera}"
                     children = [
@@ -459,7 +462,12 @@ class EufyRecordingMediaSource(MediaSource):
                 playable = playback and event["playable"]
                 row = directory(
                     identifier,
-                    title(event, detail=event_id is not None, playback=playable),
+                    title(
+                        event,
+                        time_zone=time_zone,
+                        detail=event_id is not None,
+                        playback=playable,
+                    ),
                     children=[] if event_id else None,
                     thumbnail=thumbnail,
                 )

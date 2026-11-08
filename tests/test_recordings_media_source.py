@@ -17,7 +17,9 @@ from custom_components.eufy_sdk.media_source import (
     parse_identifier,
     title,
 )
-from custom_components.eufy_sdk.recordings_models import DISCLOSURE, TIMEZONE
+from custom_components.eufy_sdk.recordings_models import DISCLOSURE
+
+TIMEZONE = fixture.TIMEZONE
 
 MEDIA_LOGGER = "custom_components.eufy_sdk.media_source"
 
@@ -51,6 +53,97 @@ def unknown_event(event_id: str = fixture.OTHER, status: str = "unknown_format")
 
 
 class MediaTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ha_zone_groups_old_bridge_utc_times_at_midnight_and_dst(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        cases = (
+            (
+                "Europe/Berlin",
+                ("2026-11-05T22:59:00Z", "2026-11-05T23:00:00Z"),
+                ("2026-11-06", "2026-11-05"),
+                ("12:00 AM · 10 s",),
+            ),
+            (
+                "Australia/Sydney",
+                ("2026-11-05T12:59:00Z", "2026-11-05T13:00:00Z"),
+                ("2026-11-06", "2026-11-05"),
+                ("12:00 AM · 10 s",),
+            ),
+            (
+                "Europe/Berlin",
+                ("2026-10-25T00:30:00Z", "2026-10-25T01:30:00Z"),
+                ("2026-10-25",),
+                ("2:30 AM · 10 s", "2:30 AM · 10 s"),
+            ),
+            (
+                "Australia/Sydney",
+                ("2026-10-03T15:59:00Z", "2026-10-03T16:00:00Z"),
+                ("2026-10-04",),
+                ("3:00 AM · 10 s", "1:59 AM · 10 s"),
+            ),
+        )
+        for zone, instants, days, titles in cases:
+            self.hass.config.time_zone = zone
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": fixture.page(
+                    [
+                        timed_event(letter, instant)
+                        for letter, instant in zip("HI", instants, strict=True)
+                    ]
+                ),
+            }
+            with self.subTest(zone=zone, instants=instants):
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base)
+                )
+                self.assertEqual(
+                    [
+                        row.media_content_id.rsplit("/", 1)[-1]
+                        for row in result.children
+                    ],
+                    list(days),
+                )
+                clips = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base + "/d/" + days[0])
+                )
+                self.assertEqual([row.title for row in clips.children], list(titles))
+
+    async def test_ha_zone_relative_labels_use_local_calendar(self):
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        for zone in ("Europe/Berlin", "Australia/Sydney"):
+            current = datetime(2026, 11, 7, 0, 10, tzinfo=ZoneInfo(zone))
+
+            class FixedNow(datetime):
+                current_time = current
+
+                @classmethod
+                def now(cls, tz: tzinfo | None = None) -> datetime:
+                    return cls.current_time.astimezone(tz)
+
+            self.hass.config.time_zone = zone
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": fixture.page(
+                    [
+                        timed_event(
+                            letter, (current - timedelta(days=offset)).isoformat()
+                        )
+                        for offset, letter in enumerate("HIJ")
+                    ]
+                ),
+            }
+            with (
+                self.subTest(zone=zone),
+                patch("custom_components.eufy_sdk.media_source.datetime", FixedNow),
+            ):
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base)
+                )
+                self.assertEqual(
+                    [row.title for row in result.children],
+                    ["Today", "Yesterday", "Thu, Nov 5"],
+                )
+
     async def test_days_group_local_midnight_and_both_dst_transitions(self):
         cases = (
             (
@@ -461,10 +554,13 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 event = {
                     **fixture.event(),
                     "startedAtLocal": local,
+                    "startedAtUtc": datetime.fromisoformat(local)
+                    .astimezone(UTC)
+                    .isoformat(),
                     "durationSeconds": 24,
                     "stationPresence": "seen_in_latest_window",
                 }
-                self.assertEqual(title(event), expected)
+                self.assertEqual(title(event, time_zone=TIMEZONE), expected)
 
     async def test_titles_do_not_use_locale_or_platform_strftime(self):
         class NoStrftime(datetime):
@@ -473,7 +569,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
 
         event = {**fixture.event(), "stationPresence": "seen_in_latest_window"}
         with patch("custom_components.eufy_sdk.media_source.datetime", NoStrftime):
-            self.assertEqual(title(event), "12:00 PM · 10 s")
+            self.assertEqual(title(event, time_zone=TIMEZONE), "12:00 PM · 10 s")
 
     async def test_unknown_and_invalid_duration_labelled(self):
         for duration in (None, -1, float("nan"), float("inf"), True, "24", 86401):
@@ -483,9 +579,14 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     "durationSeconds": duration,
                     "stationPresence": "seen_in_latest_window",
                 }
-                self.assertEqual(title(event), "12:00 PM · duration unknown")
                 self.assertEqual(
-                    title({**unknown_event(), "durationSeconds": duration}),
+                    title(event, time_zone=TIMEZONE), "12:00 PM · duration unknown"
+                )
+                self.assertEqual(
+                    title(
+                        {**unknown_event(), "durationSeconds": duration},
+                        time_zone=TIMEZONE,
+                    ),
                     "Time unknown · duration unknown",
                 )
         for duration, expected in (
@@ -499,13 +600,19 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(duration=duration):
                 self.assertEqual(
-                    title({**unknown_event(), "durationSeconds": duration}),
+                    title(
+                        {**unknown_event(), "durationSeconds": duration},
+                        time_zone=TIMEZONE,
+                    ),
                     f"Time unknown · {expected}",
                 )
         for duration, expected in ((0, "0"), (2.5, "2.5")):
             with self.subTest(duration=duration):
                 self.assertEqual(
-                    title({**unknown_event(), "durationSeconds": duration}),
+                    title(
+                        {**unknown_event(), "durationSeconds": duration},
+                        time_zone=TIMEZONE,
+                    ),
                     f"Time unknown · {expected} s",
                 )
 
@@ -513,12 +620,16 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         for status in ("ambiguous", "invalid", "unknown_format"):
             with self.subTest(status=status):
                 event = unknown_event(status=status)
-                self.assertEqual(title(event), "Time unknown · 10 s")
-                self.assertIn(
-                    "Chicago time " + status.replace("_", " "),
-                    title(event, detail=True),
+                self.assertEqual(
+                    title(event, time_zone=TIMEZONE), "Time unknown · 10 s"
                 )
-                self.assertIn("Browse only", title(event, detail=True))
+                self.assertIn(
+                    "local time " + status.replace("_", " "),
+                    title(event, time_zone=TIMEZONE, detail=True),
+                )
+                self.assertIn(
+                    "Browse only", title(event, time_zone=TIMEZONE, detail=True)
+                )
 
     async def test_unknown_folder_last_and_known_events_newest_first(self):
         newer = fixture.event(playable=True)

@@ -3,6 +3,8 @@
 
 import unittest
 from copy import deepcopy
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fixtures import recordings_v1 as fixture
 from test_recordings_progressive import playback
@@ -150,3 +152,50 @@ class WireContractTests(unittest.TestCase):
                     self.assertRaises(models.RecordingsError),
                 ):
                     models.playback(payload)
+
+
+class TimeZoneContractTests(unittest.TestCase):
+    def test_valid_zones_and_legacy_bridge_are_accepted(self):
+        for zone in ("Europe/Berlin", "Australia/Sydney", "America/Chicago", "UTC"):
+            with self.subTest(zone=zone):
+                self.assertIsNotNone(
+                    models.capability({**fixture.capability(), "timezone": zone})
+                )
+                for instant in (
+                    "2026-10-25T00:30:00Z",
+                    "2026-10-25T01:30:00Z",
+                    "2026-10-03T15:59:00Z",
+                    "2026-10-03T16:00:00Z",
+                ):
+                    utc = datetime.fromisoformat(instant)
+                    local = utc.astimezone(ZoneInfo(zone))
+                    row = {
+                        **fixture.event(),
+                        "timezone": zone,
+                        "startedAtMs": int(utc.timestamp() * 1000),
+                        "startedAtUtc": instant,
+                        "startedAtLocal": local.isoformat(),
+                        "sourceStartLocal": local.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    self.assertEqual(
+                        models.event(row, fixture.CAMERA)["timezone"], zone
+                    )
+        self.assertEqual(
+            models.event(fixture.event(), fixture.CAMERA)["timezone"], fixture.TIMEZONE
+        )
+
+    def test_invalid_zones_fail_safely(self):
+        for zone in (None, "", "Invalid/Zone", "+05:00", "../UTC", "/UTC", 3, []):
+            with self.subTest(zone=zone):
+                self.assertIsNone(
+                    models.capability({**fixture.capability(), "timezone": zone})
+                )
+                with self.assertRaisesRegex(
+                    models.RecordingsError, "^Recordings unavailable$"
+                ):
+                    models.event({**fixture.event(), "timezone": zone}, fixture.CAMERA)
+
+    def test_zone_must_agree_with_absolute_and_local_times(self):
+        for zone in ("Europe/Berlin", "Australia/Sydney"):
+            with self.subTest(zone=zone), self.assertRaises(models.RecordingsError):
+                models.event({**fixture.event(), "timezone": zone}, fixture.CAMERA)

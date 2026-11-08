@@ -7,9 +7,8 @@ import math
 import re
 from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-TIMEZONE = "America/Chicago"
 DISCLOSURE = "latest 20 station-wide; history incomplete"
 MAX_STATION_WINDOW = 87381
 COVER_CAP = 524288
@@ -29,6 +28,16 @@ def require(condition: bool) -> None:
     """Fail with a safe, fixed message."""
     if not condition:
         raise RecordingsError
+
+
+def time_zone(value: Any) -> str:
+    """Validate an IANA zone without retaining invalid wire text in errors."""
+    require(isinstance(value, str))
+    try:
+        ZoneInfo(value)
+    except (ValueError, ZoneInfoNotFoundError):
+        raise RecordingsError from None
+    return value
 
 
 def opaque_id(value: Any, prefix: str) -> str:
@@ -138,7 +147,7 @@ def capability(value: Any) -> dict | None:
         playback = value.get("playback") is True
         require(value.get("enabled") is True)
         require(value.get("browseOnly") is (not playback))
-        require(value.get("timezone") == TIMEZONE)
+        time_zone(value.get("timezone"))
         window = station_window(value.get("stationWindow"))
         # Legacy bridges omit this additive capability field at the default window.
         require(
@@ -284,14 +293,14 @@ def event(value: Any, camera: str) -> dict:
     """Allowlist an event without retaining selectors or vendor strings."""
     require(isinstance(value, dict) and value.get("cameraId") == camera)
     no_selectors(value)
-    require(value.get("timezone") == TIMEZONE)
+    time_zone(value.get("timezone"))
     fields(value, ("startedAtMs", "endedAtMs", "durationSeconds"))
     result = {
         "eventId": opaque_id(value.get("eventId"), "e"),
         "cameraId": camera,
         "playable": flag(value.get("playable")),
         "recordingAvailable": flag(value.get("recordingAvailable", True)),
-        "timezone": TIMEZONE,
+        "timezone": time_zone(value.get("timezone")),
     }
     for key in ("startedAtMs", "endedAtMs"):
         result[key] = time_ms(value.get(key), nullable=True)
@@ -327,11 +336,14 @@ def event(value: Any, camera: str) -> dict:
         require(result["startedAtUtc"].endswith("Z"))
         require(utc.year >= 1970)
         require(int(utc.timestamp() * 1000) == result["startedAtMs"])
-        chicago = utc.astimezone(ZoneInfo(TIMEZONE))
-        require(local == utc and local.utcoffset() == chicago.utcoffset())
-        require(local.replace(tzinfo=None) == chicago.replace(tzinfo=None))
+        station_local = utc.astimezone(ZoneInfo(result["timezone"]))
+        require(local == utc and local.utcoffset() == station_local.utcoffset())
+        require(local.replace(tzinfo=None) == station_local.replace(tzinfo=None))
         if result["sourceStartLocal"] is not None:
-            require(result["sourceStartLocal"] == chicago.strftime("%Y-%m-%d %H:%M:%S"))
+            require(
+                result["sourceStartLocal"]
+                == station_local.strftime("%Y-%m-%d %H:%M:%S")
+            )
     if result["timeStatus"] == "unknown_format":
         require(result["sourceStartLocal"] is None)
     duration = value.get("durationSeconds")

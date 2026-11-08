@@ -100,7 +100,7 @@ class ContractTests(unittest.TestCase):
             {"version": True},
             {"scopeId": "bad"},
             {"stationWindow": True},
-            {"timezone": "UTC"},
+            {"timezone": "Invalid/Zone"},
         ):
             self.assertIsNone(models.capability({**fixture.capability(), **changes}))
         self.assertEqual(

@@ -20,8 +20,10 @@ with bounded station paging while a camera folder has interest. An empty folder 
 station window. Every event is an expandable information folder: video playback,
 downloads and media resolution are unavailable in Phase 1.
 
-Event titles start with Chicago local `YYYY-MM-DD HH:mm:ss · duration` for
-Advanced Camera Card date parsing. Unknown times have an explicit status. Event
+Day folders and clip titles use Home Assistant's configured time zone, converted
+from absolute UTC timestamps. Today and Yesterday use that local calendar. The
+bridge zone is validated as an IANA zone; legacy bridge zones remain supported.
+Install this integration before the matching bridge. Unknown times have an explicit status. Event
 details include UTC when known. Folder titles contain only the trimmed camera name;
 history and cache status appear in a non-playable information child.
 
@@ -57,7 +59,8 @@ those live UI behaviors or qualify the bridge/SDK/device pairing.
 
 
 The bridge enrolls cameras already classified in its inventory beneath the one
-T9000 station, excluding J Safe after trimming and case folding. Battery cameras
+T9000 station. The add-on's optional `recordings_skip_cameras` list excludes names
+after trimming and case folding; restart the add-on after changing it. Battery cameras
 use the same station-only metadata and cover path. No camera is contacted by browsing.
 Diagnostics include sanitized bridge recording counts, masked unknown time shapes,
 paging status and cache counts, alongside opaque folder links. The diagnostic read

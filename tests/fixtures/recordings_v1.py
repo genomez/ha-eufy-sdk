@@ -13,7 +13,9 @@ from PIL import Image
 
 from custom_components.eufy_sdk.api import EufySdkApiClient
 from custom_components.eufy_sdk.recordings import RecordingRuntime
-from custom_components.eufy_sdk.recordings_models import DISCLOSURE, TIMEZONE
+from custom_components.eufy_sdk.recordings_models import DISCLOSURE
+
+TIMEZONE = "America/Chicago"  # Legacy bridge compatibility fixture.
 
 SCOPE = "s_" + "S" * 22
 CAMERA = "c_" + "C" * 22
@@ -154,6 +156,7 @@ async def runtime(*, playable: bool = False) -> RecordingRuntime:
 def hass(runtime: RecordingRuntime) -> Mock:
     """Discover one loaded entry, without HA startup or a server."""
     result = Mock()
+    result.config.time_zone = TIMEZONE
     result.config_entries.async_entries.return_value = [
         SimpleNamespace(
             state=ConfigEntryState.LOADED,
