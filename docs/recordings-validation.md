@@ -9,7 +9,7 @@ environment is Python **3.14.4**, Home Assistant **2026.7.0**. All commands belo
 ran from the integration repository root, with this interpreter:
 
 ```text
-C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe
+<HA test venv>/Scripts/python.exe
 ```
 
 Command suffixes (prepend the quoted interpreter path):
@@ -58,7 +58,7 @@ The unchanged hello capability uses `pageSize:20`; amended catalog replies use
 and 1,200 subtests, with no failures. Command (from this repository root):
 
 ```powershell
-& 'C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe' -B tools/run_offline_tests.py
+& '<HA test venv>/Scripts/python.exe' -B tools/run_offline_tests.py
 ```
 
 The regression coverage accepts a growing unique camera roster, retains stable
@@ -72,6 +72,6 @@ RPC keeps the folder links.
 
 Changed Python files passed the same environment's `python -m ruff check` and
 `python -m ruff format --check`. Full log:
-`C:/Dev/eufy-s1-rectest-20261102/artifacts/recordings-3o-r2-ha-full.log`.
+`artifacts/recordings-3o-r2-ha-full.log (local validation log, not published)`.
 No live HA, camera, station, SSH, cloud, credentials or private capture was read.
 Frontend rendering and live paging remain separate lead acceptance checks.
