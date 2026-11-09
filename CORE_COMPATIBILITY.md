@@ -1,3 +1,41 @@
+# S1 experimental.14 — Home Assistant compatibility
+
+## .14 changes
+
+- Fixed: S350 (T8416) cameras no longer show a spotlight switch they don't have. A push connection that silently stops delivering events is now detected and reconnected. Camera settings are no longer overwritten by older values when a startup or refresh overlaps a change. Snapshot refreshes are no longer lost when they overlap; queued refreshes stop after a sign-in failure.
+- Changed: Floodlight brightness/spotlight controls that HomeBase S1 can't drive are hidden. Number settings use per-model ranges. Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder. More playback diagnostics.
+- Upgrade: Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.
+- Known limits: Playback is silent; multi-lens cameras show one view; a late update from a camera can still briefly show an old state.
+
+# S1 experimental.12
+
+Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.
+
+- Push-store save failures are caught and reported through push-connection diagnostics (#539).
+- Session and FCM files use an owner-only temporary file and atomic rename where the filesystem permits (#540). On restricted directories or single-file mounts, the existing in-place fallback is non-atomic and retains existing file permissions.
+- Stored snapshots recover after a successful re-login, including when an older in-flight download fails afterwards (#545).
+- Optional HomeBase S1 storage telemetry also supports firmware 4.4.1.4; it remains off by default.
+- After an acknowledged light command, Home Assistant holds the requested display value for up to 45 seconds. A matching boolean report releases it early. The acknowledgement does not confirm the physical light state.
+- A registry identity conflict invalidates the affected child-camera status to unknown.
+- HomeBase firmware metadata updates from newly received inventory without a Home Assistant restart. A new Firmware version sensor exposes the received version.
+- Dated experimental.11 and experimental.12 modification notices are retained, including the restored integration notice.
+
+Defaults are unchanged. Live view and optional floodlight safety remain off by default. Keep battery-camera preload off. Verify the integration ZIP checksum and restart Home Assistant after replacing the integration. Changing live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms.
+
+Known live-view stalls, unexplained floodlight ON events and brightness/spotlight formatting issues remain unresolved. This is an experimental fork.
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.12
+
+Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
+
+Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
+
+Modified for genomez experimental.11, 2026-10-31
+
+Modified for genomez experimental.12, 2026-11-02
+
+## Historical documentation before experimental.12 publication
+
 # S1 experimental.11 — Home Assistant compatibility
 
 Home Assistant custom integration for the S1 experimental stack. Use the paired integration ZIP or HACS Redownload, then restart Home Assistant.

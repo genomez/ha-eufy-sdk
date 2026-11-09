@@ -15,7 +15,7 @@ prefetches covers in the background.
 The HomeBase query sees the latest 20 station-wide events. The bridge accumulates a
 seven-day, evictable catalog, capped at 2,000 rows total and 400 per camera. Each
 camera browse returns up to 100 newest events; a truncated result is disclosed,
-with bounded station paging while a camera folder has interest. An empty folder does not prove that the camera has no history.
+with bounded station paging while a camera folder has interest. Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder. These status entries do not prove that the camera has no history.
 “May no longer be on HomeBase” marks retained events outside the last successful
 station window. Every event is an expandable information folder: video playback,
 downloads and media resolution are unavailable in Phase 1.
