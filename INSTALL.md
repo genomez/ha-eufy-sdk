@@ -1,339 +1,39 @@
-# Experimental.14 â€” DRAFT for owner review
+# S1 experimental.14
 
-Pair add-on 0.4.1-s1.experimental.14, integration/bridge 0.3.1-s1.experimental.14, and SDK 0.2.1-s1.experimental.14. Linux amd64.
+Pair: add-on **0.4.1-s1.experimental.14**, integration/bridge **0.3.1-s1.experimental.14**, SDK **0.2.1-s1.experimental.14**.
 
-Hide unsupported controls and show inert playback-status entries. Coalesce snapshot invalidations, retain follow-up refreshes, and cancel queued refreshes on authentication failure.
+## Fixed
+- S350 (T8416) cameras no longer show a spotlight switch they don't have.
+- A push connection that silently stops delivering events is now detected and reconnected.
+- Camera settings are no longer overwritten by older values when a startup or refresh overlaps a change.
+- Snapshot refreshes are no longer lost when they overlap; queued refreshes stop after a sign-in failure.
 
-Install the matching integration and restart Home Assistant before updating/starting the add-on. Run only one bridge on the account. Quick-start recording playback remains on by default; Home Assistant supplies the recording time zone. Command keepalive remains 29000 ms. Restart the add-on after changing playback-model or camera-skip options.
+## Changed
+- Floodlight brightness/spotlight controls that HomeBase S1 can't drive are hidden.
+- Number settings use per-model ranges.
+- Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder.
+- More playback diagnostics.
 
-Experimental; accepted after an overnight test-build soak in one household. Software ordering fixes do not establish device sampling chronology or eliminate late RTC/cloud state. The earlier progressive-playback stop remains unexplained. Playback is silent, recent-history coverage is bounded, and multi-lens cameras guarantee only one view. Live view takes priority. Extra-model eligibility does not prove playback compatibility. Keep battery preload off and retain the previous paired versions and backups for rollback.
+## Upgrade
+Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.
 
-Prepared locally. Publication is pending separate approval.
+## Known limits
+Playback is silent; multi-lens cameras show one view; a late update from a camera can still briefly show an old state.
 
-## Previous documentation
+## Use and rollback
 
-# S1 experimental.13
+This is unofficial, experimental HomeBase S1 support, tested mainly in one household. Linux amd64 is supported. Run only one bridge on the account. Back up the integration and add-on and retain the previous paired versions for rollback; restore both together and restart Home Assistant.
 
-SDK 0.2.1-s1.experimental.13; bridge/integration 0.3.1-s1.experimental.13; add-on 0.4.1-s1.experimental.13. Linux amd64.
+Recorded playback starts while the clip is still being fetched by default. Recording times and day folders use Home Assistant's time zone. Live view and optional floodlight safety remain opt-in. Keep battery-camera preload off. Command keepalive remains 29000 ms.
 
-Recorded playback is progressive by default. Extra camera models are an eligibility opt-in, not proof of codec or lens compatibility. Keep the previous add-on/integration pair and backups for rollback; restore both together and restart Home Assistant. Live view and floodlight safety remain opt-in; keep battery preload off. Command keepalive is 29000 ms.
+Restart the add-on after changing any option. **Extra playback camera models** lets you try models outside the tested seven; it does not guarantee playback. **Cameras to skip for recordings** removes those cameras from recording lists, thumbnails and playback.
 
-Publication and final artifact acceptance are pending.
+Recordings require exactly one HomeBase S1 (T9000). Recent-history coverage is limited. Live view takes priority, so playback can wait or fail while the HomeBase is busy. The cause of an earlier playback stop remains unknown.
 
-## Historical documentation through experimental.12
+Review diagnostics before sharing them. Never post credentials, session files, serial numbers, private network details or private footage. Preserve the bundled licenses and source-access notices when redistributing.
 
-# S1 experimental.12
+## Installation
 
-Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.
+Back up the existing integration and add-on. Verify the integration ZIP against its `.zip.sha256`, then copy only `custom_components/eufy_sdk` into the Home Assistant configuration. Install or update the paired add-on from `https://github.com/genomez/ha-eufy-sdk-addon#s1-experimental` and enter account settings privately. Reconfigure the existing integration rather than creating a duplicate.
 
-- Push-store save failures are caught and reported through push-connection diagnostics (#539).
-- Session and FCM files use an owner-only temporary file and atomic rename where the filesystem permits (#540). On restricted directories or single-file mounts, the existing in-place fallback is non-atomic and retains existing file permissions.
-- Stored snapshots recover after a successful re-login, including when an older in-flight download fails afterwards (#545).
-- Optional HomeBase S1 storage telemetry also supports firmware 4.4.1.4; it remains off by default.
-- After an acknowledged light command, Home Assistant holds the requested display value for up to 45 seconds. A matching boolean report releases it early. The acknowledgement does not confirm the physical light state.
-- A registry identity conflict invalidates the affected child-camera status to unknown.
-- HomeBase firmware metadata updates from newly received inventory without a Home Assistant restart. A new Firmware version sensor exposes the received version.
-- Dated experimental.11 and experimental.12 modification notices are retained, including the restored integration notice.
-
-Defaults are unchanged. Live view and optional floodlight safety remain off by default. Keep battery-camera preload off. Verify the integration ZIP checksum and restart Home Assistant after replacing the integration. Changing live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms.
-
-Known live-view stalls, unexplained floodlight ON events and brightness/spotlight formatting issues remain unresolved. This is an experimental fork.
-
-Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.12
-
-Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
-
-Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
-
-Modified for genomez experimental.11, 2026-10-31
-
-Modified for genomez experimental.12, 2026-11-02
-
-## Historical documentation before experimental.12 publication
-
-# S1 experimental.11 — Installation
-
-Home Assistant custom integration for the S1 experimental stack. Use the paired integration ZIP or HACS Redownload, then restart Home Assistant.
-
-Pair add-on `0.4.1-s1.experimental.11`, integration/bridge `0.3.1-s1.experimental.11` and SDK `0.2.1-s1.experimental.11`.
-
-Verify the integration ZIP checksum, keep a backup of the existing integration, update the paired add-on and integration, and restart Home Assistant after replacing the integration. HACS users can use Redownload for this integration version.
-
-## Changes
-
-- Diagnostics keep bounded failure-only command and property-write history, so failures remain visible when later commands succeed. The SDK error history is limited to 32 entries.
-- Event thumbnail decoding supports the V2 encrypted-chroma variant. Alarm pushes that explicitly report an app stop are labelled stopped rather than triggered.
-- Unsupported RTSP stream publish controls are hidden for cameras behind HomeBase S1. RTSP URLs and the existing recording/authentication settings retain their existing support rules.
-- Streaming-quality sensors behind HomeBase S1 appear only when the camera has reported the corresponding quality parameter. The separate video-quality select is unchanged.
-- After updating both components and restarting Home Assistant, 15 existing RTSP stream switches and 15 existing streaming-quality sensors on the affected installation are expected to become unavailable. Their retained entity entries can be removed in Home Assistant. Streaming-quality sensors with reported support remain available.
-- Camera-health diagnostics show the last suppressed signal-strength reading, its reason and source. This diagnostic does not change the published signal strength or prove the current radio state.
-- More cameras now show Online/Offline status from HomeBase S1 (T9000). Offline/recovery testing covers T8425, T8426, T8416, T8214, T8134 and T8170; T8171 has not yet been offline-tested.
-- Camera status holds until the HomeBase reports a change.
-- After a HomeBase reconnect, cameras show unknown until the next routine status update, about 10 minutes by default plus polling and sweep time. Failed or disabled polling or missing reports can leave status unknown longer.
-- A camera marked offline never holds back light OFF commands or retries. Existing transport and safety checks still apply. Upgrade the add-on and integration together.
-
-## Defaults and use
-
-Defaults are unchanged. Live view is off by default; only boolean `webrtc_relay: true` enables it. Changing that option requires an add-on restart. Command keepalive remains 29000 ms. Integration `light_correction_enabled` remains off. With safety off, OFF-stuck incident reporting is inactive and its four attributes are absent. No new option or default was added. Keep battery-camera preload off.
-
-## Known issues
-
-- T8113-Z firmware 3.3.8 can show a picture then black.
-- Some live-view sessions need another open or wait for the hub offer.
-- Unexplained floodlight ON events and brightness/spotlight command formatting remain unresolved. This update does not claim to fix these issues. Passive diagnostics do not establish physical state.
-
-## Releases, source and notices
-
-Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.11
-
-Integration release and ZIP checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.11
-
-Image manifest: `sha256:28cc3774423aae12a7a328c0d39c66c317f8c5232466073c356076d1bbd50471`.
-
-See LICENSE and source headers for applicable license and author notices. Runtime/source archives retain their original notices and corresponding-source links.
-
-Full SDK corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/download/s1-runtime-0.4.1.experimental.11/eufy-sdk-0.2.1-s1.experimental.11-source.tar.gz; SHA-256 `d49311318a9522d7cdc6ebb0bddaeaa12bd7d8df383688b414ed294c2b03d465`, 1619648 bytes. The npm package is separate. In-image source records retain their historical build-time values.
-
-## Historical experimental.9 / experimental.10 documentation
-
-# S1 experimental.10 — Installation
-
-Home Assistant custom integration for the S1 experimental stack. Install the integration ZIP or use HACS Redownload for this version, then restart Home Assistant.
-
-Integration `0.3.1-s1.experimental.10` requires add-on 0.4.1-s1.experimental.9 (unchanged). Bridge `0.3.1-s1.experimental.9` and SDK `0.2.1-s1.experimental.9` are unchanged. This is an integration-only update; keep the existing add-on.
-
-Verify the integration ZIP SHA-256, retain a backup of the existing integration, copy its `custom_components/eufy_sdk` directory into the Home Assistant configuration, and restart Home Assistant. Alternatively use HACS Redownload for this version. Keep the existing add-on; this update does not require replacing or restarting it.
-
-## Changes
-
-- With optional floodlight safety enabled, a light last confirmed off no longer opens a false "no reports" OFF-stuck incident after a Home Assistant restart or bridge reconnect. Incident closures are recorded after startup.
-- Pan/tilt acknowledgement timeouts now explain: "Pan/tilt command sent, but the camera didn't confirm in time; it may still have moved." The acknowledgement timeout and retry behavior are unchanged; this message does not confirm physical movement.
-- Event images refresh on new camera events and image-update signals, and once per completed device snapshot, instead of on every camera-health update. Availability recovery still refreshes the image; identical image data stays quiet.
-- The "Recording mode" select is now named "RTSP recording mode" to clarify that it controls RTSP/NAS recording, not HomeBase continuous recording. Existing entity IDs are unchanged.
-
-## Defaults and use
-
-Defaults are unchanged. Live view is off by default; only boolean `webrtc_relay: true` enables it. Changing that option requires an add-on restart. Command keepalive remains 29000 ms. Integration `light_correction_enabled` remains off. With safety off, OFF-stuck incident reporting is inactive and its four attributes are absent. No new option or default was added. Keep battery-camera preload off.
-
-## Known issues
-
-- T8113-Z firmware 3.3.8 can show a picture then black.
-- Some live-view sessions need another open or wait for the hub offer.
-- Unexplained floodlight ON events and brightness/spotlight command formatting remain unresolved. This update does not claim to fix these issues. Passive diagnostics do not establish physical state.
-
-## Releases, source and notices
-
-Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.9
-
-Integration release and ZIP checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.10
-
-See LICENSE and source headers for applicable license and author notices. Runtime/source archives retain their original notices and corresponding-source links.
-
-## Historical experimental.9 documentation
-
-# S1 experimental.9 — Installation
-
-Home Assistant custom integration for the S1 experimental stack. Install the paired integration ZIP or use HACS Redownload, then restart Home Assistant.
-
-Pair add-on `0.4.1-s1.experimental.9`, integration/bridge `0.3.1-s1.experimental.9` and SDK `0.2.1-s1.experimental.9`.
-
-Verify the integration ZIP SHA-256, copy its custom_components/eufy_sdk directory into the Home Assistant configuration, and restart Home Assistant. Alternatively use HACS Redownload for the matching version.
-
-## Changes
-
-- Failed SDK background read-through refreshes report through the existing `state_refresh` origin and retain last-known values until an update succeeds.
-- Routine camera health attributes refresh less often. On one installation, 15 connectivity sensors went from about 317,000 recorder rows a day to about 1,600.
-- With the existing optional floodlight safety enabled, unconfirmed OFF incidents expose `off_stuck_incident`, `off_stuck_reason`, `off_stuck_opened_at` and `off_stuck_escalate_at`.
-- SDK Markdown formatting was corrected. A test-only change uses 5.0015 seconds to avoid clock rounding; production timing is unchanged.
-
-## Defaults and use
-
-Live view is off by default; only boolean `webrtc_relay: true` enables it. Live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms. Integration `light_correction_enabled` remains off. With safety off, OFF-stuck incident reporting is inactive and its four attributes are absent. No new option or default was added. Keep battery-camera preload off.
-
-## Known issues
-
-T8113-Z firmware 3.3.8 can show a picture then black. Some live-view sessions need another open or wait for the hub offer. Unexplained floodlight ON events and brightness/spotlight command formatting remain unresolved. This release does not claim to fix these issues. Passive diagnostics do not establish physical state.
-
-## Releases, source and notices
-
-Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.9
-
-Integration release and ZIP checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.9
-
-Image manifest: `sha256:fe2fca682ecf41655402abc7ba2da970995eeed4a6010f51865409b60141bd0e`. The integration release archive corresponds to source commit `bf6d218faa3df8734c8bfee594ed6ae6e807e1f3`; current branch documentation can differ from that tagged archive.
-
-See LICENSE and source headers for applicable license and author notices. Runtime/source archives retain their original notices and immutable base corresponding-source links.
-
-## Historical experimental.8 documentation
-
-# Experimental.8 verified public delivery
-
-Runtime/source release: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.8
-Integration release: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.8
-Verified registry manifest: sha256:4289f94e617c0e60207edb8ddaa75d88cfdf777ad081e9e43feb915a4b2ef119
-Paired add-on 0.4.1-s1.experimental.8, integration/bridge 0.3.1-s1.experimental.8 and SDK 0.2.1-s1.experimental.8. These bindings come from independent anonymous release, asset, workflow and registry verification. Installation, HACS and physical-device acceptance remain separate.
-
-The official integration ZIP remains frozen at 6bb1365de39615d9e094b44b7665118451326e8d; current branch documentation may differ from the release archive. Version-specific source, image-context and archive records below remain historical. The exact prepared implementation and workflow are unchanged.
-
-## Historical local preparation and earlier release records
-
-# Experimental.8 local preparation
-
-Version `0.3.1-s1.experimental.8` is prepared locally and unpublished. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
-
-RTC late-viewer keyframe gating; bounded refresh backoff and recovery; isolated slow replies; camera connectivity and hub reply evidence; T8171 detection; opt-in floodlight safety with bounded confirmation and problem notices; observation-only media stall evidence.
-
-Live view remains off by default; only boolean `webrtc_relay: true` enables it. Command keepalive remains 29000 ms. Integration floodlight safety uses `light_correction_enabled` and remains off by default. The opt-in safety binds HA intent, uses 15-minute motion and ON waits with a 30-minute watchdog, retries OFF until camera confirmation within its limits, and reports problems with bounded phone retries. It may retry an authorized ON intent; the historical .7 OFF-only corrector description below is superseded. Passive connectivity diagnostics do not establish physical state.
-
-Media gap evidence is observation only; no automatic stream restart is added. T8113-Z firmware 3.3.8 picture-then-black remains unresolved. A second live-view open may still be needed. Brightness/spotlight formatting and unexplained floodlight ON events remain under investigation. The refresh retry/backoff addresses the prior .7 refresh issue.
-
-This is an offline local candidate, with no release, registry, installation, account, device, media or new soak acceptance. Update and installation instructions in the historical text apply only after a separately approved publication.
-
-## Historical published experimental.7 documentation
-
-# Experimental.7 published delivery
-
-Integration release: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.7. Runtime release: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.7. HACS installation remains unverified. Reproduce the official ZIP from release tag `0.3.1-s1.experimental.7`, commit `b3922d91fcd73a10b763b69dfcf1c4d72ccc7a1f`.
-
-## Historical preparation record
-
-# Integration installation, migration and rollback
-
-**Experimental integration `0.3.1-s1.experimental.7` requires a separate installation decision.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate ZIP and hashes. This local experimental.7 candidate is unpublished; release and HACS availability are not established. These instructions do not authorize installation, authentication or HA restart. The earlier source preview alone is not this artifact. Display name: **Eufy SDK S1 Experimental (genomez)**; domain: `eufy_sdk`; owner: `@genomez`; repository: `https://github.com/genomez/ha-eufy-sdk`.
-
-Confirm the separately reviewed paired bridge/add-on artifact and its recovery plan first. This archive includes no bridge, account session, add-on data, Core overlay or dashboard/player installation. [CORE_COMPATIBILITY.md](CORE_COMPATIBILITY.md) documents unqualified stock-Core media and switching.
-
-## Backup and identity checkpoint
-
-1. Record privately the exact current component owner: HACS repository URL and selected release/commit, or manual source. Record its manifest version, complete file list and SHA-256 hashes; the `eufy_sdk` config entry ID/version, exact host/port, unique ID and options; entity IDs/unique IDs, device identifiers and registry relationships. Compare the candidate against the exact installed component. A shared domain is not migration proof.
-2. Create and download a completed Home Assistant backup including its configuration. Verify readability and preserve its emergency kit/encryption key as applicable. Keep an exact copy of the prior `custom_components/eufy_sdk` directory and file hashes outside `custom_components` and outside repositories. A version number or remote release link is not a rollback copy.
-3. Preserve coherent configuration/registry state together: `.storage/core.config_entries`, `.storage/core.entity_registry`, `.storage/core.device_registry`, `.storage/core.area_registry`, applicable floor/label registries, all HACS storage/ownership files, and related dashboards/automations/YAML. Use the verified HA backup or a consistent copy while HA is stopped in an approved maintenance window. Live individual file copies can be inconsistent. Preserve the whole configuration when unsure what is relevant. Do not selectively edit/reconstruct registry files.
-4. Preserve paired bridge/add-on repository/slug, exact image digest/version, endpoint and private data through its own recovery procedure. Verify the proposed endpoint serves the same intended account/device installation using existing private baseline evidence. Reconfigure validation checks bridge connection/auth state, **not account or device identity**. Stop if equivalence is unknown or the Core environment will change. Do not run concurrent old/new bridges for the same account as a test.
-5. Select **one** file owner: this fork in HACS or a manual installation. Preserve the HA config entry; HACS repository ownership and HA config-entry ownership are separate. Never remove an HA integration/config entry as a way to replace files.
-
-Record backup identifiers/hashes privately. Backups may contain credentials and private data; never upload them to the fork, ZIP, build context or issue tracker. Verify recovery before changing ownership/files.
-
-## Config entries and endpoint migration
-
-The config schema remains version 1. `host` and `port` are stored in entry data; the endpoint unique ID is `host:port`. There is no schema migration hook. Reauthentication reuses the stored endpoint. Options change poll/SOC-refresh intervals; **Reconfigure** changes host/port on the existing entry.
-
-For a compatible existing entry, retain its exact endpoint until the new paired bridge is ready. After the identity checkpoint above, use the existing entry's **Reconfigure** menu to enter the new bridge host/port. Connection/authentication must succeed before host/port, endpoint unique ID and title update. Entry ID, unrelated entry data, options and registry identifiers are preserved. An endpoint already owned by another entry is rejected without mutation. No additional entry is created. Challenge answers are explicit; no implicit login retrigger, device query or camera start validates the endpoint. Pending/blocked/cooldown/auth failure leaves the original entry intact.
-
-Changing a hostname can point at a different account, and aliases can describe the same bridge with different strings. Duplicate checks compare endpoint strings; they cannot detect aliases or prove account/device equivalence. If the new endpoint is ambiguous, stop at the identity checkpoint. Do not manually edit `.storage`, delete/recreate entries, add a second entry to work around failure, or change the domain.
-
-## Manual path
-
-1. After a separate installation decision, obtain the exact reviewed `eufy-sdk-s1-0.3.1-s1.experimental.7.zip` and SHA-256 receipt from the matching published prerelease, or use a separately approved verified local candidate. Verify the hash and extract into a separate staging directory. The ZIP contains root documentation and exactly one runtime subtree: `custom_components/eufy_sdk/`.
-2. If HACS currently manages the component, preserve its owner record and recovery first. During approved maintenance, remove the old repository's management using HACS controls. Inspect whether the UI will remove files before confirming. Keep the HA config entry. Confirm HACS no longer manages this domain; if unclear, stop instead of editing HACS storage.
-3. With HA stopped in the approved maintenance window, stage the exact old component directory into retained private recovery storage after checking the target path. Install the complete candidate `custom_components/eufy_sdk` directory into the HA configuration directory's `custom_components`. Replace the entire component instead of merging files. Copy no repository root files, tests or frontend assets into the component. Ensure one runtime directory exists.
-4. Compare installed filenames and hashes with the package receipt, including component license/manifest. Start HA and verify loaded version `0.3.1-s1.experimental.7`, existing entry/endpoint and expected entity/device identifiers. Do not add an entry for a replacement install. If needed, use the endpoint reconfigure flow only after the identity checkpoint.
-
-For a genuinely new install with no prior entries/domain owner, after the separately approved paired bridge is ready, add **Eufy SDK S1 Experimental (genomez)** in Settings > Devices & services, enter the reachable bridge endpoint, and complete only prompted authentication challenges. New setup is distinct from migration.
-
-## HACS path: exact matching published prerelease required
-
-The following path requires an exact matching full GitHub prerelease **`0.3.1-s1.experimental.7`** and a separate installation decision. Candidate preparation does not establish that a release exists or can be selected in HACS. The inherited default branch is different code. Retained metadata sets `hide_default_branch: true`. Verify the exact published source and checksums; a tag alone is insufficient. HACS prerelease update tracking is opt-in; older HACS versions may also hide prereleases until **Show beta versions** is enabled. If that release is absent or cannot be selected, stop; do not select the default branch/source preview.
-
-1. Complete the backup and identity checkpoint. If another HACS repository owns `eufy_sdk`, remove its management through HACS after preserving exact files/owner record. Inspect removal consequences; retain the HA config entry. For manual-to-HACS conversion, preserve/stage the manual files away during approved maintenance so HACS becomes the sole file owner.
-2. In HACS menu > Custom repositories, add `https://github.com/genomez/ha-eufy-sdk`, type **Integration**. Open this repository's **Download/Redownload** dialog, expand **Need a different version?**, and choose **Release `0.3.1-s1.experimental.7`** (marked pre-release). Verify that the dialog says version `0.3.1-s1.experimental.7` will be downloaded and displays the intended repository/owner. Older HACS versions may require **Show beta versions** first. If the exact version cannot be selected, stop. Do not select an inherited stable release or the default branch. This candidate uses normal `custom_components/eufy_sdk` repository layout, not `zip_release`; the manual ZIP is separate.
-3. Verify the fork is sole HACS owner, compare downloaded component files to candidate hashes, then restart HA in the approved window. Keep the existing HA entry. Check version/endpoint and entity/device identity before further acceptance. Reconfigure the endpoint only after the identity checkpoint if required.
-4. Stop if HACS rejects ownership, removal appears to delete an HA entry, or version selection is uncertain. Do not force duplicate repositories, edit `.storage/hacs*`, or redownload old files over the candidate.
-
-For future prerelease update checks on a downloaded repository, current HACS supplies a disabled-by-default **Pre-release** switch entity: enable that entity and turn it on only if beta updates are wanted. This is separate from explicitly selecting the release for installation. HACS installation and the fork replacement controls have not been exercised by packaging. Concrete UI ownership review remains required; metadata alone is not acceptance.
-
-## Acceptance boundary
-
-Check setup/load, endpoint and retained identifiers through bounded observations. Do not start/switch cameras, operate lights, trigger authentication beyond explicit approved challenges or change automations without separate approval. Stock-Core playback and camera switching remain unqualified after successful setup. Setup failure, changed IDs, duplicate entries, unexpected auth or physical-state disagreement requires stopping and considering rollback.
-
-## Exact rollback
-
-1. Stop candidate changes, save failure evidence privately, and record changed files/entry data/HACS ownership. Obtain the maintenance window before stopping HA or restoring configuration. Use recovery captured immediately before replacement, not an inherited upstream version label.
-2. If only the endpoint changed and the prior bridge is already reachable with its intended authentication state, use **Reconfigure while the candidate is still installed and HA is running** to return the existing entry to its original host/port. Verify original entry ID/schema, data/options, unique ID/title and registry identifiers against the private baseline. This supported alternative avoids a full configuration restore only when the original state is recovered exactly. A custom original title or other config/HACS/registry changes may still require restoration. If the old endpoint is unavailable or baseline comparison fails, use the coherent backup path in step 4 instead.
-3. With HA stopped in the approved window, stage the candidate outside `custom_components` into retained recovery storage. Restore the entire exact prior component, including license. Verify original filenames/hashes and absence of candidate-only runtime files; do not merge trees.
-4. Restore the prior sole HACS/manual owner through supported controls. If reconfigure-back did not recover the exact original configuration, or config/registry/HACS state changed beyond that endpoint, restore the **matching configuration snapshot as a unit** through documented HA backup restoration. This overwrites other changes since capture; review that impact before authorization. Do not merge registry records, reset unique IDs or delete entries. If configuration was unchanged or recovered exactly in step 2, verify original records and keep them intact.
-5. Coordinate paired bridge/add-on restoration to exact prior identity/digest/data and endpoint through its own recovery path if it changed. Restore Core only through its separately approved recovery; the integration ZIP cannot restore add-on data or overlays.
-6. Start HA and verify prior version/hashes, original entry ID/schema/host/port/unique ID, sole file owner and original entity/device IDs against the baseline. Successful process start is insufficient. Retain pre-install and failed-candidate recovery material until owner acceptance; no automated cleanup or deletion is supplied.
-
-## Documentation basis
-
-Reviewed 2026-10-14. Replacement checkpoints are this fork's policy; these primary sources do not certify the candidate/migration.
-
-- [HACS integration requirements](https://www.hacs.xyz/docs/publish/integration/): one component under `custom_components` and required manifest fields.
-- [HACS manifest/version semantics](https://www.hacs.xyz/docs/publish/start/): display name, default-branch hiding, minimum fields and releases rather than tags for version selection.
-- [HACS release download dialog](https://github.com/hacs/frontend/blob/main/src/components/dialogs/hacs-download-dialog.ts), [release-list endpoint](https://github.com/hacs/integration/blob/main/custom_components/hacs/websocket/repository.py), and [beta update switch](https://www.hacs.dev/docs/use/entities/switch/): explicit release selection and opt-in update tracking are separate; source review is not UI acceptance.
-- [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/), [component download location](https://www.hacs.xyz/docs/use/repositories/type/integration/).
-- [HA manifest domain/version](https://developers.home-assistant.io/docs/creating_integration_manifest/): unique unchanged domain matching directory, valid custom version.
-- [HA config-entry migration/reconfigure](https://developers.home-assistant.io/docs/core/integration/config_flow/): reconfigure updates existing entries rather than creating more.
-- [HA backup/download/restore](https://www.home-assistant.io/common-tasks/general/#backups): preserve configuration/recovery keys; restore overwrites selected parts.
-
-
-## Historical input documentation and modification notices
-
-# Integration installation, migration and rollback
-
-**Experimental integration `0.3.1-s1.experimental.6` requires a separate installation decision.** Use the exact matching published prerelease and checksums, or a separately approved verified local candidate ZIP and hashes. Candidate preparation does not establish release or HACS availability. These instructions do not authorize installation, authentication or HA restart. The earlier source preview alone is not this artifact. Display name: **Eufy SDK S1 Experimental (genomez)**; domain: `eufy_sdk`; owner: `@genomez`; repository: `https://github.com/genomez/ha-eufy-sdk`.
-
-Confirm the separately reviewed paired bridge/add-on artifact and its recovery plan first. This archive includes no bridge, account session, add-on data, Core overlay or dashboard/player installation. [CORE_COMPATIBILITY.md](CORE_COMPATIBILITY.md) documents unqualified stock-Core media and switching.
-
-## Backup and identity checkpoint
-
-1. Record privately the exact current component owner: HACS repository URL and selected release/commit, or manual source. Record its manifest version, complete file list and SHA-256 hashes; the `eufy_sdk` config entry ID/version, exact host/port, unique ID and options; entity IDs/unique IDs, device identifiers and registry relationships. Compare the candidate against the exact installed component. A shared domain is not migration proof.
-2. Create and download a completed Home Assistant backup including its configuration. Verify readability and preserve its emergency kit/encryption key as applicable. Keep an exact copy of the prior `custom_components/eufy_sdk` directory and file hashes outside `custom_components` and outside repositories. A version number or remote release link is not a rollback copy.
-3. Preserve coherent configuration/registry state together: `.storage/core.config_entries`, `.storage/core.entity_registry`, `.storage/core.device_registry`, `.storage/core.area_registry`, applicable floor/label registries, all HACS storage/ownership files, and related dashboards/automations/YAML. Use the verified HA backup or a consistent copy while HA is stopped in an approved maintenance window. Live individual file copies can be inconsistent. Preserve the whole configuration when unsure what is relevant. Do not selectively edit/reconstruct registry files.
-4. Preserve paired bridge/add-on repository/slug, exact image digest/version, endpoint and private data through its own recovery procedure. Verify the proposed endpoint serves the same intended account/device installation using existing private baseline evidence. Reconfigure validation checks bridge connection/auth state, **not account or device identity**. Stop if equivalence is unknown or the Core environment will change. Do not run concurrent old/new bridges for the same account as a test.
-5. Select **one** file owner: this fork in HACS or a manual installation. Preserve the HA config entry; HACS repository ownership and HA config-entry ownership are separate. Never remove an HA integration/config entry as a way to replace files.
-
-Record backup identifiers/hashes privately. Backups may contain credentials and private data; never upload them to the fork, ZIP, build context or issue tracker. Verify recovery before changing ownership/files.
-
-## Config entries and endpoint migration
-
-The config schema remains version 1. `host` and `port` are stored in entry data; the endpoint unique ID is `host:port`. There is no schema migration hook. Reauthentication reuses the stored endpoint. Options change poll/SOC-refresh intervals; **Reconfigure** changes host/port on the existing entry.
-
-For a compatible existing entry, retain its exact endpoint until the new paired bridge is ready. After the identity checkpoint above, use the existing entry's **Reconfigure** menu to enter the new bridge host/port. Connection/authentication must succeed before host/port, endpoint unique ID and title update. Entry ID, unrelated entry data, options and registry identifiers are preserved. An endpoint already owned by another entry is rejected without mutation. No additional entry is created. Challenge answers are explicit; no implicit login retrigger, device query or camera start validates the endpoint. Pending/blocked/cooldown/auth failure leaves the original entry intact.
-
-Changing a hostname can point at a different account, and aliases can describe the same bridge with different strings. Duplicate checks compare endpoint strings; they cannot detect aliases or prove account/device equivalence. If the new endpoint is ambiguous, stop at the identity checkpoint. Do not manually edit `.storage`, delete/recreate entries, add a second entry to work around failure, or change the domain.
-
-## Manual path
-
-1. After a separate installation decision, obtain the exact reviewed `eufy-sdk-s1-0.3.1-s1.experimental.6.zip` and SHA-256 receipt from the matching published prerelease, or use a separately approved verified local candidate. Verify the hash and extract into a separate staging directory. The ZIP contains root documentation and exactly one runtime subtree: `custom_components/eufy_sdk/`.
-2. If HACS currently manages the component, preserve its owner record and recovery first. During approved maintenance, remove the old repository's management using HACS controls. Inspect whether the UI will remove files before confirming. Keep the HA config entry. Confirm HACS no longer manages this domain; if unclear, stop instead of editing HACS storage.
-3. With HA stopped in the approved maintenance window, stage the exact old component directory into retained private recovery storage after checking the target path. Install the complete candidate `custom_components/eufy_sdk` directory into the HA configuration directory's `custom_components`. Replace the entire component instead of merging files. Copy no repository root files, tests or frontend assets into the component. Ensure one runtime directory exists.
-4. Compare installed filenames and hashes with the package receipt, including component license/manifest. Start HA and verify loaded version `0.3.1-s1.experimental.6`, existing entry/endpoint and expected entity/device identifiers. Do not add an entry for a replacement install. If needed, use the endpoint reconfigure flow only after the identity checkpoint.
-
-For a genuinely new install with no prior entries/domain owner, after the separately approved paired bridge is ready, add **Eufy SDK S1 Experimental (genomez)** in Settings > Devices & services, enter the reachable bridge endpoint, and complete only prompted authentication challenges. New setup is distinct from migration.
-
-## HACS path: exact matching published prerelease required
-
-The following path requires an exact matching full GitHub prerelease **`0.3.1-s1.experimental.6`** and a separate installation decision. Candidate preparation does not establish that a release exists or can be selected in HACS. The inherited default branch is different code. Retained metadata sets `hide_default_branch: true`. Verify the exact published source and checksums; a tag alone is insufficient. HACS prerelease update tracking is opt-in; older HACS versions may also hide prereleases until **Show beta versions** is enabled. If that release is absent or cannot be selected, stop; do not select the default branch/source preview.
-
-1. Complete the backup and identity checkpoint. If another HACS repository owns `eufy_sdk`, remove its management through HACS after preserving exact files/owner record. Inspect removal consequences; retain the HA config entry. For manual-to-HACS conversion, preserve/stage the manual files away during approved maintenance so HACS becomes the sole file owner.
-2. In HACS menu > Custom repositories, add `https://github.com/genomez/ha-eufy-sdk`, type **Integration**. Open this repository's **Download/Redownload** dialog, expand **Need a different version?**, and choose **Release `0.3.1-s1.experimental.6`** (marked pre-release). Verify that the dialog says version `0.3.1-s1.experimental.6` will be downloaded and displays the intended repository/owner. Older HACS versions may require **Show beta versions** first. If the exact version cannot be selected, stop. Do not select an inherited stable release or the default branch. This candidate uses normal `custom_components/eufy_sdk` repository layout, not `zip_release`; the manual ZIP is separate.
-3. Verify the fork is sole HACS owner, compare downloaded component files to candidate hashes, then restart HA in the approved window. Keep the existing HA entry. Check version/endpoint and entity/device identity before further acceptance. Reconfigure the endpoint only after the identity checkpoint if required.
-4. Stop if HACS rejects ownership, removal appears to delete an HA entry, or version selection is uncertain. Do not force duplicate repositories, edit `.storage/hacs*`, or redownload old files over the candidate.
-
-For future prerelease update checks on a downloaded repository, current HACS supplies a disabled-by-default **Pre-release** switch entity: enable that entity and turn it on only if beta updates are wanted. This is separate from explicitly selecting the release for installation. HACS installation and the fork replacement controls have not been exercised by packaging. Concrete UI ownership review remains required; metadata alone is not acceptance.
-
-## Acceptance boundary
-
-Check setup/load, endpoint and retained identifiers through bounded observations. Do not start/switch cameras, operate lights, trigger authentication beyond explicit approved challenges or change automations without separate approval. Stock-Core playback and camera switching remain unqualified after successful setup. Setup failure, changed IDs, duplicate entries, unexpected auth or physical-state disagreement requires stopping and considering rollback.
-
-## Exact rollback
-
-1. Stop candidate changes, save failure evidence privately, and record changed files/entry data/HACS ownership. Obtain the maintenance window before stopping HA or restoring configuration. Use recovery captured immediately before replacement, not an inherited upstream version label.
-2. If only the endpoint changed and the prior bridge is already reachable with its intended authentication state, use **Reconfigure while the candidate is still installed and HA is running** to return the existing entry to its original host/port. Verify original entry ID/schema, data/options, unique ID/title and registry identifiers against the private baseline. This supported alternative avoids a full configuration restore only when the original state is recovered exactly. A custom original title or other config/HACS/registry changes may still require restoration. If the old endpoint is unavailable or baseline comparison fails, use the coherent backup path in step 4 instead.
-3. With HA stopped in the approved window, stage the candidate outside `custom_components` into retained recovery storage. Restore the entire exact prior component, including license. Verify original filenames/hashes and absence of candidate-only runtime files; do not merge trees.
-4. Restore the prior sole HACS/manual owner through supported controls. If reconfigure-back did not recover the exact original configuration, or config/registry/HACS state changed beyond that endpoint, restore the **matching configuration snapshot as a unit** through documented HA backup restoration. This overwrites other changes since capture; review that impact before authorization. Do not merge registry records, reset unique IDs or delete entries. If configuration was unchanged or recovered exactly in step 2, verify original records and keep them intact.
-5. Coordinate paired bridge/add-on restoration to exact prior identity/digest/data and endpoint through its own recovery path if it changed. Restore Core only through its separately approved recovery; the integration ZIP cannot restore add-on data or overlays.
-6. Start HA and verify prior version/hashes, original entry ID/schema/host/port/unique ID, sole file owner and original entity/device IDs against the baseline. Successful process start is insufficient. Retain pre-install and failed-candidate recovery material until owner acceptance; no automated cleanup or deletion is supplied.
-
-## Documentation basis
-
-Reviewed 2026-10-14. Replacement checkpoints are this fork's policy; these primary sources do not certify the candidate/migration.
-
-- [HACS integration requirements](https://www.hacs.xyz/docs/publish/integration/): one component under `custom_components` and required manifest fields.
-- [HACS manifest/version semantics](https://www.hacs.xyz/docs/publish/start/): display name, default-branch hiding, minimum fields and releases rather than tags for version selection.
-- [HACS release download dialog](https://github.com/hacs/frontend/blob/main/src/components/dialogs/hacs-download-dialog.ts), [release-list endpoint](https://github.com/hacs/integration/blob/main/custom_components/hacs/websocket/repository.py), and [beta update switch](https://www.hacs.dev/docs/use/entities/switch/): explicit release selection and opt-in update tracking are separate; source review is not UI acceptance.
-- [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/), [component download location](https://www.hacs.xyz/docs/use/repositories/type/integration/).
-- [HA manifest domain/version](https://developers.home-assistant.io/docs/creating_integration_manifest/): unique unchanged domain matching directory, valid custom version.
-- [HA config-entry migration/reconfigure](https://developers.home-assistant.io/docs/core/integration/config_flow/): reconfigure updates existing entries rather than creating more.
-- [HA backup/download/restore](https://www.home-assistant.io/common-tasks/general/#backups): preserve configuration/recovery keys; restore overwrites selected parts.
+Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.

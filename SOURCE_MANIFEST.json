@@ -20,28 +20,28 @@
       "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 56210,
-      "sha256": "fb0f6a153cd655b6aa82ae7df383b017c56bf93d2b0c40b28bb9fd5156bdf331"
+      "bytes": 2420,
+      "sha256": "0d0c4c1cd166572d89f4f64b209f98583c655b5a7f109bffa6015f4813d0910a"
     },
     "INSTALL.md": {
-      "bytes": 45044,
-      "sha256": "20dacf628c9b27fea197e020dd8a4d920376eac6e9907fd44470faa6379b3c53"
+      "bytes": 2971,
+      "sha256": "cf80a2ddb44c54ea8b3674720f22ded9855accd5ffa2ac791c66ba15970ba73c"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 35133,
-      "sha256": "57214e4d6af9d9770cb8e7910dd186797979a8313eaa6d15dd12b9bf8205e816"
+      "bytes": 35001,
+      "sha256": "b8cfc94011b8f4679712445ed82cdde2f6e8dffdad74a88321be78a07265c6f7"
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 10769,
-      "sha256": "948ecd7da0450f1e0c8283d4131382714b0ad8916f23939ef41c81f8a36714b3"
+      "sha256": "187f0a029c99aabb810e5d6d8aaac6b4873ae431a1a5d1ee771665c25df9e7cb"
     },
     "LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "MODIFICATIONS.md": {
-      "bytes": 39746,
-      "sha256": "d6b47f307d984e9e55d35ca67de4ec826e70b800774e1aa7a94fe70beba8e6ee"
+      "bytes": 39611,
+      "sha256": "4ed6aae9123faefcab7151df26800e933635ab8c86d6697dee0e8e9dfb7a69cb"
     },
     "PREVIEW_SOURCE_MANIFEST.json": {
       "bytes": 14151,
@@ -52,8 +52,8 @@
       "sha256": "209423844f1b3134e2e2e221c51a0681d46ee4512e184781fd5d7ebe957383c8"
     },
     "README.md": {
-      "bytes": 30346,
-      "sha256": "d093d347b70f75190a15ab67b41b083d165a492b502825635b0e51fa4d07726c"
+      "bytes": 2971,
+      "sha256": "cf80a2ddb44c54ea8b3674720f22ded9855accd5ffa2ac791c66ba15970ba73c"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,

@@ -1,8 +1,10 @@
 Modified for genomez experimental.14, 2026-11-09
 
-Hide unsupported controls and show inert playback-status entries. Coalesce snapshot invalidations, retain follow-up refreshes, and cancel queued refreshes on authentication failure.
+Unsupported controls, recording status entries and overlapping snapshot refreshes.
 
-DRAFT for owner review. Version and documentation changes only relative to the soaked inputs.
+Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.
+
+
 
 ## Previous notices
 
@@ -31,7 +33,7 @@ Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/r
 
 Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
 
-Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
+The accepted image is delivered without rebuilding. Earlier release records below are historical.
 
 Modified for genomez experimental.11, 2026-10-31
 
@@ -276,7 +278,7 @@ The official integration ZIP remains frozen at 6bb1365de39615d9e094b44b766511845
 
 # Experimental.8 local preparation
 
-Version `0.3.1-s1.experimental.8` is prepared locally and unpublished. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
+Version `0.3.1-s1.experimental. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
 
 RTC late-viewer keyframe gating; bounded refresh backoff and recovery; isolated slow replies; camera connectivity and hub reply evidence; T8171 detection; opt-in floodlight safety with bounded confirmation and problem notices; observation-only media stall evidence.
 
@@ -307,7 +309,6 @@ Original MIT licenses, copyright and upstream attribution are preserved byte-for
 This preparation is local and unpublished, with no runtime/add-on packaging or live acceptance.
 
 ## Historical notices retained from experimental.6 and earlier
-
 
 The integration is distributed under the MIT License in `LICENSE` and `custom_components/eufy_sdk/LICENSE`. Original copyright and license text are preserved without replacement. Derived work credits remain in README.md.
 
@@ -342,7 +343,6 @@ Six added offline test items and two added subtests cover pending-equivalent suc
 ## Release package refresh, 2026-10-17
 
 Integration `0.3.1-s1.experimental.6`, paired with runtime `0.4.1-s1.experimental.6`, is prepared from reviewed source commit `0f4ff70` (implementation `c50fe57`). Implementation files, translations and tests are unchanged. This refresh updates candidate documentation, publication provenance and pinned package/source inventories, then builds a deterministic manual ZIP. No installation, authentication, dependency installation, publication or newly supported Core range is claimed.
-
 
 ## Historical input documentation and modification notices
 
