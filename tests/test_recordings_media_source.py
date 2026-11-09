@@ -276,10 +276,15 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(
                     [row.title for row in result.children],
-                    ["Today", "Yesterday", "Thu, Nov 5"],
+                    ["Today", "Yesterday", "2026-11-05"],
                 )
 
     async def test_days_group_local_midnight_and_both_dst_transitions(self):
+        class FixedNow(datetime):
+            @classmethod
+            def now(cls, tz: tzinfo | None = None) -> datetime:
+                return cls(2027, 1, 2, tzinfo=UTC).astimezone(tz)
+
         cases = (
             (
                 ("2026-11-08T05:59:00Z", "2026-11-08T06:00:00Z"),
@@ -296,7 +301,10 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
         )
         base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
         for timestamps, dates in cases:
-            with self.subTest(dates=dates):
+            with (
+                self.subTest(dates=dates),
+                patch("custom_components.eufy_sdk.media_source.datetime", FixedNow),
+            ):
                 older, newer = [
                     timed_event(letter, timestamp)
                     for letter, timestamp in zip("HI", timestamps, strict=True)
@@ -316,6 +324,7 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     ],
                     list(dates),
                 )
+                self.assertEqual([row.title for row in result.children], list(dates))
                 self.runtime.client.rpc.assert_awaited_once_with(
                     "recordings.catalog",
                     timeout=3,
@@ -343,6 +352,9 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
             "2026-03-09T00:10:00-05:00",
             "2026-11-02T00:10:00-06:00",
             "2027-01-01T00:10:00-06:00",
+            "2027-01-02T00:10:00-06:00",
+            "2028-03-01T00:10:00-06:00",
+            "2028-03-02T00:10:00-06:00",
             "2026-11-08T02:10:00+00:00",
         ):
             current = datetime.fromisoformat(now).astimezone(ZoneInfo(TIMEZONE))
@@ -372,8 +384,10 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     [row.title for row in result.children[:2]], ["Today", "Yesterday"]
                 )
-                if now.startswith("2026-11-07"):
-                    self.assertEqual(result.children[2].title, "Thu, Nov 5")
+                self.assertEqual(
+                    result.children[2].title,
+                    (current.date() - timedelta(days=2)).isoformat(),
+                )
                 yesterday = result.children[1].media_content_id.removeprefix(
                     "media-source://eufy_sdk/"
                 )
@@ -381,6 +395,81 @@ class MediaTests(unittest.IsolatedAsyncioTestCase):
                     SimpleNamespace(identifier=yesterday)
                 )
                 self.assertEqual(day.title, "Yesterday")
+
+    async def test_year_safe_folders_keep_identifiers_order_and_clip_titles(self):
+        cases = (
+            (
+                "2027-01-02T20:00:00-06:00",
+                ("2026-12-31", "2027-01-02", "2025-12-31", "2027-01-01"),
+                ("2027-01-02", "2027-01-01", "2026-12-31", "2025-12-31"),
+            ),
+            (
+                "2028-03-02T20:00:00-06:00",
+                ("2028-02-28", "2028-03-02", "2024-02-29", "2028-02-29", "2028-03-01"),
+                ("2028-03-02", "2028-03-01", "2028-02-29", "2028-02-28", "2024-02-29"),
+            ),
+        )
+        base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"
+        for now, unsorted_days, ordered_days in cases:
+            current = datetime.fromisoformat(now)
+
+            class FixedNow(datetime):
+                current_time = current
+
+                @classmethod
+                def now(cls, tz: tzinfo | None = None) -> datetime:
+                    return cls.current_time.astimezone(tz)
+
+            rows = [
+                {
+                    **timed_event(letter, day + "T16:58:00-06:00"),
+                    "durationSeconds": 36,
+                }
+                for letter, day in zip(
+                    "HIJKL"[: len(unsorted_days)], unsorted_days, strict=True
+                )
+            ]
+            self.runtime.client.rpc.return_value = {
+                "ok": True,
+                "recordings": fixture.page([unknown_event(), *rows]),
+            }
+            with (
+                self.subTest(now=now),
+                patch("custom_components.eufy_sdk.media_source.datetime", FixedNow),
+            ):
+                result = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base)
+                )
+                expected_titles = ["Today", "Yesterday", *ordered_days[2:]]
+                self.assertEqual(
+                    [row.title for row in result.children],
+                    [*expected_titles, "Time unknown"],
+                )
+                self.assertEqual(
+                    [row.media_content_id for row in result.children],
+                    [
+                        folder_id(fixture.SCOPE, fixture.CAMERA) + "/d/" + day
+                        for day in ordered_days
+                    ]
+                    + [folder_id(fixture.SCOPE, fixture.CAMERA) + "/u"],
+                )
+                for day, expected_title in zip(
+                    ordered_days, expected_titles, strict=True
+                ):
+                    clips = await self.source.async_browse_media(
+                        SimpleNamespace(identifier=base + "/d/" + day)
+                    )
+                    self.assertEqual(clips.title, expected_title)
+                    self.assertEqual(
+                        [row.title for row in clips.children], ["4:58 PM · 36 s"]
+                    )
+                unknown = await self.source.async_browse_media(
+                    SimpleNamespace(identifier=base + "/u")
+                )
+                self.assertEqual(unknown.title, "Time unknown")
+                self.assertEqual(
+                    [row.title for row in unknown.children], ["Time unknown · 10 s"]
+                )
 
     async def test_hidden_or_unplayable_only_days_are_never_shown(self):
         base = f"s/{fixture.SCOPE}/c/{fixture.CAMERA}"

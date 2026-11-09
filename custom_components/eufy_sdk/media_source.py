@@ -87,7 +87,6 @@ MONTHS = (
     "Nov",
     "Dec",
 )
-WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 
 def folder_id(scope: str, camera: str) -> str:
@@ -137,7 +136,7 @@ def day_title(day: date, today: date) -> str:
         return "Today"
     if day == today - timedelta(days=1):
         return "Yesterday"
-    return f"{WEEKDAYS[day.weekday()]}, {MONTHS[day.month - 1]} {day.day}"
+    return day.isoformat()
 
 
 def runtimes(hass: HomeAssistant) -> list[RecordingRuntime]:
