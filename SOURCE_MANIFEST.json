@@ -16,8 +16,8 @@
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
     "CORE_COMPATIBILITY.md": {
-      "bytes": 13067,
-      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
+      "bytes": 13070,
+      "sha256": "071ba583aa76f25b8043c95594647e24b3f331cdbddcc709c0384935e2b1f817"
     },
     "EXPERIMENTAL.md": {
       "bytes": 2420,
@@ -33,7 +33,7 @@
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 10769,
-      "sha256": "187f0a029c99aabb810e5d6d8aaac6b4873ae431a1a5d1ee771665c25df9e7cb"
+      "sha256": "8ddf6309c37f7b444453508d439ca41d0f29c5f89c6748476dea2993bc625609"
     },
     "LICENSE": {
       "bytes": 1065,
