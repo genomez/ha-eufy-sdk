@@ -1,3 +1,56 @@
+# Experimental.14 â€” DRAFT for owner review
+
+Pair add-on 0.4.1-s1.experimental.14, integration/bridge 0.3.1-s1.experimental.14, and SDK 0.2.1-s1.experimental.14. Linux amd64.
+
+Hide unsupported controls and show inert playback-status entries. Coalesce snapshot invalidations, retain follow-up refreshes, and cancel queued refreshes on authentication failure.
+
+Install the matching integration and restart Home Assistant before updating/starting the add-on. Run only one bridge on the account. Quick-start recording playback remains on by default; Home Assistant supplies the recording time zone. Command keepalive remains 29000 ms. Restart the add-on after changing playback-model or camera-skip options.
+
+Experimental; accepted after an overnight test-build soak in one household. Software ordering fixes do not establish device sampling chronology or eliminate late RTC/cloud state. The earlier progressive-playback stop remains unexplained. Playback is silent, recent-history coverage is bounded, and multi-lens cameras guarantee only one view. Live view takes priority. Extra-model eligibility does not prove playback compatibility. Keep battery preload off and retain the previous paired versions and backups for rollback.
+
+Prepared locally. Publication is pending separate approval.
+
+## Previous documentation
+
+# S1 experimental.13
+
+SDK 0.2.1-s1.experimental.13; bridge/integration 0.3.1-s1.experimental.13; add-on 0.4.1-s1.experimental.13. Linux amd64.
+
+Recorded playback is progressive by default. Extra camera models are an eligibility opt-in, not proof of codec or lens compatibility. Keep the previous add-on/integration pair and backups for rollback; restore both together and restart Home Assistant. Live view and floodlight safety remain opt-in; keep battery preload off. Command keepalive is 29000 ms.
+
+Publication and final artifact acceptance are pending.
+
+## Historical documentation through experimental.12
+
+# S1 experimental.12
+
+Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.
+
+- Push-store save failures are caught and reported through push-connection diagnostics (#539).
+- Session and FCM files use an owner-only temporary file and atomic rename where the filesystem permits (#540). On restricted directories or single-file mounts, the existing in-place fallback is non-atomic and retains existing file permissions.
+- Stored snapshots recover after a successful re-login, including when an older in-flight download fails afterwards (#545).
+- Optional HomeBase S1 storage telemetry also supports firmware 4.4.1.4; it remains off by default.
+- After an acknowledged light command, Home Assistant holds the requested display value for up to 45 seconds. A matching boolean report releases it early. The acknowledgement does not confirm the physical light state.
+- A registry identity conflict invalidates the affected child-camera status to unknown.
+- HomeBase firmware metadata updates from newly received inventory without a Home Assistant restart. A new Firmware version sensor exposes the received version.
+- Dated experimental.11 and experimental.12 modification notices are retained, including the restored integration notice.
+
+Defaults are unchanged. Live view and optional floodlight safety remain off by default. Keep battery-camera preload off. Verify the integration ZIP checksum and restart Home Assistant after replacing the integration. Changing live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms.
+
+Known live-view stalls, unexplained floodlight ON events and brightness/spotlight formatting issues remain unresolved. This is an experimental fork.
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.12
+
+Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
+
+Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
+
+Modified for genomez experimental.11, 2026-10-31
+
+Modified for genomez experimental.12, 2026-11-02
+
+## Historical documentation before experimental.12 publication
+
 # S1 experimental.11 — Experimental support and limitations
 
 Home Assistant custom integration for the S1 experimental stack. Use the paired integration ZIP or HACS Redownload, then restart Home Assistant.
