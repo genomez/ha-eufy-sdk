@@ -320,8 +320,8 @@
       "sha256": "9dfe902e972c05c7d827c4b5fec413eb9be9002f1cf06e07f51cd3df22d8ecb7"
     },
     "docs/recordings.md": {
-      "bytes": 4306,
-      "sha256": "02f4a14ad60fa5c41f67d64b953e7baaef453a2ea860a83232d75defa01e2de3"
+      "bytes": 4390,
+      "sha256": "a1014fe6fc9ddf38a337b9d07950f20c90082bc589fc351437cf9b38a7accaba"
     },
     "frontend/scoped-webrtc-camera/lifecycle-trace.js": {
       "bytes": 3171,

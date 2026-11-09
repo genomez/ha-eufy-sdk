@@ -23,7 +23,7 @@ downloads and media resolution are unavailable in Phase 1.
 Day folders and clip titles use Home Assistant's configured time zone, converted
 from absolute UTC timestamps. Today and Yesterday use that local calendar. The
 bridge zone is validated as an IANA zone; legacy bridge zones remain supported.
-Install this integration before the matching bridge. Unknown times have an explicit status. Event
+Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up. Unknown times have an explicit status. Event
 details include UTC when known. Folder titles contain only the trimmed camera name;
 history and cache status appear in a non-playable information child.
 
