@@ -123,7 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         update_interval=timedelta(minutes=poll_min),
         config_entry=entry,
     )
-    guard_notifications = GuardNotifications(hass, entry.options)
+    guard_notifications = GuardNotifications(hass, entry.options, entry)
     coordinator._light_safety_controllers = set()  # noqa: SLF001
 
     # Forward every bridge event onto the HA event bus for automations — and recover
@@ -262,6 +262,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         client=client,
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
+        guard_notifications=guard_notifications,
         options_snapshot=deepcopy(dict(entry.options)),
         entry_data_snapshot=deepcopy(dict(entry.data)),
     )
@@ -347,6 +348,10 @@ async def _async_reload_on_update(
         return
     if previous == current:
         return
+    if (
+        guard_notifications := getattr(runtime, "guard_notifications", None)
+    ) is not None:
+        guard_notifications.options_updated(current)
     for controller in tuple(runtime.coordinator._light_safety_controllers):  # noqa: SLF001
         try:
             controller.options_updated()

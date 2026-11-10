@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import persistent_notification
+from homeassistant.helpers import device_registry as dr
 
+from .const import DOMAIN
 from .notification_delivery import (
     NOTICE_RETRY_DELAYS,
     PHONE_FAILURE_SENTENCE,
@@ -17,6 +20,8 @@ from .notification_delivery import (
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+    from .data import EufySdkConfigEntry
 
 REASONS = frozenset(
     {
@@ -49,6 +54,31 @@ KEYS = (
     "attempts",
     "outcomeAtMs",
 )
+
+MODE_LABELS = {
+    0: "Away",
+    1: "Home",
+    2: "Schedule",
+    3: "Custom 1",
+    4: "Custom 2",
+    5: "Custom 3",
+    6: "Off",
+    47: "Geofencing",
+    63: "Disarmed",
+}
+
+
+def guard_runtime(raw: Any) -> str | None:
+    """Validate an authoritative runtime advertisement independently of receipts."""
+    if (
+        isinstance(raw, dict)
+        and type(raw.get("version")) is int
+        and raw["version"] == 1
+        and isinstance(raw.get("runtimeGeneration"), str)
+        and re.fullmatch(r"[a-f0-9-]{36}", raw["runtimeGeneration"])
+    ):
+        return raw["runtimeGeneration"]
+    return None
 
 
 def guard_capability(raw: Any) -> bool:
@@ -137,16 +167,78 @@ def guard_attributes(client: Any, serial: str) -> dict:
 
 
 class GuardNotifications:
-    """Deliver one persistent problem per intent, with shared phone retries."""
+    """Maintain one bounded station problem, with shared phone retries."""
 
-    def __init__(self, hass: HomeAssistant, options: dict) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        options: dict,
+        entry: EufySdkConfigEntry | None = None,
+    ) -> None:
         """Bind delivery to the loaded entry and its configured notify service."""
         self.hass = hass
         self.options = options
+        self.entry = entry
         self.seen: dict[tuple[str, str], None] = {}
-        self.latest: dict[str, tuple[str, int]] = {}
-        self.notices: dict[str, set[str]] = {}
+        self.latest: dict[str, tuple[str, int, bool]] = {}
+        self.notices: dict[str, tuple[str, str, str]] = {}
+        self.unresolved: dict[str, int] = {}
         self.tasks: dict[str, asyncio.Task] = {}
+
+    def options_updated(self, options: dict) -> None:
+        """Route unresolved problems to the live service and cancel old deliveries."""
+        previous = self.options.get("light_safety_notify_service")
+        self.options = options
+        if previous == options.get("light_safety_notify_service"):
+            return
+        self.close()
+        for serial, (title, message, tag) in self.notices.items():
+            self._schedule(serial, title, message, tag)
+
+    def _station_name(self, serial: str) -> str:
+        """Use the device registry display name, excluding a serial-valued alias."""
+        device = dr.async_get(self.hass).async_get_device(
+            identifiers={(DOMAIN, serial)}
+        )
+        name = (device.name_by_user or device.name) if device else None
+        if (
+            isinstance(name, str)
+            and name.strip()
+            and serial.casefold() not in name.casefold()
+        ):
+            return name
+        return "HomeBase"
+
+    def _mode_label(self, serial: str, mode: int) -> str:
+        """Use the select's published option label, with known-mode fallbacks."""
+        properties = getattr(
+            getattr(self.entry, "runtime_data", None), "properties", {}
+        )
+        for spec in properties.get(serial, []):
+            if spec.get("name") == "armingMode":
+                labels = spec.get("enumValues") or {}
+                label = labels.get(str(mode), labels.get(mode))
+                if (
+                    isinstance(label, str)
+                    and label
+                    and serial.casefold() not in label.casefold()
+                ):
+                    return label
+        return MODE_LABELS.get(mode, f"mode {mode}")
+
+    def _schedule(self, serial: str, title: str, message: str, tag: str) -> None:
+        """Keep at most one phone delivery task per tracked station."""
+        service = self.options.get("light_safety_notify_service")
+        if not isinstance(service, str) or not service:
+            return
+        task = self.hass.async_create_task(self._deliver(service, title, message, tag))
+        self.tasks[serial] = task
+
+        def finished(done: asyncio.Task) -> None:
+            if self.tasks.get(serial) is done:
+                self.tasks.pop(serial, None)
+
+        task.add_done_callback(finished)
 
     def apply(self, raw: dict) -> None:
         """Ignore older or duplicate outcomes; only a later report clears problems."""
@@ -155,47 +247,65 @@ class GuardNotifications:
             return
         serial, handle = receipt["deviceSn"], receipt["handle"]
         previous = self.latest.get(serial)
+        if previous is None and len(self.latest) >= MAX_TARGETS:
+            return
         if (
             previous
             and previous[0] == receipt["runtimeGeneration"]
-            and receipt["generation"] < previous[1]
+            and (
+                receipt["generation"] < previous[1]
+                or (receipt["generation"] == previous[1] and previous[2])
+            )
         ):
             return
-        self.latest[serial] = (receipt["runtimeGeneration"], receipt["generation"])
+        self.latest[serial] = (
+            receipt["runtimeGeneration"],
+            receipt["generation"],
+            receipt["outcome"] != "pending",
+        )
         key = (receipt["runtimeGeneration"], handle)
         if receipt["outcome"] == "pending" or key in self.seen:
             return
         self.seen[key] = None
         if len(self.seen) > MAX_TARGETS:
             self.seen.pop(next(iter(self.seen)))
+        if receipt["outcome"] == "not_reported" and receipt["reason"] in {
+            "superseded",
+            "cancelled",
+        }:
+            return
         task = self.tasks.pop(serial, None)
         if task:
             task.cancel()
         if receipt["outcome"] == "reported":
-            for tag in self.notices.pop(serial, set()):
-                persistent_notification.async_dismiss(self.hass, tag)
+            notice = self.notices.pop(serial, None)
+            self.unresolved.pop(serial, None)
+            if notice:
+                persistent_notification.async_dismiss(self.hass, notice[2])
             return
-        tag = f"eufy_guard_{handle}"
+        tag = f"eufy_guard_{hashlib.sha256(serial.encode()).hexdigest()}"
         title = (
             "Eufy guard mode not reported"
             if receipt["outcome"] == "not_reported"
             else "Eufy guard mode contradicted"
         )
+        count = min(2**53 - 1, self.unresolved.get(serial, 0) + 1)
+        self.unresolved[serial] = count
+        mode = self._mode_label(serial, receipt["requestedMode"])
+        explanation = (
+            "The station reported a different guard mode after this command."
+            if receipt["outcome"] == "contradicted"
+            else "No matching report was received in time."
+        )
         message = (
-            f"Station {serial}, requested guard mode {receipt['requestedMode']}: "
-            f"{receipt['outcome']} ({receipt['reason']}). "
-            "A matching report after this command was not received. "
-            "Check the station in the app."
+            f"{self._station_name(serial)}, requested guard mode {mode}. "
+            f"{explanation} {count} unresolved intent(s). Check the station in the app."
         )
         persistent_notification.async_create(
             self.hass, message, title=title, notification_id=tag
         )
-        self.notices.setdefault(serial, set()).add(tag)
-        service = self.options.get("light_safety_notify_service")
-        if isinstance(service, str) and service:
-            self.tasks[serial] = self.hass.async_create_task(
-                self._deliver(service, title, message, tag)
-            )
+        self.notices[serial] = (title, message, tag)
+        self._schedule(serial, title, message, tag)
 
     async def _deliver(self, service: str, title: str, message: str, tag: str) -> None:
         """Reuse phone formatting, bounded retry spacing and persistent fallback."""

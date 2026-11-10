@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
     from .api import EufySdkApiClient
     from .coordinator import EufySdkDataUpdateCoordinator
+    from .guard_confirmation import GuardNotifications
     from .recordings import RecordingRuntime
 
 
@@ -39,3 +40,4 @@ class EufySdkData:
     entry_data_snapshot: dict[str, Any] = field(default_factory=dict)
 
     recordings: RecordingRuntime | None = None
+    guard_notifications: GuardNotifications | None = None

@@ -22,7 +22,7 @@ import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import LOGGER
-from .guard_confirmation import guard_capability, guard_receipt
+from .guard_confirmation import guard_capability, guard_receipt, guard_runtime
 from .inventory_evidence import inventory_evidence
 from .manifest_reads import normalize_properties, normalize_snapshot
 from .recordings_api import RecordingsApi
@@ -602,6 +602,7 @@ class EufySdkApiClient(RecordingsApi):
         self.guard_confirmation_supported = False
         self.guard_receipts: dict[str, dict] = {}
         self._guard_runtime: str | None = None
+        self._guard_scope_revision = 0
         self.inventory_evidence: dict | None = None
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
@@ -1007,8 +1008,33 @@ class EufySdkApiClient(RecordingsApi):
                 )
         self._pending.clear()
 
+    def _advertise_guard_runtime(self, raw: Any) -> None:
+        """Replace receipt scope only from an authoritative lifecycle advertisement."""
+        runtime = guard_runtime(raw)
+        if not self.guard_confirmation_supported or runtime is None:
+            return
+        if runtime != self._guard_runtime:
+            self._guard_scope_revision += 1
+            self._guard_runtime = runtime
+            self.guard_receipts.clear()
+
+    def _set_guard_capability(self, data: dict) -> None:
+        """Negotiate additive guard metadata on hello and ready."""
+        self.guard_confirmation_supported = guard_capability(
+            data.get("guardConfirmation")
+        )
+        if data.get("event") == "hello":
+            self._guard_scope_revision += 1
+            self._guard_runtime = None
+        self._advertise_guard_runtime(data.get("guardRuntime"))
+        if not self.guard_confirmation_supported:
+            self.guard_receipts.clear()
+
     def _project_guard_event(self, data: dict) -> dict | None:
         """Order intent outcomes and reject events from a retired runtime."""
+        if data["event"] == "guardRuntime":
+            self._advertise_guard_runtime(data)
+            return None
         receipt = guard_receipt(data)
         if not self.guard_confirmation_supported or receipt is None:
             return None
@@ -1039,7 +1065,7 @@ class EufySdkApiClient(RecordingsApi):
 
     def _dispatch_event(self, data: dict) -> None:
         """Order health and lifecycle events before notifying integration consumers."""
-        if data["event"] == "guardConfirmation":
+        if data["event"] in {"guardRuntime", "guardConfirmation"}:
             data = self._project_guard_event(data)
         elif data["event"] == "lateContraryEffect":
             data = late_contrary_event(data)
@@ -1086,12 +1112,7 @@ class EufySdkApiClient(RecordingsApi):
                         data.get("recordings")
                     )
                 if data.get("event") in ("hello", "ready"):
-                    self.guard_confirmation_supported = guard_capability(
-                        data.get("guardConfirmation")
-                    )
-                    self._guard_runtime = None
-                    if not self.guard_confirmation_supported:
-                        self.guard_receipts.clear()
+                    self._set_guard_capability(data)
                 if data.get("event") == "hello":
                     self._set_bounded_capability(data.get("boundedStateWrites"))
                     self._set_late_contrary_capability(data.get("lateContraryEffects"))
@@ -1343,6 +1364,7 @@ class EufySdkApiClient(RecordingsApi):
         """Recover missed events without making optional metadata block the roster."""
         if not self.guard_confirmation_supported:
             return
+        scope_revision = self._guard_scope_revision
         pending = [
             receipt
             for receipt in self.guard_receipts.values()
@@ -1356,11 +1378,17 @@ class EufySdkApiClient(RecordingsApi):
             return_exceptions=True,
         )
         self._require_connection(transport, generation)
+        if scope_revision != self._guard_scope_revision:
+            return
         for requested, reply in zip(pending, replies, strict=True):
             if not isinstance(reply, dict):
                 continue
             recovered = guard_receipt(reply.get("guardConfirmation"))
-            if recovered and recovered["handle"] == requested["handle"]:
+            if (
+                recovered
+                and recovered["handle"] == requested["handle"]
+                and recovered["runtimeGeneration"] == requested["runtimeGeneration"]
+            ):
                 self._dispatch_event({"event": "guardConfirmation", **recovered})
             elif reply.get("guardConfirmation", False) is None:
                 current = self.guard_receipts.get(requested["deviceSn"])
@@ -1592,6 +1620,8 @@ class EufySdkApiClient(RecordingsApi):
             or not self.bounded_state_writes_supported
         ):
             if name == "armingMode":
+                guard_scope_revision = self._guard_scope_revision
+                transport, connection_generation = self._ws, self._connection_generation
                 # Guard mode is exposed as armingMode. Allow preparation time
                 # before the SDK's per-command RTC/P2P waits begin.
                 reply = await self.rpc(
@@ -1603,6 +1633,9 @@ class EufySdkApiClient(RecordingsApi):
                 )
                 if (
                     self.guard_confirmation_supported
+                    and guard_scope_revision == self._guard_scope_revision
+                    and transport is self._ws
+                    and connection_generation == self._connection_generation
                     and isinstance(reply, dict)
                     and guard_receipt(reply.get("guardConfirmation"))
                 ):
