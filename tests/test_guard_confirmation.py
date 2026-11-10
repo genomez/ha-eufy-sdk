@@ -247,6 +247,67 @@ class GuardConfirmationTests(unittest.IsolatedAsyncioTestCase):
             ["devices.list", "guard.confirmation.get"],
         )
 
+    async def test_same_runtime_reconnect_recovers_terminal_missed_during_gap(self):
+        cap = {"version": 1, "maxAttempts": 1, "enabledRetry": False}
+
+        def hello(runtime) -> dict:
+            return {
+                "event": "hello",
+                "guardConfirmation": cap,
+                "guardRuntime": {"version": 1, "runtimeGeneration": runtime},
+            }
+
+        client = self.client()
+        client._set_guard_capability(hello(RUNTIME))
+        client._dispatch_event({"event": "guardConfirmation", **receipt()})
+        revision = client._guard_scope_revision
+        client._set_guard_capability(hello(RUNTIME))
+        self.assertGreater(client._guard_scope_revision, revision)
+        self.assertEqual(client._guard_runtime, RUNTIME)
+        self.assertIn("synthetic-station", client.guard_receipts)
+        client.rpc = AsyncMock(
+            side_effect=[
+                {"devices": []},
+                {"guardConfirmation": receipt("not_reported")},
+            ]
+        )
+        await client.list_devices()
+        self.assertEqual(
+            client.guard_receipts["synthetic-station"]["outcome"], "not_reported"
+        )
+        self.assertEqual(
+            [call.args[0] for call in client.rpc.await_args_list],
+            ["devices.list", "guard.confirmation.get"],
+        )
+        client._set_guard_capability(hello(NEXT_RUNTIME))
+        self.assertEqual(client.guard_receipts, {})
+
+    async def test_legacy_hello_without_advertisement_keeps_recoverable_receipts(self):
+        client = self.client()
+        client._set_guard_capability(
+            {
+                "event": "hello",
+                "guardConfirmation": {
+                    "version": 1,
+                    "maxAttempts": 1,
+                    "enabledRetry": False,
+                },
+            }
+        )
+        client._dispatch_event({"event": "guardConfirmation", **receipt()})
+        client._set_guard_capability(
+            {
+                "event": "hello",
+                "guardConfirmation": {
+                    "version": 1,
+                    "maxAttempts": 1,
+                    "enabledRetry": False,
+                },
+            }
+        )
+        self.assertIsNone(client._guard_runtime)
+        self.assertIn("synthetic-station", client.guard_receipts)
+
     async def test_recovery_failure_or_expired_handle_cannot_fail_inventory(self):
         client = self.client()
         client._dispatch_event({"event": "guardConfirmation", **receipt()})

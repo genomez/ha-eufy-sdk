@@ -1024,8 +1024,11 @@ class EufySdkApiClient(RecordingsApi):
             data.get("guardConfirmation")
         )
         if data.get("event") == "hello":
+            # A new socket fences old continuations. Receipts from the same
+            # advertised runtime stay, so outcomes missed during the gap recover.
             self._guard_scope_revision += 1
-            self._guard_runtime = None
+            if guard_runtime(data.get("guardRuntime")) is None:
+                self._guard_runtime = None
         self._advertise_guard_runtime(data.get("guardRuntime"))
         if not self.guard_confirmation_supported:
             self.guard_receipts.clear()
