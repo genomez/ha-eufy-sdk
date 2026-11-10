@@ -20,6 +20,7 @@ from .alarm_logic import (
     panel_state_for,
 )
 from .entity import EufySdkDeviceEntity, has_capability
+from .guard_confirmation import guard_attributes
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -60,6 +61,14 @@ class EufySdkAlarmControlPanel(EufySdkDeviceEntity, AlarmControlPanelEntity):
         super().__init__(coordinator, serial)
         self._attr_unique_id = f"{serial}_alarm_control_panel"
         self._attr_name = "Security mode"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Keep guard intent outcomes separate from the reported mode."""
+        return {
+            **super().extra_state_attributes,
+            **(guard_attributes(self.client, self._sn)),
+        }
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:

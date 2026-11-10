@@ -21,6 +21,7 @@ from .entity import (
     remove_stale_solix_entities,
     solix_devices_with,
 )
+from .guard_confirmation import guard_attributes
 from .snapshot_policy import (
     SNAPSHOT_POLICY_DEFAULT,
     SNAPSHOT_POLICY_OPTIONS,
@@ -117,6 +118,18 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
                 }
         self._raw_by_label = {v: k for k, v in self._label_by_raw.items()}
         self._attr_options = list(self._label_by_raw.values())
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Keep guard intent outcomes separate from the reported mode."""
+        return {
+            **super().extra_state_attributes,
+            **(
+                guard_attributes(self.client, self._sn)
+                if self._prop == "armingMode"
+                else {}
+            ),
+        }
 
     @property
     def current_option(self) -> str | None:

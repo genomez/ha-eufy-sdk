@@ -20,6 +20,12 @@ from homeassistant.helpers.storage import Store
 
 from .api import CommandReceipt, command_health, command_health_is_current
 from .const import CONF_LIGHT_CORRECTION, CONF_LIGHT_CORRECTION_PAUSE
+from .notification_delivery import (
+    NOTICE_RETRY_DELAYS,
+    PHONE_FAILURE_SENTENCE,
+    deliver_phone_notice,
+    notice_retry_delay,
+)
 
 SAFETY_EVENT = "eufy_sdk_floodlight_safety"
 QUIET_SECONDS = 900
@@ -40,10 +46,6 @@ RECOVERY_SECONDS = 45
 # SDK late-effect work ends at sentAt + 45 s; the bounded caller lasts 80 s
 # (api.BOUNDED_CALLER_SECONDS). Allow a further conservative settlement margin.
 OUTCOME_SETTLE_SECONDS = 180
-NOTICE_RETRY_DELAYS = (60, 120, 300, 600)
-PHONE_FAILURE_SENTENCE = (
-    "Phone delivery failed; check the notification service in the integration options."
-)
 PHONE_KINDS = frozenset({"off_unconfirmed", "now_off", "on_unconfirmed", "now_on"})
 NOTICE_KINDS = frozenset(
     {
@@ -1267,19 +1269,8 @@ class LightCorrection:
                     previous if type(previous) is int and previous >= 0 else 0
                 ) + 1
                 phone_attempt = True
-                domain, action = service.split(".", 1)
-                data = {"tag": tag, "channel": "Eufy"}
-                if problem:
-                    data.update({"importance": "high", "sticky": True})
-                await self.entity.hass.services.async_call(
-                    domain,
-                    action,
-                    {
-                        "title": title,
-                        "message": message,
-                        "data": data,
-                    },
-                    blocking=True,
+                await deliver_phone_notice(
+                    self.entity.hass, service, title, message, tag, problem=problem
                 )
             if (
                 notice.get("phone_attempts", 0) > len(NOTICE_RETRY_DELAYS) + 1
@@ -1315,9 +1306,7 @@ class LightCorrection:
                         )
                     except Exception:  # noqa: BLE001 - preserve the pending retry
                         self._record("notice_unavailable")
-                delay = NOTICE_RETRY_DELAYS[
-                    min(max(0, attempts - 1), len(NOTICE_RETRY_DELAYS) - 1)
-                ]
+                delay = notice_retry_delay(attempts)
                 notice["retry_due"] = self.notice_retry_due = monotonic() + delay
                 if self.notice_queue:
                     self.notice_pending = self.notice_queue.popleft()

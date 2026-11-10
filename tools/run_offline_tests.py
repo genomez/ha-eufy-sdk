@@ -20,8 +20,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / ".offline"
-OUTPUT.mkdir(exist_ok=True)
+OUTPUT = Path(os.environ.get("EUFY_OFFLINE_OUTPUT", str(ROOT / ".offline"))).resolve()
+if not OUTPUT.is_relative_to(ROOT / ".offline"):
+    raise RuntimeError("Offline output must remain in .offline")
+OUTPUT.mkdir(parents=True, exist_ok=True)
 TEMP = OUTPUT / "temp"
 TEMP.mkdir(exist_ok=True)
 os.environ["TEMP"] = os.environ["TMP"] = str(TEMP)

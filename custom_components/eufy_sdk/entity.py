@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import math
 import re
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import callback
@@ -27,6 +28,7 @@ from .api import (
 from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 from .firmware_metadata import firmware_version
+from .inventory_evidence import inventory_attributes
 from .light_correction import LightCorrection
 from .pushmap import DETECTION_EVENTS
 
@@ -227,6 +229,15 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
             model=dev.get("model") or dev.get("codec"),  # the model code, not the codec
             serial_number=sn,
             **({"sw_version": version} if (version := firmware_version(dev)) else {}),
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose roster quality separately from property observations."""
+        return inventory_attributes(
+            getattr(getattr(self, "coordinator", None), "inventory_evidence", None),
+            getattr(self, "_sn", ""),
+            int(time.time() * 1000),
         )
 
     @property

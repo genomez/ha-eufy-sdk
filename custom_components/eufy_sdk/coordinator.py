@@ -31,6 +31,7 @@ from .const import LOGGER
 from .firmware_metadata import sync_firmware_registry
 
 if TYPE_CHECKING:
+    from .api import EufySdkApiClient
     from .data import EufySdkConfigEntry
 
 
@@ -48,6 +49,7 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     solix_snapshot_generation: int = 0
 
     property_observations: dict | None = None
+    inventory_evidence: dict | None = None
 
     # A queued refresh request is not a completed snapshot. Keep receipt order
     # separately so entities can reconcile without bypassing HA's debouncer.
@@ -501,6 +503,28 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         msg = "bridge_auth_not_ready"
         raise UpdateFailed(msg)
 
+    def _apply_inventory_snapshot(
+        self, snapshot: dict, client: EufySdkApiClient
+    ) -> None:
+        """Retain topology rows during a cloud subset without claiming freshness."""
+        evidence = getattr(client, "inventory_evidence", None)
+        self.inventory_evidence = evidence if isinstance(evidence, dict) else None
+        if self.inventory_evidence and self.inventory_evidence.get("quality") in {
+            "partial",
+            "retained",
+        }:
+            for serial, previous in (self.data or {}).items():
+                if serial not in snapshot:
+                    snapshot[serial] = deepcopy(previous)
+                    old = (getattr(self, "_inventory_rows", None) or {}).get(serial, {})
+                    self.inventory_evidence["rows"][serial] = {
+                        "quality": "retained",
+                        "lastSuccessfulObservationMs": old.get(
+                            "lastSuccessfulObservationMs"
+                        ),
+                    }
+        self._inventory_rows = deepcopy((self.inventory_evidence or {}).get("rows", {}))
+
     async def _read_snapshot(self) -> dict[str, dict]:
         """Ensure the connection is up, confirm we're authed, and return the devices."""
         client = self.config_entry.runtime_data.client
@@ -559,4 +583,6 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                     self.device_serial_counts.get(serial, 0) + 1
                 )
         self._snapshot_transport_generation = transport_generation
-        return {d["sn"]: d for d in devices if d.get("sn")}
+        snapshot = {d["sn"]: d for d in devices if d.get("sn")}
+        self._apply_inventory_snapshot(snapshot, client)
+        return snapshot

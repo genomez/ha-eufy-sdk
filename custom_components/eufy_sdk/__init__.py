@@ -39,6 +39,7 @@ from .const import (
 from .coordinator import EufySdkDataUpdateCoordinator
 from .data import EufySdkData
 from .firmware_metadata import apply_metadata_event
+from .guard_confirmation import GuardNotifications
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
 from .pushmap import DOORBELL_EVENT
@@ -122,6 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         update_interval=timedelta(minutes=poll_min),
         config_entry=entry,
     )
+    guard_notifications = GuardNotifications(hass, entry.options)
     coordinator._light_safety_controllers = set()  # noqa: SLF001
 
     # Forward every bridge event onto the HA event bus for automations — and recover
@@ -137,6 +139,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
         coordinator._clear_fast_retry(stop=True)  # noqa: SLF001
 
     entry.async_on_unload(_stop_recovery)
+    entry.async_on_unload(guard_notifications.close)
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
     doorbell_event_ids: dict[tuple[str, str], None] = {}
     recordings: RecordingRuntime | None = None
@@ -163,7 +166,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
 
     entry.async_on_unload(_close_recordings)
 
-    def _on_event(evt: dict) -> None:  # noqa: PLR0912 - explicit bridge event dispatch
+    def _on_event(evt: dict) -> None:  # noqa: PLR0912, PLR0915 - explicit bridge event dispatch
         if evt.get("event") in ("hello", "recordings.capability"):
             _sync_recordings()
             if evt["event"] == "recordings.capability":
@@ -188,6 +191,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
                 if len(doorbell_event_ids) > MAX_DOORBELL_EVENT_IDS:
                     doorbell_event_ids.pop(next(iter(doorbell_event_ids)))
             # Identity-less pulses may be genuine repeats; never time-filter them.
+        if evt.get("event") == "guardConfirmation":
+            guard_notifications.apply(evt)
+            coordinator.async_update_listeners()
         coordinator.apply_command_health_event(evt)
         if evt.get("event") == "cameraHealth":
             coordinator.apply_camera_health_event(evt)
