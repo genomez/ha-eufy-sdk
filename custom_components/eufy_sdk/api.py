@@ -1057,7 +1057,15 @@ class EufySdkApiClient(RecordingsApi):
             and data.get("property") == "armingMode"
             and "value" in data
         ):
-            self.guard_reconciliation.observe(serial, data["value"], time.monotonic())
+            # Generic property changes can also announce cached/cloud values.
+            self.guard_reconciliation.observe_snapshot(
+                {
+                    "sn": serial,
+                    "state": {"armingMode": data["value"]},
+                    "stateEvidence": {"armingMode": data.get("evidence")},
+                },
+                time.monotonic(),
+            )
         elif data.get("event") == "propertiesObserved":
             self.guard_reconciliation.observe_receipt(data)
 
@@ -1069,12 +1077,7 @@ class EufySdkApiClient(RecordingsApi):
             return
         for device in devices:
             projected = normalize_snapshot(device)
-            state = projected.get("state")
-            self.guard_reconciliation.observe(
-                projected.get("sn"),
-                state.get("armingMode") if isinstance(state, dict) else None,
-                started,
-            )
+            self.guard_reconciliation.observe_snapshot(projected, started)
 
     def _set_guard_capability(self, data: dict) -> None:
         """Negotiate additive guard metadata on hello and ready."""

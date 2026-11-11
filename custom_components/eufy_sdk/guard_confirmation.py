@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components import persistent_notification
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN
 from .notification_delivery import (
     NOTICE_RETRY_DELAYS,
     PHONE_FAILURE_SENTENCE,
@@ -186,6 +186,9 @@ class GuardReconciliation:
         self.lost: dict[str, dict] = {}
         self.timers: dict[str, asyncio.TimerHandle] = {}
         self.loss_deadlines: dict[str, float] = {}
+        self.pending: dict[str, dict] = {}
+        self.restarts: dict[tuple[str, str], None] = {}
+        self.closed = False
 
     def begin(self, serial: str) -> object | None:
         """Fence cached observations before a local command can be dispatched."""
@@ -214,10 +217,18 @@ class GuardReconciliation:
             self.preparing.pop(serial, None)
             self.loss_deadlines.pop(serial, None)
         self._forget_loss(serial)
+        if receipt["outcome"] == "pending":
+            self.pending[serial] = receipt
+        else:
+            self.pending.pop(serial, None)
 
     def lose(self, receipt: dict, *, after_restart: bool = True) -> None:
         """Retain a lost pending receipt until fresh state or a finite deadline."""
         serial = receipt["deviceSn"]
+        if after_restart:
+            self.restarts[(receipt["runtimeGeneration"], receipt["handle"])] = None
+            if len(self.restarts) > MAX_TARGETS:
+                self.restarts.pop(next(iter(self.restarts)))
         if serial in self.lost:
             # Another restart must fence old state without extending the deadline.
             if after_restart:
@@ -237,7 +248,9 @@ class GuardReconciliation:
 
     def _expire_loss(self, serial: str) -> None:
         """Bound unknown reported state after a lost pending intent."""
-        self._resolve_loss(serial, matched=False)
+        pending = self.lost.get(serial)
+        if pending is not None:
+            self._resolve_loss(serial, matched=self.matches(pending))
 
     def observe(self, serial: str, mode: Any, started: float) -> None:
         """Accept only valued, ordered arming-mode reports for tracked stations."""
@@ -249,8 +262,8 @@ class GuardReconciliation:
         mode = mode if type(mode) is int and mode in MODE_LABELS else None
         self.states[serial] = (started, mode)
         lost = self.lost.get(serial)
-        if lost and started >= self.starts[serial] and mode is not None:
-            self._resolve_loss(serial, matched=mode == lost["requestedMode"])
+        if lost and lost["attempts"] == 1 and self.matches(lost):
+            self._resolve_loss(serial, matched=True)
 
     def matches(self, receipt: dict) -> bool:
         """Require this intent's current reported mode and post-command evidence."""
@@ -260,7 +273,7 @@ class GuardReconciliation:
             self.identities.get(serial)
             == (receipt["runtimeGeneration"], receipt["handle"])
             and state
-            and state[0] >= self.starts[serial]
+            and state[0] > self.starts[serial]
             and state[1] == receipt["requestedMode"]
         )
 
@@ -283,6 +296,39 @@ class GuardReconciliation:
         self.observe(
             event["deviceSn"], properties["armingMode"], time.monotonic() - age
         )
+
+    def observe_snapshot(self, device: dict, started: float) -> None:
+        """Never give cached values the poll's time as station observation time."""
+        serial = device.get("sn")
+        if serial not in self.starts:
+            return
+        state = device.get("state")
+        mode = state.get("armingMode") if isinstance(state, dict) else None
+        evidence = device.get("stateEvidence")
+        evidence = evidence.get("armingMode") if isinstance(evidence, dict) else None
+        if (
+            isinstance(evidence, dict)
+            and type(evidence.get("version")) is int
+            and evidence.get("version") == 1
+            and evidence.get("source") in ("rtc_push", "rtc_readback")
+            and evidence.get("status") == "current"
+        ):
+            self.observe_receipt(
+                {
+                    "deviceSn": serial,
+                    "source": "rtc",
+                    "observedAtMs": evidence.get("receivedAtMs"),
+                    "properties": {"armingMode": mode},
+                }
+            )
+        previous = self.states.get(serial)
+        if mode is None or (previous is not None and previous[1] != mode):
+            # Missing/changed unqualified cache state cannot preserve a match.
+            self.observe(serial, None, started)
+
+    def restart_known(self, receipt: dict) -> bool:
+        """Distinguish authoritative rollover from an expired recovery handle."""
+        return (receipt["runtimeGeneration"], receipt["handle"]) in self.restarts
 
     def grace_seconds(self, receipt: dict) -> float:
         """Keep restart reconciliation and its delivery grace within one minute."""
@@ -314,24 +360,36 @@ class GuardReconciliation:
         if pending is None:
             return
         self._forget_loss(serial)
-        if matched and pending["attempts"] != 1:
-            LOGGER.warning(
-                "Guard mode matches after restart, but an undispatched receipt "
-                "cannot map to reported; retaining its attributes"
-            )
-            return
+        self.pending.pop(serial, None)
+        silent_drop = matched and pending["attempts"] == 0
         self.emit(
             {
                 **pending,
-                "outcome": "reported" if matched else "not_reported",
-                "reason": "reported_after_command" if matched else "runtime_closed",
+                "outcome": "reported"
+                if matched and not silent_drop
+                else "not_reported",
+                "reason": (
+                    "cancelled"
+                    if silent_drop
+                    else "reported_after_command"
+                    if matched
+                    else "runtime_closed"
+                ),
                 "outcomeAtMs": int(time.time() * 1000),
             }
         )
 
     def close(self) -> None:
-        """Cancel bounded local work when the client unloads."""
-        for timer in self.timers.values():
+        """Resolve unconfirmed pending intents on the safe side before unload."""
+        if self.closed:
+            return
+        self.closed = True
+        for serial, pending in tuple(self.pending.items()):
+            self.lost.setdefault(serial, pending)
+            # Notification delivery also checks the coordinator's current mode
+            # and failed-poll gate before suppressing this unload resolution.
+            self._resolve_loss(serial, matched=False)
+        for timer in tuple(self.timers.values()):
             timer.cancel()
         self.timers.clear()
         self.lost.clear()
@@ -356,6 +414,7 @@ class GuardNotifications:
         self.unresolved: dict[str, int] = {}
         self.tasks: dict[str, asyncio.Task] = {}
         self.deferred: dict[tuple[str, str], tuple[dict, asyncio.TimerHandle]] = {}
+        self.closed = False
 
     def options_updated(self, options: dict) -> None:
         """Route unresolved problems to the live service and cancel old deliveries."""
@@ -480,6 +539,9 @@ class GuardNotifications:
         """Allow a finite grace period without silencing older real failures."""
         if self._reported_match(receipt, reconciliation):
             return
+        if self.closed:
+            self._raise_problem(receipt)
+            return
         if len(self.deferred) >= MAX_TARGETS:
             # Capacity pressure must not silently lose a real failure.
             oldest = next(iter(self.deferred))
@@ -554,14 +616,25 @@ class GuardNotifications:
                 "ack_missing": "The command may not have reached the station.",
                 "transport_uncertain": "The command may not have reached the station.",
                 "runtime_closed": (
-                    "The add-on restarted before a report. "
-                    "The mode change could not be confirmed after a restart."
+                    "The connection to the add-on was interrupted before a report."
                 ),
                 "session_changed": "The connection changed before a report.",
                 "window_expired": "No report was received within the time window.",
                 "budget_expired": "No report was received within the time window.",
             }.get(receipt["reason"], "The mode change could not be confirmed.")
         )
+        runtime = getattr(self.entry, "runtime_data", None)
+        reconciliation = getattr(
+            getattr(runtime, "client", None), "guard_reconciliation", None
+        )
+        if receipt["attempts"] == 0:
+            explanation = "The command was not sent to the station."
+        elif (
+            receipt["reason"] == "runtime_closed"
+            and reconciliation is not None
+            and reconciliation.restart_known(receipt)
+        ):
+            explanation = "The mode change could not be confirmed after a restart."
         count_sentence = f" {count} unresolved intents." if count > 1 else ""
         message = (
             f"{self._station_name(serial)}, requested guard mode {mode}. "
@@ -600,8 +673,21 @@ class GuardNotifications:
         self.tasks.clear()
 
     def close(self) -> None:
-        """Cancel delivery tasks on entry unload without replaying commands."""
+        """Flush unconfirmed alerts immediately when their timers cannot survive."""
+        if self.closed:
+            return
+        self.closed = True
         self._cancel_deliveries()
-        for _, timer in self.deferred.values():
+        runtime = getattr(self.entry, "runtime_data", None)
+        reconciliation = getattr(
+            getattr(runtime, "client", None), "guard_reconciliation", None
+        )
+        if reconciliation is not None:
+            reconciliation.close()
+        for key, (receipt, timer) in tuple(self.deferred.items()):
             timer.cancel()
+            if reconciliation is not None:
+                self._finish_deferred(key, reconciliation)
+            else:
+                self._raise_problem(receipt)
         self.deferred.clear()

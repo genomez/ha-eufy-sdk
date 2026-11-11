@@ -61,6 +61,10 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
             if name.endswith("async_create"):
                 self.create = mocked
 
+    async def asyncTearDown(self):
+        self.owner.close()
+        await self.deliveries()
+
     def event(self, outcome="pending", **fields: object):
         self.client._dispatch_event(
             {"event": "guardConfirmation", **receipt(outcome, **fields)}
@@ -82,6 +86,12 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
             timer.cancel()
             self.owner._finish_deferred(key, self.client.guard_reconciliation)
 
+    def expire_loss(self):
+        reconciliation = self.client.guard_reconciliation
+        self.now = reconciliation.loss_deadlines[SERIAL]
+        reconciliation.timers[SERIAL].cancel()
+        reconciliation._expire_loss(SERIAL)
+
     async def deliveries(self):
         await asyncio.gather(*self.owner.tasks.values())
 
@@ -91,7 +101,22 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.restart()
         self.now += 1
         self.client.rpc = AsyncMock(
-            return_value={"devices": [{"sn": SERIAL, "state": {"armingMode": 1}}]}
+            return_value={
+                "devices": [
+                    {
+                        "sn": SERIAL,
+                        "state": {"armingMode": 1},
+                        "stateEvidence": {
+                            "armingMode": {
+                                "version": 1,
+                                "source": "rtc_push",
+                                "status": "current",
+                                "receivedAtMs": 2000,
+                            }
+                        },
+                    }
+                ]
+            }
         )
         await self.client.list_devices()
         self.assertEqual(
@@ -111,6 +136,9 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.restart()
         self.now += 1
         self.mode(0)
+        self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "pending")
+        self.create.assert_not_called()
+        self.expire_loss()
         self.assertEqual(self.client.guard_receipts[SERIAL]["reason"], "runtime_closed")
         self.finish_grace()
         await self.deliveries()
@@ -153,11 +181,7 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
                 await self.client.list_devices()
                 self.assertEqual(
                     self.client.guard_receipts[SERIAL]["outcome"],
-                    "reported"
-                    if mode == 1
-                    else "not_reported"
-                    if mode == 0
-                    else "pending",
+                    "pending",
                 )
                 self.assertEqual(
                     [call.args[0] for call in self.client.rpc.await_args_list],
@@ -198,12 +222,27 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "pending")
         self.assertIn(SERIAL, self.client.guard_reconciliation.timers)
 
-    async def test_undispatched_match_keeps_attributes_and_logs_unclear_mapping(self):
+    async def test_undispatched_match_settles_silently_at_deadline_without_poll_reloss(
+        self,
+    ):
         self.event(attempts=0, reason="waiting_dispatch")
         self.restart()
-        with self.assertLogs("custom_components.eufy_sdk", level="WARNING"):
-            self.mode(1)
+        self.now += 1
+        self.mode(1)
         self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "pending")
+        self.expire_loss()
+        self.assertEqual(self.client.guard_receipts[SERIAL]["reason"], "cancelled")
+        self.assertEqual(self.client.guard_reconciliation.pending, {})
+        self.client.rpc = AsyncMock(return_value={"devices": []})
+        for _ in range(3):
+            await self.client.list_devices()
+        self.assertEqual(
+            [call.args[0] for call in self.client.rpc.await_args_list],
+            ["devices.list"] * 3,
+        )
+        self.now += 1
+        self.mode(0)
+        self.assertEqual(self.client.guard_reconciliation.timers, {})
         self.create.assert_not_called()
 
     async def test_tonight_session_change_late_matching_report_suppresses_both_notices(
@@ -220,7 +259,16 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         timer = next(iter(self.owner.deferred.values()))[1]
         self.assertAlmostEqual(timer.when() - asyncio.get_running_loop().time(), 10, 1)
         self.now = 36.4
-        self.mode(1)
+        # RTC param reports produce propertiesObserved even if SDK guard tracking ended.
+        self.client._dispatch_event(
+            {
+                "event": "propertiesObserved",
+                "source": "rtc",
+                "deviceSn": SERIAL,
+                "observedAtMs": 36400,
+                "properties": {"armingMode": 1},
+            }
+        )
         self.now = 44.9
         self.finish_grace()
         await self.deliveries()
@@ -246,6 +294,12 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
                 "deviceSn": SERIAL,
                 "property": "armingMode",
                 "value": 1,
+                "evidence": {
+                    "version": 1,
+                    "source": "rtc_push",
+                    "status": "current",
+                    "receivedAtMs": 1000,
+                },
             }
         )
         self.finish_grace()
@@ -433,24 +487,24 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_unload_cancels_loss_and_notification_timers(self):
-        self.event()
-        self.restart()
-        loss_timer = self.client.guard_reconciliation.timers[SERIAL]
-        self.owner.apply(receipt("not_reported", generation=2))
+        self.event("not_reported")
         notice_timer = next(iter(self.owner.deferred.values()))[1]
         self.owner.close()
         self.client._ws.close = AsyncMock()
         await self.client.close()
-        self.assertTrue(loss_timer.cancelled())
         self.assertTrue(notice_timer.cancelled())
-        self.create.assert_not_called()
+        self.create.assert_called_once()
+        await self.deliveries()
+        self.hass.services.async_call.assert_awaited_once()
 
     async def test_all_failure_reasons_have_specific_friendly_text(self):
         expected = {
             "dispatch_rejected": "The station rejected the command.",
             "ack_missing": "The command may not have reached the station.",
             "transport_uncertain": "The command may not have reached the station.",
-            "runtime_closed": "The add-on restarted before a report.",
+            "runtime_closed": (
+                "The connection to the add-on was interrupted before a report."
+            ),
             "session_changed": "The connection changed before a report.",
             "window_expired": "No report was received within the time window.",
             "budget_expired": "No report was received within the time window.",
@@ -471,3 +525,201 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(
                 sentence, self.hass.services.async_call.await_args.args[2]["message"]
             )
+
+    async def test_matching_post_begin_cache_without_station_time_cannot_suppress(self):
+        self.event()
+        self.now = 2
+        self.client.rpc = AsyncMock(
+            return_value={"devices": [{"sn": SERIAL, "state": {"armingMode": 1}}]}
+        )
+        await self.client.list_devices()
+        self.event("not_reported", reason="dispatch_rejected")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+        self.hass.services.async_call.assert_awaited_once()
+
+    async def test_snapshot_receipt_time_must_follow_command(self):
+        self.now = 10
+        self.event()
+        self.now = 12
+        self.client.rpc = AsyncMock(
+            return_value={
+                "devices": [
+                    {
+                        "sn": SERIAL,
+                        "state": {"armingMode": 1},
+                        "stateEvidence": {
+                            "armingMode": {
+                                "version": 1,
+                                "source": "rtc_readback",
+                                "status": "current",
+                                "receivedAtMs": 9000,
+                            }
+                        },
+                    }
+                ]
+            }
+        )
+        await self.client.list_devices()
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_different_restart_report_then_later_match_resolves_silently(self):
+        self.event()
+        self.restart()
+        self.now += 1
+        self.mode(0)
+        self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "pending")
+        self.now += 40
+        self.mode(1)
+        self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "reported")
+        self.assertEqual(self.client.guard_reconciliation.timers, {})
+        self.create.assert_not_called()
+
+    async def test_undispatched_different_mode_alerts_only_at_deadline_as_not_sent(
+        self,
+    ):
+        self.event(attempts=0, reason="waiting_dispatch")
+        self.restart()
+        self.now += 1
+        self.mode(0)
+        self.create.assert_not_called()
+        self.expire_loss()
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+        self.assertIn(
+            "The command was not sent to the station.", self.create.call_args.args[1]
+        )
+
+    async def test_null_recovery_interruption_does_not_claim_restart(self):
+        self.event()
+        self.client.rpc = AsyncMock(
+            side_effect=[{"devices": []}, {"guardConfirmation": None}]
+        )
+        await self.client.list_devices()
+        self.expire_loss()
+        self.finish_grace()
+        await self.deliveries()
+        message = self.create.call_args.args[1]
+        self.assertIn("connection to the add-on was interrupted", message)
+        self.assertNotIn("restart", message)
+
+    async def test_unload_during_lost_deadline_flushes_failure_immediately(self):
+        self.event()
+        self.restart()
+        timer = self.client.guard_reconciliation.timers[SERIAL]
+        self.owner.close()
+        await self.deliveries()
+        self.assertTrue(timer.cancelled())
+        self.assertEqual(self.owner.deferred, {})
+        self.create.assert_called_once()
+        self.hass.services.async_call.assert_awaited_once()
+
+    async def test_unload_never_resolved_pending_alerts_but_confirmed_mode_is_silent(
+        self,
+    ):
+        self.event()
+        self.now = 2
+        self.mode(1)
+        self.owner.close()
+        self.assertNotEqual(self.client.guard_receipts[SERIAL]["outcome"], "pending")
+        self.create.assert_not_called()
+
+    async def test_unload_pending_without_loss_or_confirmation_raises(self):
+        self.event()
+        self.owner.close()
+        await self.deliveries()
+        self.create.assert_called_once()
+        self.hass.services.async_call.assert_awaited_once()
+
+    async def test_client_close_before_notice_close_still_flushes_phone_once(self):
+        self.event()
+        self.client._ws.close = AsyncMock()
+        await self.client.close()
+        self.owner.close()
+        await self.deliveries()
+        self.create.assert_called_once()
+        self.hass.services.async_call.assert_awaited_once()
+
+    async def test_failed_poll_still_blocks_suppression(self):
+        self.event()
+        self.now = 2
+        self.mode(1)
+        self.owner.entry.runtime_data.coordinator = SimpleNamespace(
+            data={SERIAL: {"state": {"armingMode": 1}}}, last_update_success=False
+        )
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_snapshot_without_mode_still_overwrites_match_with_unknown(self):
+        self.event()
+        self.now = 2
+        self.mode(1)
+        self.now = 3
+        self.client.rpc = AsyncMock(
+            return_value={"devices": [{"sn": SERIAL, "state": {}}]}
+        )
+        await self.client.list_devices()
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_null_recovery_undispatched_match_does_not_relose_or_rewarn(self):
+        self.event(attempts=0, reason="waiting_dispatch")
+        self.client.rpc = AsyncMock(
+            side_effect=[{"devices": []}, {"guardConfirmation": None}]
+        )
+        await self.client.list_devices()
+        self.now = 2
+        self.mode(1)
+        timer = self.client.guard_reconciliation.timers[SERIAL]
+        self.client.rpc = AsyncMock(return_value={"devices": []})
+        with patch("custom_components.eufy_sdk.const.LOGGER.warning") as warning:
+            for _ in range(3):
+                await self.client.list_devices()
+            self.assertIs(self.client.guard_reconciliation.timers[SERIAL], timer)
+            self.expire_loss()
+            for _ in range(3):
+                await self.client.list_devices()
+            warning.assert_not_called()
+        self.assertEqual(self.client.guard_receipts[SERIAL]["reason"], "cancelled")
+        self.assertEqual(self.client.guard_reconciliation.lost, {})
+        self.assertEqual(
+            [call.args[0] for call in self.client.rpc.await_args_list],
+            ["devices.list"] * 6,
+        )
+        self.create.assert_not_called()
+
+    async def test_unload_pending_failed_poll_still_blocks_suppression(self):
+        self.event()
+        self.now = 2
+        self.mode(1)
+        self.owner.entry.runtime_data.coordinator = SimpleNamespace(
+            data={SERIAL: {"state": {"armingMode": 1}}}, last_update_success=False
+        )
+        self.owner.close()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_unqualified_property_change_cannot_confirm_failed_command(self):
+        self.event()
+        self.now = 2
+        self.client._dispatch_event(
+            {
+                "event": "propertyChanged",
+                "deviceSn": SERIAL,
+                "property": "armingMode",
+                "value": 1,
+            }
+        )
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
