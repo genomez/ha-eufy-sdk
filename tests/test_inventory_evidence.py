@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 from custom_components.eufy_sdk.api import EufySdkApiClient
 from custom_components.eufy_sdk.coordinator import EufySdkDataUpdateCoordinator
+from custom_components.eufy_sdk.entity import EufySdkDeviceEntity
 from custom_components.eufy_sdk.inventory_evidence import (
     inventory_attributes,
     inventory_evidence,
@@ -32,6 +33,21 @@ def evidence(quality="partial"):
 
 class InventoryEvidenceTests(unittest.IsolatedAsyncioTestCase):
     """Preserve entities and original successful inventory observations."""
+
+    async def test_refresh_timestamps_are_excluded_from_recorder(self):
+        entity = EufySdkDeviceEntity(
+            SimpleNamespace(data={"synthetic-b": {}}, inventory_evidence=evidence()),
+            "synthetic-b",
+        )
+        attrs = entity.extra_state_attributes
+        self.assertIn("inventory_age_seconds", attrs)
+        self.assertEqual(attrs["inventory_last_success_ms"], 1000)
+        self.assertTrue(
+            {"inventory_age_seconds", "inventory_last_success_ms"}
+            <= entity._unrecorded_attributes
+        )
+        self.assertNotIn("inventory_quality", entity._unrecorded_attributes)
+        self.assertNotIn("inventory_refresh_quality", entity._unrecorded_attributes)
 
     async def test_api_keeps_atomic_evidence_separate_from_property_state(self):
         client = EufySdkApiClient("synthetic", 3000, Mock())

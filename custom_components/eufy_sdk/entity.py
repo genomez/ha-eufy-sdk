@@ -216,6 +216,9 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
 
     _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset(
+        {"inventory_age_seconds", "inventory_last_success_ms"}
+    )
 
     def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
         """Bind to a device serial and build its HA device_info."""
