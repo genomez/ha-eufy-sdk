@@ -50,14 +50,19 @@ class SafetyFindingsTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         await self.at(916)
         self.assertIsNone(controller.pending)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        self.now = 1081
+        self.report(controller, True)
+        await self.drain()
         self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
         self.assertEqual(entity.hass.services.async_call.await_count, 1)
         self.assertGreaterEqual(client.get_properties.await_count, 2)
         client.get_properties.return_value = [
             {"name": "light", "boundedStateWrites": True}
         ]
-        await self.at(931)
+        await self.at(1096)
         self.assertIs(controller.pending, False)
+        self.assertFalse(controller.watchdog_blocked)
         self.assertEqual(len(self.sent), 1)
         self.report(controller, False)
         await self.drain()
@@ -75,6 +80,10 @@ class SafetyFindingsTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         await self.at(916)
         await self.at(931)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        self.now = 1081
+        self.report(controller, True)
+        await self.drain()
         self.assertIsNone(controller.pending)
         self.assertGreaterEqual(client.set_property.await_count, 3)
         self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
@@ -90,12 +99,124 @@ class SafetyFindingsTests(unittest.IsolatedAsyncioTestCase):
         self.report(controller, True)
         await self.drain()
         self.assertIsNone(controller.pending)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        await self.at(1081)
         self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
         await entity.write(True)
         busy.explicit_busy = 0
         await self.at(2000)
         self.assertTrue(controller.on_authorized)
         self.assertTrue(all(row[2] is True for row in self.sent))
+
+    async def test_transient_abort_then_later_calibration_never_pages(self):
+        entity, controller, client = await self.make()
+        self.phone(entity)
+        self.report(controller, True)
+        client.get_properties.return_value = []
+        self.now = 901
+        self.report(controller, True)
+        await self.drain()
+        self.assertTrue(controller.watchdog_blocked)
+        client.get_properties.return_value = [
+            {"name": "light", "boundedStateWrites": True}
+        ]
+        await self.at(916)
+        self.assertIs(controller.pending, False)
+        self.assertFalse(controller.watchdog_blocked)
+        self.report(controller, False)
+        self.assertFalse(controller.watchdog_blocked)
+        self.now = 2000
+        self.report(controller, True)
+        self.assertFalse(controller.watchdog_blocked)
+        self.now = 2901
+        self.report(controller, True)
+        await self.drain()
+        self.assertIs(controller.pending, False)
+        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        entity.hass.services.async_call.assert_not_awaited()
+
+    async def test_sibling_calibrations_share_hub_without_paging(self):
+        entity, first, client = await self.make()
+        other, second, _ = await self.make(index=1, coordinator=entity.coordinator)
+        self.phone(entity)
+        self.report(first, True)
+        self.report(second, True)
+        send = client.set_property.side_effect
+
+        async def recovering(target, prop, desired, **kwargs):
+            result = await send(target, prop, desired, **kwargs)
+            if target == entity._sn:
+                return CommandReceipt("pending_accepted", True, "unconfirmed", intent=1)
+            return result
+
+        client.set_property.side_effect = recovering
+        self.now = 901
+        self.report(first, True)
+        await self.drain()
+        self.report(second, True)
+        await self.drain()
+        self.assertTrue(first.recovery_pending)
+        self.assertIsNone(second.pending)
+        self.report(first, False)
+        await self.at(961)
+        self.assertIs(second.pending, False)
+        self.assertTrue(any(row[1] == other._sn for row in self.sent))
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        self.assertEqual(self.notices(other, "off_blocked"), [])
+        entity.hass.services.async_call.assert_not_awaited()
+        other.hass.services.async_call.assert_not_awaited()
+
+    async def test_continuously_blocked_light_pages_at_deadline_plus_three_minutes(
+        self,
+    ):
+        entity, controller, _ = await self.make()
+        _, busy, _ = await self.make(index=1, coordinator=entity.coordinator)
+        self.phone(entity)
+        self.report(controller, True)
+        deadline = controller._watchdog_deadline()
+        busy.explicit_busy = 1
+        for offset in range(0, 180, 15):
+            await self.at(deadline + offset)
+            self.assertEqual(self.notices(entity, "off_blocked"), [])
+        await self.at(deadline + 179.5)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        due, tick, _ = min(
+            (row for row in self.timers if not row[2]), key=lambda row: row[0]
+        )
+        self.assertEqual(due, deadline + 180)
+        self.now = due
+        tick(None)
+        await self.drain()
+        self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
+        self.assertEqual(entity.hass.services.async_call.await_count, 1)
+        self.assertEqual(self.sent, [])
+
+    async def test_repeated_explicit_off_accepts_report_after_first_send(self):
+        entity, controller, _ = await self.make()
+        self.phone(entity)
+        self.report(controller, True)
+        self.now = 10
+        await entity.write(False)
+        first = (controller.pending_since, controller.sent_at, controller.sent_wall)
+        for moment in (20, 30, 40):
+            self.now = moment
+            await entity.write(False)
+            self.assertEqual(
+                (controller.pending_since, controller.sent_at, controller.sent_wall),
+                first,
+            )
+        controller.observe(
+            {
+                "source": "rtc",
+                "properties": {"light": False},
+                "observedAtMs": (self.wall + 15) * 1000,
+            }
+        )
+        self.assertIsNone(controller.pending)
+        await self.at(310)
+        self.assertEqual(self.notices(entity, "off_unconfirmed"), [])
+        entity.hass.services.async_call.assert_not_awaited()
 
     async def test_pending_off_push_during_bridge_parent_and_cooldown_waits(self):
         for index, reason in enumerate(("bridge", "parent", "cooldown")):

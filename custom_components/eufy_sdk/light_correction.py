@@ -33,6 +33,7 @@ CAP_SECONDS = 1800
 OFF_DWELL_SECONDS = 120
 GAP_SECONDS = 300
 OFF_ALERT_SECONDS = 300
+OFF_BLOCKED_GRACE_SECONDS = 180
 OFF_STUCK_BLOCKED_SECONDS = 300
 OFF_STUCK_ESCALATE_SECONDS = 120
 OFF_STUCK_ID_LENGTH = 32
@@ -418,9 +419,10 @@ class LightCorrection:
         self.explicit_busy += 1
         if self.pending is not value:
             self.pending_since = monotonic()
+        if self.pending is not value or value:
+            self.sent_at = monotonic()
+            self.sent_wall = time()
         self.pending = value
-        self.sent_at = monotonic()
-        self.sent_wall = time()
         self.attempts = 1
         self.safety_off = False
         self.retry_due = monotonic() + (ON_DELAYS[0] if value else OFF_DELAYS[0])
@@ -438,6 +440,8 @@ class LightCorrection:
         if not self.enabled:
             return
         if isinstance(receipt, CommandReceipt):
+            if receipt.send_attempted and self.pending is False:
+                self.watchdog_blocked = False
             self.health(receipt.command_health)
             self.sdk_intent = receipt.intent
             self.track_recovery(receipt)
@@ -598,12 +602,14 @@ class LightCorrection:
         value = values.get("light")
         if type(value) is bool:
             if value and self.on_since is None:
+                self.watchdog_blocked = False
                 if self.observed is False and self.pending is None:
                     self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
                     self.notice_problem = False
                 self.on_since = monotonic()
                 self.on_reported_at = stamp / 1000
             elif not value:
+                self.watchdog_blocked = False
                 if self.on_since is not None:
                     self.confirmed_on_minutes = int((monotonic() - self.on_since) / 60)
                     self.confirmed_on_reported_at = self.on_reported_at
@@ -656,6 +662,8 @@ class LightCorrection:
 
     def _confirmed(self) -> None:
         desired = self.pending
+        if desired is False:
+            self.watchdog_blocked = False
         self.pending = None
         problem = (
             "on_unconfirmed" if desired else "off_unconfirmed"
@@ -708,28 +716,29 @@ class LightCorrection:
 
     def _watchdog_overdue(self) -> bool:
         """Keep the correction deadline independent of transport admission."""
-        now = monotonic()
-        return (
-            self.intent() is False
-            and self.observed is True
-            and self.on_since is not None
-            and self.off_since is not None
-            and now - self.off_since >= OFF_DWELL_SECONDS
-            and (
-                now - self.on_since >= CAP_SECONDS
-                or (
-                    now - self.on_since >= QUIET_SECONDS
-                    and not self.motion_active
-                    and now
-                    - (
-                        self.last_motion
-                        if self.last_motion is not None
-                        else self.started
-                    )
-                    >= QUIET_SECONDS
+        deadline = self._watchdog_deadline()
+        return deadline is not None and monotonic() >= deadline
+
+    def _watchdog_deadline(self) -> float | None:
+        """Anchor correction and alert grace to the current reported-ON episode."""
+        if (
+            self.intent() is not False
+            or self.observed is not True
+            or self.on_since is None
+            or self.off_since is None
+        ):
+            return None
+        deadline = self.on_since + CAP_SECONDS
+        if not self.motion_active:
+            quiet = (
+                max(
+                    self.on_since,
+                    self.last_motion if self.last_motion is not None else self.started,
                 )
+                + QUIET_SECONDS
             )
-        )
+            deadline = min(deadline, quiet)
+        return max(deadline, self.off_since + OFF_DWELL_SECONDS)
 
     def _waiting(self, *, desired: bool | None = False) -> bool:
         health = self.entity.device.get("cameraHealth") or {}
@@ -1081,13 +1090,16 @@ class LightCorrection:
                     "on_unconfirmed" if self.pending else "off_unconfirmed", True
                 )
         elif (
-            self.task is None
-            and self._watchdog_overdue()
+            (deadline := self._watchdog_deadline()) is not None
+            and now >= deadline + OFF_BLOCKED_GRACE_SECONDS
             and (
                 self.watchdog_blocked
                 or self._waiting()
                 or self.recovery_pending
-                or (self.queue is not None and self.queue.busy())
+                or (
+                    self.queue is not None
+                    and (self.queue.busy() or self.queue.lock.locked())
+                )
             )
         ):
             self.state = "protection gap"
@@ -1116,7 +1128,17 @@ class LightCorrection:
             else:
                 self.check_policy()
 
-        self.timer = async_call_later(self.entity.hass, TICK_SECONDS, tick)
+        delay = TICK_SECONDS
+        deadline = self._watchdog_deadline()
+        if (
+            self.pending is None
+            and deadline is not None
+            and "off_blocked" not in self.notice_kinds
+        ):
+            remaining = deadline + OFF_BLOCKED_GRACE_SECONDS - monotonic()
+            if remaining > 0:
+                delay = min(delay, remaining)
+        self.timer = async_call_later(self.entity.hass, delay, tick)
 
     async def _read(self, intent: int | None = None) -> None:
         intent = self.sdk_intent if intent is None else intent
@@ -1220,19 +1242,22 @@ class LightCorrection:
                 self.track_recovery(receipt)
                 if generation != self.generation or not self.enabled:
                     return
-                self.receipt(receipt)
                 if not admitted or (
                     isinstance(receipt, CommandReceipt) and not receipt.send_attempted
                 ):
+                    self.receipt(receipt)
                     self.retry_due = monotonic() + TICK_SECONDS
                     return
+                if not desired:
+                    self.watchdog_blocked = False
                 if watchdog:
                     self.pending = False
                     self.pending_since = monotonic()
                     self.attempts = 0
                     self.safety_off = True
-                self.sent_at = sent_at
-                self.sent_wall = sent_wall
+                if watchdog or desired:
+                    self.sent_at = sent_at
+                    self.sent_wall = sent_wall
                 self.attempts += 1
                 delays = ON_DELAYS if desired else OFF_DELAYS
                 self.retry_due = (
@@ -1241,6 +1266,7 @@ class LightCorrection:
                 self._record(
                     "controller_request", desired=desired, attempts=self.attempts
                 )
+                self.receipt(receipt)
                 if (
                     self._fresh()
                     and self.observed is desired
