@@ -179,6 +179,9 @@ class LightCorrection:
         self.off_stuck_replay = False
         self.waiting_since: float | None = None
         self.watchdog_blocked = False
+        self.blocked_since: float | None = None
+        self.queue_owned = False
+        self.off_send_in_flight = False
         self.off_stuck_floor: float | None = None
 
     @property
@@ -442,6 +445,7 @@ class LightCorrection:
         if isinstance(receipt, CommandReceipt):
             if receipt.send_attempted and self.pending is False:
                 self.watchdog_blocked = False
+                self.blocked_since = None
             self.health(receipt.command_health)
             self.sdk_intent = receipt.intent
             self.track_recovery(receipt)
@@ -603,6 +607,7 @@ class LightCorrection:
         if type(value) is bool:
             if value and self.on_since is None:
                 self.watchdog_blocked = False
+                self.blocked_since = None
                 if self.observed is False and self.pending is None:
                     self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
                     self.notice_problem = False
@@ -610,6 +615,7 @@ class LightCorrection:
                 self.on_reported_at = stamp / 1000
             elif not value:
                 self.watchdog_blocked = False
+                self.blocked_since = None
                 if self.on_since is not None:
                     self.confirmed_on_minutes = int((monotonic() - self.on_since) / 60)
                     self.confirmed_on_reported_at = self.on_reported_at
@@ -664,6 +670,7 @@ class LightCorrection:
         desired = self.pending
         if desired is False:
             self.watchdog_blocked = False
+            self.blocked_since = None
         self.pending = None
         problem = (
             "on_unconfirmed" if desired else "off_unconfirmed"
@@ -961,6 +968,7 @@ class LightCorrection:
         if self._stopping() or self.entity.hass.state is not CoreState.running:
             return
         if not self.enabled:
+            self.blocked_since = None
             if not self.entity._removed:
                 self.waiting_since = None
                 self._close_off_stuck("disabled")
@@ -978,6 +986,7 @@ class LightCorrection:
                 self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
                 self.notice_problem = False
                 self.watchdog_blocked = False
+                self.blocked_since = None
             self.intent_initialized = True
             self.off_since = now if intent is False else None
             self._record(
@@ -1080,30 +1089,45 @@ class LightCorrection:
         self, now: float, intent: bool | None, *, paused: bool
     ) -> None:
         """Keep alert deadlines running while command admission is blocked."""
-        if paused or intent is None:
+        if not self.enabled or self._stopping() or paused or intent is None:
+            self.blocked_since = None
             return
         if self.pending is not None:
+            self.blocked_since = None
             if now - self.pending_since >= (
                 ON_ALERT_SECONDS if self.pending else OFF_ALERT_SECONDS
             ):
                 self._notice(
                     "on_unconfirmed" if self.pending else "off_unconfirmed", True
                 )
-        elif (
-            (deadline := self._watchdog_deadline()) is not None
-            and now >= deadline + OFF_BLOCKED_GRACE_SECONDS
+            return
+        if not self._watchdog_is_blocked():
+            self.blocked_since = None
+            return
+        if self.blocked_since is None:
+            self.blocked_since = now
+        if now - self.blocked_since >= OFF_BLOCKED_GRACE_SECONDS:
+            self.state = "protection gap"
+            self._notice("off_blocked", True)
+
+    def _watchdog_is_blocked(self) -> bool:
+        """Separate a blocked OFF from this light's own admitted send."""
+        return (
+            self._watchdog_overdue()
+            and not self.off_send_in_flight
             and (
                 self.watchdog_blocked
                 or self._waiting()
                 or self.recovery_pending
                 or (
                     self.queue is not None
-                    and (self.queue.busy() or self.queue.lock.locked())
+                    and (
+                        self.queue.busy()
+                        or (self.queue.lock.locked() and not self.queue_owned)
+                    )
                 )
             )
-        ):
-            self.state = "protection gap"
-            self._notice("off_blocked", True)
+        )
 
     def _arm(self) -> None:
         if self._stopping():
@@ -1129,13 +1153,8 @@ class LightCorrection:
                 self.check_policy()
 
         delay = TICK_SECONDS
-        deadline = self._watchdog_deadline()
-        if (
-            self.pending is None
-            and deadline is not None
-            and "off_blocked" not in self.notice_kinds
-        ):
-            remaining = deadline + OFF_BLOCKED_GRACE_SECONDS - monotonic()
+        if self.blocked_since is not None and "off_blocked" not in self.notice_kinds:
+            remaining = self.blocked_since + OFF_BLOCKED_GRACE_SECONDS - monotonic()
             if remaining > 0:
                 delay = min(delay, remaining)
         self.timer = async_call_later(self.entity.hass, delay, tick)
@@ -1178,6 +1197,13 @@ class LightCorrection:
                 self.outcome_unknown_since = monotonic()
                 self._record("outcome_unknown", reason="recovery_watch_unavailable")
 
+    def _begin_automatic_send(self, desired: bool) -> None:
+        """Mark admission before the transport's first send await."""
+        self.automatic_owned = True
+        if not desired:
+            self.off_send_in_flight = True
+            self.blocked_since = None
+
     async def _run(self, generation: int) -> None:  # noqa: PLR0911, PLR0912, PLR0915
         if self.queue is None:
             self.task = None
@@ -1185,7 +1211,9 @@ class LightCorrection:
         admitted = False
         runtime_generation = self.runtime_generation
         try:
+            self._check_command_notice(monotonic(), self.intent(), paused=self.paused)
             async with self.queue.lock:
+                self.queue_owned = True
                 if generation != self.generation or not self.enabled:
                     return
                 for intent, due in tuple(self.recoveries.items()):
@@ -1223,7 +1251,7 @@ class LightCorrection:
                         generation, desired, watchdog
                     )
                     if admitted:
-                        self.automatic_owned = True
+                        self._begin_automatic_send(desired)
                     return admitted
 
                 sent_at = monotonic()
@@ -1250,6 +1278,7 @@ class LightCorrection:
                     return
                 if not desired:
                     self.watchdog_blocked = False
+                    self.blocked_since = None
                 if watchdog:
                     self.pending = False
                     self.pending_since = monotonic()
@@ -1292,10 +1321,15 @@ class LightCorrection:
             self.retry_due = monotonic() + TICK_SECONDS
             self._record("request_unconfirmed")
         finally:
+            self.queue_owned = False
+            self.off_send_in_flight = False
             self.task = None
-            if self.enabled:
+            if self.enabled and not self._stopping():
                 if self.pending is None and self._watchdog_overdue():
                     self.watchdog_blocked = True
+                self._check_command_notice(
+                    monotonic(), self.intent(), paused=self.paused
+                )
                 self._arm()
 
     def _notice(self, kind: str, problem: bool) -> None:
@@ -1516,6 +1550,7 @@ class LightCorrection:
 
     def stop(self, state: str) -> None:
         """Revoke unsent authority without touching the existing display timers."""
+        self.blocked_since = None
         self._revoke_automatic()
         self.generation += 1
         self.state = state

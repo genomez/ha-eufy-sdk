@@ -13,6 +13,7 @@ from custom_components.eufy_sdk.api import (
     CommandReceipt,
     EufySdkApiClientCommunicationError,
 )
+from custom_components.eufy_sdk.const import CONF_LIGHT_CORRECTION_PAUSE
 from custom_components.eufy_sdk.light_correction import LightCorrection
 
 
@@ -100,7 +101,7 @@ class SafetyFindingsTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         self.assertIsNone(controller.pending)
         self.assertEqual(self.notices(entity, "off_blocked"), [])
-        await self.at(1081)
+        await self.at(self.now + 180)
         self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
         await entity.write(True)
         busy.explicit_busy = 0
@@ -217,6 +218,121 @@ class SafetyFindingsTests(unittest.IsolatedAsyncioTestCase):
         await self.at(310)
         self.assertEqual(self.notices(entity, "off_unconfirmed"), [])
         entity.hass.services.async_call.assert_not_awaited()
+
+    async def test_past_deadline_own_send_does_not_page(self):
+        for index, reason in enumerate(("motion", "pause")):
+            with self.subTest(reason=reason):
+                entity, controller, client = await self.make(index=index)
+                self.phone(entity)
+                self.report(controller, True, motion=True)
+                release = asyncio.Event()
+                send = client.set_property.side_effect
+
+                async def inflight(*args, _send=send, _release=release, **kwargs):
+                    result = await _send(*args, **kwargs)
+                    await _release.wait()
+                    return result
+
+                client.set_property.side_effect = inflight
+                self.now += 3600
+                if reason == "pause":
+                    entity.coordinator.config_entry.options[
+                        CONF_LIGHT_CORRECTION_PAUSE
+                    ] = "input_boolean.pause"
+                    self.states["input_boolean.pause"] = "on"
+                self.report(controller, True, motion=False)
+                if reason == "pause":
+                    self.states["input_boolean.pause"] = "off"
+                    controller.check_policy()
+                await self.drain()
+                self.assertEqual(len(self.sent), index + 1)
+                self.assertTrue(controller.queue.lock.locked())
+                await self.at(self.now + 60)
+                self.assertEqual(self.notices(entity, "off_blocked"), [])
+                release.set()
+                await self.drain()
+                self.assertIs(controller.pending, False)
+                self.assertIsNone(controller.blocked_since)
+                controller.stop("closed")
+
+    async def test_two_lights_end_long_motion_together_without_paging(self):
+        entity, first, client = await self.make()
+        other, second, _ = await self.make(index=1, coordinator=entity.coordinator)
+        self.phone(entity)
+        self.report(first, True, motion=True)
+        self.report(second, True, motion=True)
+        send = client.set_property.side_effect
+        release = asyncio.Event()
+
+        async def inflight(target, prop, desired, **kwargs):
+            result = await send(target, prop, desired, **kwargs)
+            if target == entity._sn:
+                await release.wait()
+            return result
+
+        client.set_property.side_effect = inflight
+        self.now = 3600
+        self.report(first, True, motion=False)
+        self.report(second, True, motion=False)
+        await self.drain()
+        await self.at(3660)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        self.assertEqual(self.notices(other, "off_blocked"), [])
+        release.set()
+        await self.drain()
+        self.assertIs(first.pending, False)
+        self.assertIs(second.pending, False)
+        self.assertIsNone(first.blocked_since)
+        self.assertIsNone(second.blocked_since)
+
+    async def test_past_deadline_wait_requires_continuous_three_minutes(self):
+        entity, controller, _ = await self.make()
+        _, busy, _ = await self.make(index=1, coordinator=entity.coordinator)
+        self.phone(entity)
+        self.report(controller, True, motion=True)
+        busy.explicit_busy = 1
+        self.now = 3600
+        self.report(controller, True, motion=False)
+        start = self.now
+        await self.drain()
+        self.assertEqual(controller.blocked_since, start)
+        for offset in range(0, 180, 15):
+            await self.at(start + offset)
+            self.assertEqual(self.notices(entity, "off_blocked"), [])
+            self.assertEqual(controller.blocked_since, start)
+        await self.at(start + 179.5)
+        due, tick, _ = min(
+            (row for row in self.timers if not row[2]), key=lambda row: row[0]
+        )
+        self.assertEqual(due, start + 180)
+        self.now = due
+        tick(None)
+        await self.drain()
+        self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
+        self.assertEqual(entity.hass.services.async_call.await_count, 1)
+
+    async def test_pause_breaks_continuous_blockage(self):
+        entity, controller, _ = await self.make()
+        _, busy, _ = await self.make(index=1, coordinator=entity.coordinator)
+        self.phone(entity)
+        entity.coordinator.config_entry.options[CONF_LIGHT_CORRECTION_PAUSE] = (
+            "input_boolean.pause"
+        )
+        self.states["input_boolean.pause"] = "off"
+        self.report(controller, True)
+        busy.explicit_busy = 1
+        await self.at(901)
+        await self.at(1080)
+        self.states["input_boolean.pause"] = "on"
+        controller.check_policy()
+        self.assertIsNone(controller.blocked_since)
+        self.now = 2000
+        self.states["input_boolean.pause"] = "off"
+        controller.check_policy()
+        await self.at(2179.5)
+        self.assertEqual(self.notices(entity, "off_blocked"), [])
+        await self.at(2180)
+        self.assertEqual(len(self.notices(entity, "off_blocked")), 1)
 
     async def test_pending_off_push_during_bridge_parent_and_cooldown_waits(self):
         for index, reason in enumerate(("bridge", "parent", "cooldown")):
