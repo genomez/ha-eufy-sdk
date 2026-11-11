@@ -82,13 +82,14 @@ class RestartQuietTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(controller.off_stuck["escalate_at"], self.wall + 60 + 1800)
         self.assertEqual(self.sent, [])
 
-    async def test_reconnect_unknown_and_on_get_full_silence_interval(self):
+    async def test_reconnect_preserves_silence_interval_for_known_on(self):
         for index, value in enumerate((None, True)):
             with self.subTest(value=value):
                 entity, controller, client = await self.make(index=index)
                 self.now += 2000
                 if value is True:
                     self.report(controller, value)
+                onset = self.now
                 client.connected = False
                 controller.reset_observations()
                 start = self.now
@@ -97,7 +98,7 @@ class RestartQuietTests(unittest.IsolatedAsyncioTestCase):
                 entity._handle_property_changed(
                     SimpleNamespace(data={"event": "ready"})
                 )
-                start = self.now
+                start = onset if value is True else self.now
                 self.now = start + 299
                 controller.check_policy()
                 self.assertEqual(self.incidents(entity), [])

@@ -38,6 +38,7 @@ OFF_STUCK_ESCALATE_SECONDS = 120
 OFF_STUCK_ID_LENGTH = 32
 ON_ALERT_SECONDS = 600
 REPORT_FRESH_SECONDS = 120
+REPORT_TIME_EPSILON = 0.000001
 OFF_DELAYS = (60, 120, 300)
 ON_DELAYS = (30, 60, 120, 300)
 SPACING_SECONDS = 3
@@ -46,13 +47,26 @@ RECOVERY_SECONDS = 45
 # SDK late-effect work ends at sentAt + 45 s; the bounded caller lasts 80 s
 # (api.BOUNDED_CALLER_SECONDS). Allow a further conservative settlement margin.
 OUTCOME_SETTLE_SECONDS = 180
-PHONE_KINDS = frozenset({"off_unconfirmed", "now_off", "on_unconfirmed", "now_on"})
+PHONE_KINDS = frozenset(
+    {
+        "off_unconfirmed",
+        "off_blocked",
+        "activation_gap",
+        "now_off",
+        "on_unconfirmed",
+        "now_on",
+    }
+)
+EPISODE_NOTICE_KINDS = (PHONE_KINDS - {"activation_gap"}) | {"safety_off"}
 NOTICE_KINDS = frozenset(
     {
         "safety_off",
         "now_off",
         "now_on",
         "off_unconfirmed",
+        "off_blocked",
+        "activation_gap",
+        "activation_restored",
         "on_unconfirmed",
         "camera_gap",
         "intent_gap",
@@ -102,11 +116,14 @@ class LightCorrection:
         self.last_command = False
         self.on_authorized = False
         self.current_intent: bool | None = None
+        self.intent_initialized = False
         self.off_since: float | None = None
         self.intent_bad_since: float | None = None
         self.observed: bool | None = None
         self.observed_at = 0.0
-        self.report_floor = time()
+        self.report_floor = monotonic()
+        self.report_floor_wall = time()
+        self.observed_mono: float | None = None
         self.report_received: float | None = None
         self.on_since: float | None = None
         self.on_reported_at: float | None = None
@@ -119,6 +136,7 @@ class LightCorrection:
         self.pending: bool | None = None
         self.pending_since = 0.0
         self.sent_at = 0.0
+        self.sent_wall = 0.0
         self.retry_due = 0.0
         self.attempts = 0
         self.safety_off = False
@@ -139,6 +157,10 @@ class LightCorrection:
         self.store: Store | None = None
         self.loaded = False
         self.loading = False
+        self.storage_loaded = False
+        self.activation_attempts = 0
+        self.activation_retry_due = 0.0
+        self.activation_task: asyncio.Task | None = None
         self.bound_entity: str | None = None
         self.started = monotonic()
         self.silence_since: float | None = None
@@ -155,6 +177,8 @@ class LightCorrection:
         self.off_stuck: dict | None = None
         self.off_stuck_replay = False
         self.waiting_since: float | None = None
+        self.watchdog_blocked = False
+        self.off_stuck_floor: float | None = None
 
     @property
     def options(self) -> dict:
@@ -205,7 +229,7 @@ class LightCorrection:
         await self._activate()
 
     async def _activate(self) -> None:  # noqa: PLR0912, PLR0915
-        if not self.enabled or self.loading:
+        if not self.enabled or self.loading or self._stopping():
             return
         self.loading = True
         try:
@@ -216,7 +240,7 @@ class LightCorrection:
                     1,
                     f"eufy_sdk_floodlight_safety.{entry_id}.{self.entity.entity_id}",
                 )
-            saved = await self.store.async_load() if not self.loaded else None
+            saved = await self.store.async_load() if not self.storage_loaded else None
             if not self.enabled:
                 return
             if isinstance(saved, dict):
@@ -237,7 +261,8 @@ class LightCorrection:
                     if saved.get("pending_off") is True:
                         self.pending = False
                         self.pending_since = monotonic()
-                        self.sent_at = time()
+                        self.sent_at = monotonic()
+                        self.sent_wall = time()
                         self.retry_due = monotonic() + OFF_DELAYS[0]
                         attempts = saved.get("attempts", 0)
                         self.attempts = (
@@ -248,7 +273,9 @@ class LightCorrection:
                 self.notice_bell_kind = saved.get("notice_bell_kind")
                 kinds = saved.get("notice_kinds", [])
                 if isinstance(kinds, list):
-                    self.notice_kinds = {kind for kind in kinds if kind in NOTICE_KINDS}
+                    self.notice_kinds.update(
+                        kind for kind in kinds if kind in NOTICE_KINDS
+                    )
                 self.notice_problem = saved.get("notice_problem") is True
                 queued = saved.get("notice_queue", [])
                 notices = [saved.get("notice_pending")]
@@ -273,6 +300,7 @@ class LightCorrection:
                             self.notice_pending = notice
                         else:
                             self.notice_queue.append(notice)
+            self.storage_loaded = True
             self.loaded = True
             self.bound_entity = self.binding
             self.started = monotonic()
@@ -296,12 +324,24 @@ class LightCorrection:
                     EVENT_HOMEASSISTANT_STARTED, self._ha_started
                 )
             self.check_policy()
+            self.activation_attempts = 0
+            if "activation_gap" in self.notice_kinds:
+                self.notice_kinds.discard("activation_gap")
+                self.notice_kinds.discard("activation_restored")
+                self._notice("activation_restored", False)
         except Exception:  # noqa: BLE001 - never retain raw storage exceptions
             self.loaded = False
             self.state = "protection gap"
             self._record("storage_unavailable")
+            self.activation_attempts += 1
+            self.activation_retry_due = monotonic() + notice_retry_delay(
+                self.activation_attempts
+            )
+            self._notice("activation_gap", True)
+            self._arm()
         finally:
             self.loading = False
+            self.activation_task = None
 
     @callback
     def _ha_started(self, _event: Any) -> None:
@@ -371,14 +411,16 @@ class LightCorrection:
         self._revoke_automatic()
         self.generation += 1
         if self.pending is None or self.pending is not value:
-            self.notice_kinds.difference_update(PHONE_KINDS | {"safety_off"})
+            self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
             self.notice_problem = False
         self.last_command = value
         self.on_authorized = value
         self.explicit_busy += 1
+        if self.pending is not value:
+            self.pending_since = monotonic()
         self.pending = value
-        self.pending_since = monotonic()
-        self.sent_at = time()
+        self.sent_at = monotonic()
+        self.sent_wall = time()
         self.attempts = 1
         self.safety_off = False
         self.retry_due = monotonic() + (ON_DELAYS[0] if value else OFF_DELAYS[0])
@@ -419,21 +461,28 @@ class LightCorrection:
     @property
     def recovery_pending(self) -> bool:
         """Retain every outstanding SDK token, including unknown terminal outcomes."""
-        if self.enabled:
-            self._expire_outcomes()
+        self._expire_outcomes()
         return bool(self.recoveries) or self.outcome_unknown_since is not None
 
     def _expire_outcomes(self) -> None:
         now = monotonic()
         if (
             self.outcome_unknown_since is not None
+            and now - self.outcome_unknown_since
+            >= OUTCOME_SETTLE_SECONDS - TICK_SECONDS
+        ):
+            self._notice("outcome_gap", True)
+        if (
+            self.outcome_unknown_since is not None
             and now - self.outcome_unknown_since >= OUTCOME_SETTLE_SECONDS
         ):
+            self._notice("outcome_gap", True)
             self.receipt_unknown = False
             self.outcome_unknown_since = None
             self._record("outcome_wait_expired")
         for intent, due in tuple(self.recoveries.items()):
             if now >= due + OUTCOME_SETTLE_SECONDS:
+                self._notice("outcome_gap", True)
                 self.recoveries.pop(intent)
                 self._record("recovery_wait_expired")
         self._recovery_settled()
@@ -494,27 +543,45 @@ class LightCorrection:
 
     def reset_observations(self) -> None:
         """Retain confirmed evidence, but require fresh reports for commands."""
-        self.report_floor = time()
-        if self.silence_since is not None:
-            self.silence_since = monotonic()
-        self.report_received = self.on_since = None
-        self.on_reported_at = None
+        self.report_floor = monotonic()
+        self.report_floor_wall = time()
+        if self.observed is not True:
+            if self.silence_since is not None:
+                self.silence_since = monotonic()
+            self.report_received = None
         self.motion_known = False
         self.motion_active = False
         self.check_policy()
 
-    def observe(self, event: dict) -> None:
+    def observe(self, event: dict) -> None:  # noqa: PLR0912
         """Only advancing, timestamped RTC reports qualify as camera evidence."""
         if not self.enabled or self._stopping():
             return
         stamp, values = event.get("observedAtMs"), event.get("properties")
+        now, wall = monotonic(), time()
         if (
             event.get("source") != "rtc"
             or not isinstance(values, dict)
             or type(stamp) not in (int, float)
             or not math.isfinite(stamp)
-            or not 0 <= time() - stamp / 1000 <= REPORT_FRESH_SECONDS
-            or stamp / 1000 <= max(self.report_floor, self.observed_at)
+            or not 0 <= wall - stamp / 1000 <= REPORT_FRESH_SECONDS
+            or stamp / 1000 == self.observed_at
+            or (
+                self.observed_mono is not None
+                and stamp / 1000 < self.observed_at
+                and wall - now
+                >= self.observed_at - self.observed_mono - REPORT_TIME_EPSILON
+            )
+        ):
+            return
+        observed_mono = now - (wall - stamp / 1000)
+        if not self._after_report_floor(
+            observed_mono, stamp / 1000, self.report_floor, self.report_floor_wall
+        ) or (
+            self.observed_mono is not None
+            and not self._after_report_floor(
+                observed_mono, stamp / 1000, self.observed_mono, self.observed_at
+            )
         ):
             return
         telemetry = [
@@ -532,7 +599,7 @@ class LightCorrection:
         if type(value) is bool:
             if value and self.on_since is None:
                 if self.observed is False and self.pending is None:
-                    self.notice_kinds.difference_update(PHONE_KINDS | {"safety_off"})
+                    self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
                     self.notice_problem = False
                 self.on_since = monotonic()
                 self.on_reported_at = stamp / 1000
@@ -543,6 +610,7 @@ class LightCorrection:
                 self.on_since = None
                 self.on_reported_at = None
             self.observed, self.observed_at = value, stamp / 1000
+            self.observed_mono = observed_mono
             self.report_received = monotonic()
             self._save()
             if self.intent() is False and not self.paused:
@@ -552,7 +620,9 @@ class LightCorrection:
                 self.notice_kinds.discard("camera_restored")
                 self._notice("camera_restored", False)
             self._record("report", value=value, reported_at=self.observed_at)
-            if self.pending is value and self.observed_at > self.sent_at:
+            if self.pending is value and self._report_after(
+                self.sent_at, self.sent_wall
+            ):
                 self._confirmed()
         self.check_policy()
 
@@ -589,7 +659,9 @@ class LightCorrection:
         self.pending = None
         problem = (
             "on_unconfirmed" if desired else "off_unconfirmed"
-        ) in self.notice_kinds
+        ) in self.notice_kinds or (
+            desired is False and "off_blocked" in self.notice_kinds
+        )
         if desired is False and self.safety_off:
             self._notice("now_off" if problem else "safety_off", False)
         elif problem:
@@ -601,8 +673,23 @@ class LightCorrection:
     def _fresh(self) -> bool:
         return (
             self.report_received is not None
-            and self.observed_at > self.report_floor
-            and 0 <= time() - self.observed_at <= REPORT_FRESH_SECONDS
+            and self.observed_mono is not None
+            and self._report_after(self.report_floor, self.report_floor_wall)
+            and 0 <= monotonic() - self.observed_mono <= REPORT_FRESH_SECONDS
+        )
+
+    @staticmethod
+    def _after_report_floor(
+        observed: float, stamp: float, floor: float, wall: float
+    ) -> bool:
+        """Order within one clock tick without losing wall-clock-step tolerance."""
+        return observed > floor + REPORT_TIME_EPSILON or (
+            abs(observed - floor) <= REPORT_TIME_EPSILON and stamp > wall
+        )
+
+    def _report_after(self, floor: float, wall: float) -> bool:
+        return self.observed_mono is not None and self._after_report_floor(
+            self.observed_mono, self.observed_at, floor, wall
         )
 
     def _quiet(self) -> bool:
@@ -617,17 +704,30 @@ class LightCorrection:
         )
 
     def _watchdog_due(self) -> bool:
+        return self._watchdog_overdue() and self._fresh() and not self._waiting()
+
+    def _watchdog_overdue(self) -> bool:
+        """Keep the correction deadline independent of transport admission."""
         now = monotonic()
         return (
             self.intent() is False
             and self.observed is True
-            and self._fresh()
             and self.on_since is not None
             and self.off_since is not None
             and now - self.off_since >= OFF_DWELL_SECONDS
             and (
                 now - self.on_since >= CAP_SECONDS
-                or (now - self.on_since >= QUIET_SECONDS and self._quiet())
+                or (
+                    now - self.on_since >= QUIET_SECONDS
+                    and not self.motion_active
+                    and now
+                    - (
+                        self.last_motion
+                        if self.last_motion is not None
+                        else self.started
+                    )
+                    >= QUIET_SECONDS
+                )
             )
         )
 
@@ -692,6 +792,7 @@ class LightCorrection:
         ):
             return
         self.off_stuck = dict(saved)
+        self.off_stuck_floor = monotonic() - (time() - floor)
         self.off_stuck_replay = True
 
     def _off_stuck_event(self, kind: str, **data: Any) -> None:
@@ -713,6 +814,7 @@ class LightCorrection:
             return
         identity = self.off_stuck["incident_id"]
         self.off_stuck = None
+        self.off_stuck_floor = None
         self.off_stuck_replay = False
         self._save()
         self._off_stuck_event(
@@ -727,8 +829,14 @@ class LightCorrection:
             self.off_stuck is not None
             and self.observed is False
             and self._fresh()
-            and self.observed_at > self.off_stuck["confirmation_after"]
-            and (self.pending is not False or self.observed_at > self.sent_at)
+            and self.off_stuck_floor is not None
+            and self._report_after(
+                self.off_stuck_floor, self.off_stuck["confirmation_after"]
+            )
+            and (
+                self.pending is not False
+                or self._report_after(self.sent_at, self.sent_wall)
+            )
         ):
             self._close_off_stuck("confirmed_off")
 
@@ -789,6 +897,7 @@ class LightCorrection:
                 # Retain subsecond ordering across restarts, with integer public times.
                 "confirmation_after": wall,
             }
+            self.off_stuck_floor = now
             changed = True
         elif (
             self.off_stuck is not None
@@ -856,6 +965,11 @@ class LightCorrection:
             self._revoke_automatic()
             self.generation += 1
             self.current_intent = intent
+            if self.intent_initialized:
+                self.notice_kinds.difference_update(EPISODE_NOTICE_KINDS)
+                self.notice_problem = False
+                self.watchdog_blocked = False
+            self.intent_initialized = True
             self.off_since = now if intent is False else None
             self._record(
                 "intent",
@@ -893,22 +1007,23 @@ class LightCorrection:
                 self._notice("intent_gap", True)
         elif not self.loaded:
             self.state = "protection gap"
+        elif self.pending is not None:
+            self.state = (
+                "waiting for camera"
+                if self._waiting(desired=intent)
+                else "retrying ON"
+                if self.pending
+                else "retrying OFF"
+            )
         elif self._waiting(desired=intent):
             self.state = "waiting for camera"
-        elif self.pending is not None:
-            self.state = "retrying ON" if self.pending else "retrying OFF"
-            if now - self.pending_since >= (
-                ON_ALERT_SECONDS if self.pending else OFF_ALERT_SECONDS
-            ):
-                self._notice(
-                    "on_unconfirmed" if self.pending else "off_unconfirmed", True
-                )
         else:
             self.state = (
                 "waiting for quiet"
                 if self.observed is True and intent is False
                 else "watching"
             )
+        self._check_command_notice(now, intent, paused=paused)
         last = (
             self.report_received if self.report_received is not None else self.started
         )
@@ -918,13 +1033,18 @@ class LightCorrection:
             self.state = "protection gap"
             self._notice("camera_gap", True)
         if self.recovery_pending:
-            self.state = "waiting for SDK outcome"
-            if (
-                self.outcome_unknown_since is not None
-                and now - self.outcome_unknown_since > OUTCOME_SETTLE_SECONDS
-            ):
-                self.state = "protection gap"
-                self._notice("outcome_gap", True)
+            self.state = (
+                "protection gap"
+                if "outcome_gap" in self.notice_kinds
+                else "waiting for SDK outcome"
+            )
+        if (
+            not self.loaded
+            and not self.loading
+            and self.activation_task is None
+            and now >= self.activation_retry_due
+        ):
+            self.activation_task = self.entity.hass.async_create_task(self._activate())
         if self.notice_pending is not None and now >= self.notice_retry_due:
             self._deliver_pending()
         if (
@@ -947,6 +1067,32 @@ class LightCorrection:
         )
         self.entity.async_write_ha_state()
 
+    def _check_command_notice(
+        self, now: float, intent: bool | None, *, paused: bool
+    ) -> None:
+        """Keep alert deadlines running while command admission is blocked."""
+        if paused or intent is None:
+            return
+        if self.pending is not None:
+            if now - self.pending_since >= (
+                ON_ALERT_SECONDS if self.pending else OFF_ALERT_SECONDS
+            ):
+                self._notice(
+                    "on_unconfirmed" if self.pending else "off_unconfirmed", True
+                )
+        elif (
+            self.task is None
+            and self._watchdog_overdue()
+            and (
+                self.watchdog_blocked
+                or self._waiting()
+                or self.recovery_pending
+                or (self.queue is not None and self.queue.busy())
+            )
+        ):
+            self.state = "protection gap"
+            self._notice("off_blocked", True)
+
     def _arm(self) -> None:
         if self._stopping():
             return
@@ -956,7 +1102,19 @@ class LightCorrection:
         @callback
         def tick(_: Any) -> None:
             self.timer = None
-            self.check_policy()
+            if self.enabled and not self.loaded:
+                if (
+                    not self.loading
+                    and self.activation_task is None
+                    and monotonic() >= self.activation_retry_due
+                ):
+                    self.activation_task = self.entity.hass.async_create_task(
+                        self._activate()
+                    )
+                self._deliver_pending()
+                self._arm()
+            else:
+                self.check_policy()
 
         self.timer = async_call_later(self.entity.hass, TICK_SECONDS, tick)
 
@@ -1046,7 +1204,8 @@ class LightCorrection:
                         self.automatic_owned = True
                     return admitted
 
-                sent_at = time()
+                sent_at = monotonic()
+                sent_wall = time()
                 receipt = await self.entity.client.set_property(
                     self.entity._sn,
                     "light",
@@ -1073,6 +1232,7 @@ class LightCorrection:
                     self.attempts = 0
                     self.safety_off = True
                 self.sent_at = sent_at
+                self.sent_wall = sent_wall
                 self.attempts += 1
                 delays = ON_DELAYS if desired else OFF_DELAYS
                 self.retry_due = (
@@ -1084,7 +1244,7 @@ class LightCorrection:
                 if (
                     self._fresh()
                     and self.observed is desired
-                    and self.observed_at > self.sent_at
+                    and self._report_after(self.sent_at, self.sent_wall)
                 ):
                     self._confirmed()
                 self._save()
@@ -1108,6 +1268,8 @@ class LightCorrection:
         finally:
             self.task = None
             if self.enabled:
+                if self.pending is None and self._watchdog_overdue():
+                    self.watchdog_blocked = True
                 self._arm()
 
     def _notice(self, kind: str, problem: bool) -> None:
@@ -1125,14 +1287,16 @@ class LightCorrection:
                 on_minutes=self.confirmed_on_minutes,
                 on_since=self.confirmed_on_reported_at,
             )
-        superseded = {"now_off": "off_unconfirmed", "now_on": "on_unconfirmed"}.get(
-            kind
-        )
+        superseded = {
+            "now_off": {"off_unconfirmed", "off_blocked"},
+            "now_on": {"on_unconfirmed"},
+            "activation_restored": {"activation_gap"},
+        }.get(kind)
         if superseded:
             self.notice_queue = deque(
-                row for row in self.notice_queue if row["kind"] != superseded
+                row for row in self.notice_queue if row["kind"] not in superseded
             )
-            if self.notice_pending and self.notice_pending["kind"] == superseded:
+            if self.notice_pending and self.notice_pending["kind"] in superseded:
                 self.notice_retry_due = 0.0
                 self.notice_pending = (
                     self.notice_queue.popleft() if self.notice_queue else None
@@ -1155,7 +1319,6 @@ class LightCorrection:
         if (
             self.notice_task is not None
             or self.notice_pending is None
-            or not self.loaded
             or not self.enabled
             or self._stopping()
         ):
@@ -1190,6 +1353,15 @@ class LightCorrection:
                 "Still on. OFF was sent, but the camera hasn't confirmed it "
                 "after 5 minutes. The safety keeps trying."
             ),
+            "off_blocked": (
+                "Still on past the correction deadline. The safety has not been able "
+                "to send OFF and keeps trying. Check the floodlight."
+            ),
+            "activation_gap": (
+                "Protection gap: floodlight safety could not start. "
+                "Automatic activation retries continue. Check the floodlight."
+            ),
+            "activation_restored": "Floodlight safety is active again.",
             "on_unconfirmed": (
                 "Didn't turn on. HA asked for ON 10 minutes ago and the camera "
                 "hasn't confirmed it. The safety keeps trying while the schedule "
@@ -1216,7 +1388,7 @@ class LightCorrection:
         if gap:
             message = f"{name}: {message}"
             title = f"Floodlight safety: {name}"
-        elif kind in {"off_unconfirmed", "on_unconfirmed"}:
+        elif kind in {"off_unconfirmed", "off_blocked", "on_unconfirmed"}:
             title = f"Floodlight problem: {name}"
         else:
             title = f"Floodlight: {name}"
@@ -1338,6 +1510,12 @@ class LightCorrection:
         if self.task is not None and self.task is not asyncio.current_task():
             self.task.cancel()
         self.task = None
+        if (
+            self.activation_task is not None
+            and self.activation_task is not asyncio.current_task()
+        ):
+            self.activation_task.cancel()
+        self.activation_task = None
         self.on_authorized = False
         if self.entity._removed:
             getattr(

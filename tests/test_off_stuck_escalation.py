@@ -85,7 +85,7 @@ class OffStuckEscalationTests(unittest.IsolatedAsyncioTestCase):
         incident = self.incidents(entity)[0]
         self.assertEqual(incident["reason"], "no_confirmation")
         self.assertEqual(incident["waiting"], "bridge_disconnected")
-        self.assertNotIn("off_unconfirmed", controller.notice_kinds)
+        self.assertIn("off_unconfirmed", controller.notice_kinds)
         self.assertEqual(len(self.sent), 1)
 
     async def test_no_reports_boundary_and_unknown_episode_escalation(self):

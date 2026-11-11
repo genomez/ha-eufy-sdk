@@ -103,18 +103,21 @@ class LightGraceTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCase):
         await self.drain()
         self.assertEqual(len(self.commands), 1)
 
-    async def test_reconnect_requires_new_report_and_restarts_on_duration(self):
+    async def test_reconnect_requires_new_report_and_preserves_on_duration(self):
         entity, _, _, _ = await self.activate()
         self.observation(True)
         await self.advance(1700)
         entity._light_correction.reset_observations()
-        self.assertIsNone(entity._light_correction.on_since)
+        self.assertEqual(entity._light_correction.on_since, 0)
+        self.assertFalse(entity._light_correction._fresh())
         self.observation(True)
-        self.assertEqual(entity._light_correction.on_since, 1700)
+        self.assertEqual(entity._light_correction.on_since, 0)
+        await self.drain()
         await self.advance(1800)
         self.observation(True)
         await self.drain()
-        self.assertEqual(self.commands, [])
+        self.assertEqual([value for _, value, _ in self.commands], [False, False])
+        self.assertEqual(self.commands[0][0], 1700)
 
 
 class GraceProtocolTests(unittest.IsolatedAsyncioTestCase):

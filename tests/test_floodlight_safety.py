@@ -635,7 +635,7 @@ class FloodlightSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(controller.on_authorized)
         self.assertIsNone(controller.pending)
 
-    async def test_unqueryable_recovery_expires_without_gap_alert(self):
+    async def test_unqueryable_recovery_alerts_before_expiring(self):
         _, controller, client = await self.make()
         controller.track_recovery(
             CommandReceipt("pending_accepted", True, "unconfirmed", intent=1)
@@ -646,7 +646,7 @@ class FloodlightSafetyTests(unittest.IsolatedAsyncioTestCase):
         await self.at(224)
         self.report(controller, False)
         await self.drain()
-        self.assertNotIn("outcome_gap", controller.notice_kinds)
+        self.assertIn("outcome_gap", controller.notice_kinds)
         self.assertTrue(controller.recovery_pending)
         await self.at(225)
         self.assertFalse(controller.recovery_pending)

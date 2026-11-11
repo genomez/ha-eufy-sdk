@@ -217,6 +217,7 @@ class FloodlightSafetyRound2Tests(unittest.IsolatedAsyncioTestCase):
                 controller.observed_at = (
                     self.wall + self.now - (121 if mode == "stale" else 1)
                 )
+                controller.observed_mono = self.now - (121 if mode == "stale" else 1)
                 self.assertFalse(controller._quiet())
                 controller.check_policy()
                 await self.drain()
@@ -227,6 +228,7 @@ class FloodlightSafetyRound2Tests(unittest.IsolatedAsyncioTestCase):
             "parentTransport": "connected",
         }
         controller.observed_at = self.wall + self.now - 1
+        controller.observed_mono = self.now - 1
         with self.subTest(mode="offline"):
             self.assertTrue(controller._quiet())
             controller.check_policy()

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 NOTICE_RETRY_DELAYS = (60, 120, 300, 600)
+PHONE_NOTICE_TIMEOUT = 30
 PHONE_FAILURE_SENTENCE = (
     "Phone delivery failed; check the notification service in the integration options."
 )
@@ -31,10 +33,13 @@ async def deliver_phone_notice(  # noqa: PLR0913 - fixed delivery envelope
     domain, action = service.split(".", 1)
     data = {"tag": tag, "channel": "Eufy"}
     if problem:
-        data.update({"importance": "high", "sticky": True})
-    await hass.services.async_call(
-        domain,
-        action,
-        {"title": title, "message": message, "data": data},
-        blocking=True,
-    )
+        data.update(
+            {"importance": "high", "sticky": True, "ttl": 0, "priority": "high"}
+        )
+    async with asyncio.timeout(PHONE_NOTICE_TIMEOUT):
+        await hass.services.async_call(
+            domain,
+            action,
+            {"title": title, "message": message, "data": data},
+            blocking=True,
+        )
