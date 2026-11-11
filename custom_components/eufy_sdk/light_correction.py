@@ -544,13 +544,22 @@ class LightCorrection:
             "revision"
         ) == self.health_projection.get("revision"):
             until = min(until, self.health_until)
+        previous = self.health_projection
         self.health_projection = health
         self.health_until = until if health["status"] == "command_degraded" else 0.0
-        self.health_until_ms = (
-            int(time() * 1000 + max(0.0, until - monotonic()) * 1000)
-            if health["status"] == "command_degraded"
-            else None
-        )
+        if health["status"] != "command_degraded":
+            self.health_until_ms = None
+        elif (
+            self.health_until_ms is None
+            or previous is None
+            or previous.get("revision") != health.get("revision")
+            or previous.get("status") != health["status"]
+        ):
+            # Set once per cooldown; repeated deliveries of the same revision keep
+            # the end time so clock sampling cannot nudge the attribute.
+            self.health_until_ms = int(
+                time() * 1000 + max(0.0, until - monotonic()) * 1000
+            )
         self.check_policy()
 
     def reset_health(self) -> None:

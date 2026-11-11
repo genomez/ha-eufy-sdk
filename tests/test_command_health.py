@@ -87,6 +87,14 @@ class CommandSafetyTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCas
         # coordinator update becomes a state change and a recorder row.
         await self.advance(60)
         self.assertEqual(controller.attributes, first)
+        # A repeated delivery of the same revision (smaller remaining time, wall
+        # clock moved) keeps the original end time.
+        with patch(
+            "custom_components.eufy_sdk.light_correction.time",
+            return_value=10**10,
+        ):
+            self.health(remaining=59000)
+        self.assertEqual(controller.attributes, first)
         await self.advance(121)
         after = controller.attributes
         self.assertEqual(after["command_health"], "healthy")
