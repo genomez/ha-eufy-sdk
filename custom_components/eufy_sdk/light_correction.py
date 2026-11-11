@@ -150,6 +150,9 @@ class LightCorrection:
         self.explicit_busy = 0
         self.health_projection: dict | None = None
         self.health_until = 0.0
+        # Wall-clock end of the cooldown, fixed when health evidence arrives so the
+        # exposed attribute does not change on every state write.
+        self.health_until_ms: int | None = None
         self.timer = None
         self.task: asyncio.Task | None = None
         self.notice_task: asyncio.Task | None = None
@@ -543,6 +546,11 @@ class LightCorrection:
             until = min(until, self.health_until)
         self.health_projection = health
         self.health_until = until if health["status"] == "command_degraded" else 0.0
+        self.health_until_ms = (
+            int(time() * 1000 + max(0.0, until - monotonic()) * 1000)
+            if health["status"] == "command_degraded"
+            else None
+        )
         self.check_policy()
 
     def reset_health(self) -> None:
@@ -1593,8 +1601,10 @@ class LightCorrection:
             result["command_health"] = (
                 "command_degraded" if monotonic() < self.health_until else "healthy"
             )
-            result["command_health_cooldown_remaining_ms"] = max(
-                0, (self.health_until - monotonic()) * 1000
+            # An absolute end time, not a countdown: a countdown differs on every
+            # write and turns each coordinator update into a recorder row.
+            result["command_health_cooldown_until_ms"] = (
+                self.health_until_ms if monotonic() < self.health_until else None
             )
         if self.enabled:
             result.update(

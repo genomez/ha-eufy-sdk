@@ -647,6 +647,17 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         """Bind to a person-detection-capable device."""
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_last_person"
+        self._person_attributes: dict[str, Any] = {}
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """
+        Merge the latest detection's details with the base inventory attributes.
+
+        The base class defines this property, so `_attr_extra_state_attributes`
+        would be shadowed and never reach Home Assistant.
+        """
+        return {**super().extra_state_attributes, **self._person_attributes}
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to bridge detection events while registered."""
@@ -670,7 +681,7 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         else:
             return
         self._attr_native_value = name
-        self._attr_extra_state_attributes = {
+        self._person_attributes = {
             "recognized": recognized,
             "person_id": person_id,
             "event": ev,

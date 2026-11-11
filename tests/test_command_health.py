@@ -75,6 +75,23 @@ class CommandSafetyTests(fixtures.SafetyFixture, unittest.IsolatedAsyncioTestCas
         self.health(remaining=120000)
         self.assertEqual(entity._light_correction.health_until, 120)
 
+    async def test_cooldown_attribute_is_stable_while_cooling_down(self):
+        entity, _, _, _ = await self.activate()
+        self.health(remaining=120000)
+        controller = entity._light_correction
+        first = controller.attributes
+        self.assertNotIn("command_health_cooldown_remaining_ms", first)
+        self.assertEqual(first["command_health"], "command_degraded")
+        self.assertIsInstance(first["command_health_cooldown_until_ms"], int)
+        # Later writes during the same cooldown must not see a new value, or every
+        # coordinator update becomes a state change and a recorder row.
+        await self.advance(60)
+        self.assertEqual(controller.attributes, first)
+        await self.advance(121)
+        after = controller.attributes
+        self.assertEqual(after["command_health"], "healthy")
+        self.assertIsNone(after["command_health_cooldown_until_ms"])
+
     async def test_older_healthy_projection_cannot_clear_newer_degraded(self):
         entity, _, _, _ = await self.activate()
         self.health(remaining=120000, revision=2)

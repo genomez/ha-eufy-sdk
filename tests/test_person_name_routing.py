@@ -28,10 +28,10 @@ class PersonNameRoutingTests(unittest.TestCase):
             self.event(person_name=SYNTHETIC_PERSON_NAME, recognized=True)
         )
         self.assertEqual(entity._attr_native_value, SYNTHETIC_PERSON_NAME)
-        self.assertTrue(entity._attr_extra_state_attributes["recognized"])
+        self.assertTrue(entity.extra_state_attributes["recognized"])
         entity._handle_event(self.event(person_id=7, recognized=False))
         self.assertEqual(entity._attr_native_value, "Unknown")
-        self.assertFalse(entity._attr_extra_state_attributes["recognized"])
+        self.assertFalse(entity.extra_state_attributes["recognized"])
         entity._handle_event(
             self.event(
                 event="strangerDetected",
@@ -40,7 +40,25 @@ class PersonNameRoutingTests(unittest.TestCase):
             )
         )
         self.assertEqual(entity._attr_native_value, "Stranger")
-        self.assertFalse(entity._attr_extra_state_attributes["recognized"])
+        self.assertFalse(entity.extra_state_attributes["recognized"])
+
+    def test_detection_details_reach_the_public_state_attributes(self):
+        entity = self.entity()
+        entity.coordinator = SimpleNamespace(data={}, inventory_evidence=None)
+        entity._person_attributes = {}
+        self.assertEqual(
+            entity.extra_state_attributes, {"inventory_quality": "unknown"}
+        )
+        entity._handle_event(self.event(person_id=7, recognized=False))
+        self.assertEqual(
+            entity.extra_state_attributes,
+            {
+                "inventory_quality": "unknown",
+                "recognized": False,
+                "person_id": 7,
+                "event": "personDetected",
+            },
+        )
 
     def test_other_device_and_unrelated_event_do_not_change_state(self):
         entity = self.entity()
@@ -70,7 +88,7 @@ class PersonNameRoutingTests(unittest.TestCase):
             self.event(person_name=SYNTHETIC_PERSON_NAME, person_id=7, recognized=True)
         )
         self.assertEqual(entity._attr_native_value, SYNTHETIC_PERSON_NAME)
-        self.assertTrue(entity._attr_extra_state_attributes["recognized"])
+        self.assertTrue(entity.extra_state_attributes["recognized"])
 
     def test_repeated_name_does_not_name_a_later_unknown_event(self):
         entity = self.entity()
@@ -80,4 +98,4 @@ class PersonNameRoutingTests(unittest.TestCase):
             )
         entity._handle_event(self.event(recognized=False))
         self.assertEqual(entity._attr_native_value, "Unknown")
-        self.assertFalse(entity._attr_extra_state_attributes["recognized"])
+        self.assertFalse(entity.extra_state_attributes["recognized"])
