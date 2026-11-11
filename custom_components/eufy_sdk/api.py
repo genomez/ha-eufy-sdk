@@ -22,7 +22,12 @@ import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import LOGGER
-from .guard_confirmation import guard_capability, guard_receipt, guard_runtime
+from .guard_confirmation import (
+    GuardReconciliation,
+    guard_capability,
+    guard_receipt,
+    guard_runtime,
+)
 from .inventory_evidence import inventory_evidence
 from .manifest_reads import normalize_properties, normalize_snapshot
 from .recordings_api import RecordingsApi
@@ -603,6 +608,7 @@ class EufySdkApiClient(RecordingsApi):
         self.guard_receipts: dict[str, dict] = {}
         self._guard_runtime: str | None = None
         self._guard_scope_revision = 0
+        self.guard_reconciliation = GuardReconciliation(self._resolve_lost_guard)
         self.inventory_evidence: dict | None = None
         self._next_id = 0
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
@@ -976,6 +982,7 @@ class EufySdkApiClient(RecordingsApi):
 
     async def close(self) -> None:
         """Close the WebSocket and stop reconnecting."""
+        self.guard_reconciliation.close()
         had_late_contrary = self._late_contrary_capability
         self._reset_command_health()
         self._closing = True
@@ -1016,7 +1023,58 @@ class EufySdkApiClient(RecordingsApi):
         if runtime != self._guard_runtime:
             self._guard_scope_revision += 1
             self._guard_runtime = runtime
-            self.guard_receipts.clear()
+            for serial, receipt in tuple(self.guard_receipts.items()):
+                if receipt["outcome"] == "pending":
+                    self.guard_reconciliation.lose(receipt)
+                else:
+                    self.guard_receipts.pop(serial)
+
+    def _resolve_lost_guard(self, receipt: dict) -> None:
+        """Project a local reconnect resolution only over its retained intent."""
+        current = self.guard_receipts.get(receipt["deviceSn"])
+        if (
+            current is None
+            or current["outcome"] != "pending"
+            or current["handle"] != receipt["handle"]
+            or current["runtimeGeneration"] != receipt["runtimeGeneration"]
+        ):
+            return
+        self.guard_receipts[receipt["deviceSn"]] = receipt
+        if self._on_event:
+            self._on_event({"event": "guardConfirmation", **receipt})
+
+    def _observe_guard_event(self, data: dict) -> None:
+        """Track exactly the reported arming-mode value consumed by HA entities."""
+        serial = data.get("deviceSn") or data.get("sn")
+        if not isinstance(serial, str):
+            return
+        if data.get("event") == "armingModeChanged" and "mode" in data:
+            self.guard_reconciliation.observe(
+                serial, data.get("arming", data["mode"]), time.monotonic()
+            )
+        elif (
+            data.get("event") == "propertyChanged"
+            and data.get("property") == "armingMode"
+            and "value" in data
+        ):
+            self.guard_reconciliation.observe(serial, data["value"], time.monotonic())
+        elif data.get("event") == "propertiesObserved":
+            self.guard_reconciliation.observe_receipt(data)
+
+    def _observe_guard_snapshot(
+        self, devices: list[dict], started: float, revision: int
+    ) -> None:
+        """Fence snapshots before receipt recovery and after missing-handle replies."""
+        if revision != self._guard_scope_revision:
+            return
+        for device in devices:
+            projected = normalize_snapshot(device)
+            state = projected.get("state")
+            self.guard_reconciliation.observe(
+                projected.get("sn"),
+                state.get("armingMode") if isinstance(state, dict) else None,
+                started,
+            )
 
     def _set_guard_capability(self, data: dict) -> None:
         """Negotiate additive guard metadata on hello and ready."""
@@ -1064,10 +1122,12 @@ class EufySdkApiClient(RecordingsApi):
         ):
             return None
         self.guard_receipts[receipt["deviceSn"]] = receipt
+        self.guard_reconciliation.track(receipt)
         return {"event": "guardConfirmation", **receipt}
 
     def _dispatch_event(self, data: dict) -> None:
         """Order health and lifecycle events before notifying integration consumers."""
+        self._observe_guard_event(data)
         if data["event"] in {"guardRuntime", "guardConfirmation"}:
             data = self._project_guard_event(data)
         elif data["event"] == "lateContraryEffect":
@@ -1372,6 +1432,7 @@ class EufySdkApiClient(RecordingsApi):
             receipt
             for receipt in self.guard_receipts.values()
             if receipt["outcome"] == "pending"
+            and receipt["deviceSn"] not in self.guard_reconciliation.lost
         ][:32]
         replies = await asyncio.gather(
             *(
@@ -1400,17 +1461,25 @@ class EufySdkApiClient(RecordingsApi):
                     and current["handle"] == requested["handle"]
                     and current["outcome"] == "pending"
                 ):
-                    self.guard_receipts.pop(requested["deviceSn"], None)
+                    self.guard_reconciliation.lose(current, after_restart=False)
 
     async def list_devices(self) -> list[dict[str, Any]]:
         """Every device the bridge exposes (sn/name/model/codec/capabilities/state)."""
         transport, generation = self._ws, self._connection_generation
+        guard_revision = self._guard_scope_revision
+        guard_snapshot_started = time.monotonic()
         reply = await self.rpc("devices.list")
         self._require_connection(transport, generation)
         self.inventory_evidence = inventory_evidence(
             reply.get("inventoryEvidence"), reply["devices"]
         )
+        self._observe_guard_snapshot(
+            reply["devices"], guard_snapshot_started, guard_revision
+        )
         await self._recover_guard_receipts(transport, generation)
+        self._observe_guard_snapshot(
+            reply["devices"], guard_snapshot_started, guard_revision
+        )
         devices = []
         for device in reply["devices"]:
             projected = {
@@ -1623,28 +1692,32 @@ class EufySdkApiClient(RecordingsApi):
             or not self.bounded_state_writes_supported
         ):
             if name == "armingMode":
+                guard_preparation = self.guard_reconciliation.begin(sn)
                 guard_scope_revision = self._guard_scope_revision
                 transport, connection_generation = self._ws, self._connection_generation
                 # Guard mode is exposed as armingMode. Allow preparation time
                 # before the SDK's per-command RTC/P2P waits begin.
-                reply = await self.rpc(
-                    "device.set",
-                    timeout=GUARD_MODE_TIMEOUT_SECONDS,
-                    sn=sn,
-                    name=name,
-                    value=value,
-                )
-                if (
-                    self.guard_confirmation_supported
-                    and guard_scope_revision == self._guard_scope_revision
-                    and transport is self._ws
-                    and connection_generation == self._connection_generation
-                    and isinstance(reply, dict)
-                    and guard_receipt(reply.get("guardConfirmation"))
-                ):
-                    self._dispatch_event(
-                        {"event": "guardConfirmation", **reply["guardConfirmation"]}
+                try:
+                    reply = await self.rpc(
+                        "device.set",
+                        timeout=GUARD_MODE_TIMEOUT_SECONDS,
+                        sn=sn,
+                        name=name,
+                        value=value,
                     )
+                    if (
+                        self.guard_confirmation_supported
+                        and guard_scope_revision == self._guard_scope_revision
+                        and transport is self._ws
+                        and connection_generation == self._connection_generation
+                        and isinstance(reply, dict)
+                        and guard_receipt(reply.get("guardConfirmation"))
+                    ):
+                        self._dispatch_event(
+                            {"event": "guardConfirmation", **reply["guardConfirmation"]}
+                        )
+                finally:
+                    self.guard_reconciliation.end(sn, guard_preparation)
             else:
                 await self.rpc("device.set", sn=sn, name=name, value=value)
             return None

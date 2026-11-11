@@ -4,21 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 import re
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import persistent_notification
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .const import DOMAIN, LOGGER
 from .notification_delivery import (
     NOTICE_RETRY_DELAYS,
     PHONE_FAILURE_SENTENCE,
     deliver_phone_notice,
     notice_retry_delay,
 )
+from .property_sync import MAX_OBSERVATION_AGE_SECONDS
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from homeassistant.core import HomeAssistant
 
     from .data import EufySdkConfigEntry
@@ -42,6 +47,8 @@ REASONS = frozenset(
 )
 MAX_TARGETS = 1024
 MAX_SERIAL_LENGTH = 128
+RECONNECT_CONFIRM_SECONDS = 60
+NOT_REPORTED_GRACE_SECONDS = 10
 KEYS = (
     "version",
     "runtimeGeneration",
@@ -166,6 +173,170 @@ def guard_attributes(client: Any, serial: str) -> dict:
     }
 
 
+class GuardReconciliation:
+    """Keep local intent evidence across receipt loss without replaying writes."""
+
+    def __init__(self, emit: Callable[[dict], None]) -> None:
+        """Bind local resolutions to the client's identity-fenced projection."""
+        self.emit = emit
+        self.starts: dict[str, float] = {}
+        self.identities: dict[str, tuple[str, str]] = {}
+        self.states: dict[str, tuple[float, int | None]] = {}
+        self.preparing: dict[str, object] = {}
+        self.lost: dict[str, dict] = {}
+        self.timers: dict[str, asyncio.TimerHandle] = {}
+        self.loss_deadlines: dict[str, float] = {}
+
+    def begin(self, serial: str) -> object | None:
+        """Fence cached observations before a local command can be dispatched."""
+        if serial not in self.starts and len(self.starts) >= MAX_TARGETS:
+            return None
+        self.starts[serial] = time.monotonic()
+        token = object()
+        self.preparing[serial] = token
+        return token
+
+    def end(self, serial: str, token: object | None) -> None:
+        """Retire an RPC's preparation fence without disturbing a newer command."""
+        if self.preparing.get(serial) is token:
+            self.preparing.pop(serial, None)
+
+    def track(self, receipt: dict) -> None:
+        """Start conservative evidence tracking for remotely initiated intents."""
+        serial = receipt["deviceSn"]
+        identity = (receipt["runtimeGeneration"], receipt["handle"])
+        if serial not in self.starts and len(self.starts) >= MAX_TARGETS:
+            return
+        if self.identities.get(serial) != identity:
+            if serial not in self.preparing:
+                self.starts[serial] = time.monotonic()
+            self.identities[serial] = identity
+            self.preparing.pop(serial, None)
+            self.loss_deadlines.pop(serial, None)
+        self._forget_loss(serial)
+
+    def lose(self, receipt: dict, *, after_restart: bool = True) -> None:
+        """Retain a lost pending receipt until fresh state or a finite deadline."""
+        serial = receipt["deviceSn"]
+        if serial in self.lost:
+            # Another restart must fence old state without extending the deadline.
+            if after_restart:
+                self.starts[serial] = time.monotonic()
+            return
+        if serial not in self.starts:
+            self.track(receipt)
+        if serial not in self.starts:
+            return
+        if after_restart:
+            self.starts[serial] = time.monotonic()
+        self.lost[serial] = receipt
+        self.loss_deadlines[serial] = time.monotonic() + RECONNECT_CONFIRM_SECONDS
+        self.timers[serial] = asyncio.get_running_loop().call_later(
+            RECONNECT_CONFIRM_SECONDS, self._expire_loss, serial
+        )
+
+    def _expire_loss(self, serial: str) -> None:
+        """Bound unknown reported state after a lost pending intent."""
+        self._resolve_loss(serial, matched=False)
+
+    def observe(self, serial: str, mode: Any, started: float) -> None:
+        """Accept only valued, ordered arming-mode reports for tracked stations."""
+        if serial not in self.starts:
+            return
+        previous = self.states.get(serial)
+        if previous and started < previous[0]:
+            return
+        mode = mode if type(mode) is int and mode in MODE_LABELS else None
+        self.states[serial] = (started, mode)
+        lost = self.lost.get(serial)
+        if lost and started >= self.starts[serial] and mode is not None:
+            self._resolve_loss(serial, matched=mode == lost["requestedMode"])
+
+    def matches(self, receipt: dict) -> bool:
+        """Require this intent's current reported mode and post-command evidence."""
+        serial = receipt["deviceSn"]
+        state = self.states.get(serial)
+        return bool(
+            self.identities.get(serial)
+            == (receipt["runtimeGeneration"], receipt["handle"])
+            and state
+            and state[0] >= self.starts[serial]
+            and state[1] == receipt["requestedMode"]
+        )
+
+    def observe_receipt(self, event: dict) -> None:
+        """Use RTC observation time, excluding delayed pre-command reports."""
+        stamp = event.get("observedAtMs")
+        properties = event.get("properties")
+        if (
+            event.get("source") != "rtc"
+            or not isinstance(event.get("deviceSn"), str)
+            or type(stamp) not in (int, float)
+            or not math.isfinite(stamp)
+            or not isinstance(properties, dict)
+            or "armingMode" not in properties
+        ):
+            return
+        age = time.time() - stamp / 1000
+        if not 0 <= age <= MAX_OBSERVATION_AGE_SECONDS:
+            return
+        self.observe(
+            event["deviceSn"], properties["armingMode"], time.monotonic() - age
+        )
+
+    def grace_seconds(self, receipt: dict) -> float:
+        """Keep restart reconciliation and its delivery grace within one minute."""
+        serial = receipt["deviceSn"]
+        if (
+            self.identities.get(serial)
+            == (
+                receipt["runtimeGeneration"],
+                receipt["handle"],
+            )
+            and serial in self.loss_deadlines
+        ):
+            return min(
+                NOT_REPORTED_GRACE_SECONDS,
+                max(0, self.loss_deadlines[serial] - time.monotonic()),
+            )
+        return NOT_REPORTED_GRACE_SECONDS
+
+    def _forget_loss(self, serial: str) -> None:
+        """Retire a completed or replaced local reconciliation."""
+        self.lost.pop(serial, None)
+        timer = self.timers.pop(serial, None)
+        if timer:
+            timer.cancel()
+
+    def _resolve_loss(self, serial: str, *, matched: bool) -> None:
+        """Use only existing contract values for a local reconnect resolution."""
+        pending = self.lost.get(serial)
+        if pending is None:
+            return
+        self._forget_loss(serial)
+        if matched and pending["attempts"] != 1:
+            LOGGER.warning(
+                "Guard mode matches after restart, but an undispatched receipt "
+                "cannot map to reported; retaining its attributes"
+            )
+            return
+        self.emit(
+            {
+                **pending,
+                "outcome": "reported" if matched else "not_reported",
+                "reason": "reported_after_command" if matched else "runtime_closed",
+                "outcomeAtMs": int(time.time() * 1000),
+            }
+        )
+
+    def close(self) -> None:
+        """Cancel bounded local work when the client unloads."""
+        for timer in self.timers.values():
+            timer.cancel()
+        self.timers.clear()
+        self.lost.clear()
+
+
 class GuardNotifications:
     """Maintain one bounded station problem, with shared phone retries."""
 
@@ -184,6 +355,7 @@ class GuardNotifications:
         self.notices: dict[str, tuple[str, str, str]] = {}
         self.unresolved: dict[str, int] = {}
         self.tasks: dict[str, asyncio.Task] = {}
+        self.deferred: dict[tuple[str, str], tuple[dict, asyncio.TimerHandle]] = {}
 
     def options_updated(self, options: dict) -> None:
         """Route unresolved problems to the live service and cancel old deliveries."""
@@ -191,7 +363,7 @@ class GuardNotifications:
         self.options = options
         if previous == options.get("light_safety_notify_service"):
             return
-        self.close()
+        self._cancel_deliveries()
         for serial, (title, message, tag) in self.notices.items():
             self._schedule(serial, title, message, tag)
 
@@ -240,15 +412,12 @@ class GuardNotifications:
 
         task.add_done_callback(finished)
 
-    def apply(self, raw: dict) -> None:
-        """Ignore older or duplicate outcomes; only a later report clears problems."""
-        receipt = guard_receipt(raw)
-        if receipt is None:
-            return
+    def _accept(self, receipt: dict) -> bool:
+        """Order and deduplicate outcomes independently of notification timing."""
         serial, handle = receipt["deviceSn"], receipt["handle"]
         previous = self.latest.get(serial)
         if previous is None and len(self.latest) >= MAX_TARGETS:
-            return
+            return False
         if (
             previous
             and previous[0] == receipt["runtimeGeneration"]
@@ -257,7 +426,7 @@ class GuardNotifications:
                 or (receipt["generation"] == previous[1] and previous[2])
             )
         ):
-            return
+            return False
         self.latest[serial] = (
             receipt["runtimeGeneration"],
             receipt["generation"],
@@ -265,24 +434,109 @@ class GuardNotifications:
         )
         key = (receipt["runtimeGeneration"], handle)
         if receipt["outcome"] == "pending" or key in self.seen:
-            return
+            return False
         self.seen[key] = None
         if len(self.seen) > MAX_TARGETS:
             self.seen.pop(next(iter(self.seen)))
+        return True
+
+    def apply(self, raw: dict) -> None:
+        """Ignore older or duplicate outcomes; only a later report clears problems."""
+        receipt = guard_receipt(raw)
+        if receipt is None or not self._accept(receipt):
+            return
+        serial = receipt["deviceSn"]
         if receipt["outcome"] == "not_reported" and receipt["reason"] in {
             "superseded",
             "cancelled",
         }:
             return
-        task = self.tasks.pop(serial, None)
-        if task:
-            task.cancel()
         if receipt["outcome"] == "reported":
+            task = self.tasks.pop(serial, None)
+            if task:
+                task.cancel()
+            for deferred_key, (waiting, timer) in tuple(self.deferred.items()):
+                if waiting["deviceSn"] == serial:
+                    timer.cancel()
+                    self.deferred.pop(deferred_key)
             notice = self.notices.pop(serial, None)
             self.unresolved.pop(serial, None)
             if notice:
                 persistent_notification.async_dismiss(self.hass, notice[2])
             return
+        reconciliation = getattr(
+            getattr(getattr(self.entry, "runtime_data", None), "client", None),
+            "guard_reconciliation",
+            None,
+        )
+        if receipt["outcome"] == "not_reported" and reconciliation is not None:
+            self._defer_problem(receipt, reconciliation)
+            return
+        self._raise_problem(receipt)
+
+    def _defer_problem(
+        self, receipt: dict, reconciliation: GuardReconciliation
+    ) -> None:
+        """Allow a finite grace period without silencing older real failures."""
+        if self._reported_match(receipt, reconciliation):
+            return
+        if len(self.deferred) >= MAX_TARGETS:
+            # Capacity pressure must not silently lose a real failure.
+            oldest = next(iter(self.deferred))
+            waiting, timer = self.deferred.pop(oldest)
+            timer.cancel()
+            self._finish_problem(waiting, reconciliation)
+        key = (receipt["runtimeGeneration"], receipt["handle"])
+        self.deferred[key] = (
+            receipt,
+            asyncio.get_running_loop().call_later(
+                reconciliation.grace_seconds(receipt),
+                self._finish_deferred,
+                key,
+                reconciliation,
+            ),
+        )
+
+    def _finish_deferred(
+        self, key: tuple[str, str], reconciliation: GuardReconciliation
+    ) -> None:
+        """Recheck after late reports, before persistent or phone delivery."""
+        waiting = self.deferred.pop(key, None)
+        if waiting is not None:
+            self._finish_problem(waiting[0], reconciliation)
+
+    def _finish_problem(
+        self, receipt: dict, reconciliation: GuardReconciliation
+    ) -> None:
+        """Suppress only a fresh match for the exact failed intent."""
+        if not self._reported_match(receipt, reconciliation):
+            self._raise_problem(receipt)
+
+    def _reported_match(
+        self, receipt: dict, reconciliation: GuardReconciliation
+    ) -> bool:
+        """Require fresh evidence and the coordinator's current reported state."""
+        if not reconciliation.matches(receipt):
+            return False
+        coordinator = getattr(
+            getattr(self.entry, "runtime_data", None), "coordinator", None
+        )
+        if coordinator is None:
+            return True
+        data = getattr(coordinator, "data", None) or {}
+        mode = data.get(receipt["deviceSn"], {}).get("state", {}).get("armingMode")
+        return (
+            getattr(coordinator, "last_update_success", False) is True
+            and type(mode) is int
+            and mode == receipt["requestedMode"]
+        )
+
+    def _raise_problem(self, receipt: dict) -> None:
+        """Publish one station problem after the fresh-state suppression gate."""
+        serial = receipt["deviceSn"]
+        task = self.tasks.pop(serial, None)
+        if task:
+            task.cancel()
         tag = f"eufy_guard_{hashlib.sha256(serial.encode()).hexdigest()}"
         title = (
             "Eufy guard mode not reported"
@@ -295,11 +549,23 @@ class GuardNotifications:
         explanation = (
             "The station reported a different guard mode after this command."
             if receipt["outcome"] == "contradicted"
-            else "No matching report was received in time."
+            else {
+                "dispatch_rejected": "The station rejected the command.",
+                "ack_missing": "The command may not have reached the station.",
+                "transport_uncertain": "The command may not have reached the station.",
+                "runtime_closed": (
+                    "The add-on restarted before a report. "
+                    "The mode change could not be confirmed after a restart."
+                ),
+                "session_changed": "The connection changed before a report.",
+                "window_expired": "No report was received within the time window.",
+                "budget_expired": "No report was received within the time window.",
+            }.get(receipt["reason"], "The mode change could not be confirmed.")
         )
+        count_sentence = f" {count} unresolved intents." if count > 1 else ""
         message = (
             f"{self._station_name(serial)}, requested guard mode {mode}. "
-            f"{explanation} {count} unresolved intent(s). Check the station in the app."
+            f"{explanation}{count_sentence} Check the station in the app."
         )
         persistent_notification.async_create(
             self.hass, message, title=title, notification_id=tag
@@ -327,8 +593,15 @@ class GuardNotifications:
             else:
                 return
 
-    def close(self) -> None:
-        """Cancel delivery tasks on entry unload without replaying commands."""
+    def _cancel_deliveries(self) -> None:
+        """Retire phone retries when routing changes or the entry unloads."""
         for task in self.tasks.values():
             task.cancel()
         self.tasks.clear()
+
+    def close(self) -> None:
+        """Cancel delivery tasks on entry unload without replaying commands."""
+        self._cancel_deliveries()
+        for _, timer in self.deferred.values():
+            timer.cancel()
+        self.deferred.clear()

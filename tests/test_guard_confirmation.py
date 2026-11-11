@@ -323,7 +323,9 @@ class GuardConfirmationTests(unittest.IsolatedAsyncioTestCase):
         )
         client.rpc.side_effect = [{"devices": []}, {"guardConfirmation": None}]
         self.assertEqual(await client.list_devices(), [])
-        self.assertNotIn("synthetic-station", client.guard_receipts)
+        self.assertEqual(
+            client.guard_receipts["synthetic-station"]["outcome"], "pending"
+        )
 
     async def test_legacy_capability_has_no_guard_attributes_notifications_or_get(self):
         client = self.client()
@@ -441,7 +443,7 @@ class GuardNotificationTests(unittest.IsolatedAsyncioTestCase):
                 len({call.kwargs["notification_id"] for call in create.call_args_list}),
                 1,
             )
-            self.assertIn("1100 unresolved intent(s)", create.call_args.args[1])
+            self.assertIn("1100 unresolved intents", create.call_args.args[1])
             owner.apply(receipt("not_reported", 1))
             self.assertEqual(owner.unresolved["synthetic-station"], 1100)
             owner.apply(receipt("reported", 1101))
@@ -522,7 +524,7 @@ class GuardNotificationTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIn(
                         "reported a different guard mode"
                         if outcome == "contradicted"
-                        else "No matching report was received in time",
+                        else "No report was received within the time window",
                         message,
                     )
                 self.assertNotIn(serial, create.call_args.kwargs["notification_id"])
