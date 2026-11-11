@@ -72,7 +72,18 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
 
     def mode(self, mode, **fields: object):
         self.client._dispatch_event(
-            {"event": "armingModeChanged", "deviceSn": SERIAL, "mode": mode, **fields}
+            {
+                "event": "armingModeChanged",
+                "deviceSn": SERIAL,
+                "mode": mode,
+                "evidence": {
+                    "version": 1,
+                    "source": "rtc_push",
+                    "status": "current",
+                    "receivedAtMs": self.now * 1000,
+                },
+                **fields,
+            }
         )
 
     def restart(self):
@@ -592,7 +603,8 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
         await self.deliveries()
         self.create.assert_called_once()
         self.assertIn(
-            "The command was not sent to the station.", self.create.call_args.args[1]
+            "The command may not have been sent to the station.",
+            self.create.call_args.args[1],
         )
 
     async def test_null_recovery_interruption_does_not_claim_restart(self):
@@ -719,6 +731,107 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
                 "value": 1,
             }
         )
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_sdk_property_change_then_earlier_stamped_receipt_confirms_restart(
+        self,
+    ):
+        self.event()
+        self.restart()
+        self.now = 2
+        self.mode(0)
+        reconciliation = self.client.guard_reconciliation
+        differing = reconciliation.states[SERIAL]
+        self.now = 20.002
+        self.client._dispatch_event(
+            {
+                "event": "propertyChanged",
+                "deviceSn": SERIAL,
+                "property": "armingMode",
+                "value": 1,
+            }
+        )
+        self.assertEqual(reconciliation.states[SERIAL], differing)
+        self.assertFalse(reconciliation.matches(receipt()))
+        self.now = 20.003
+        self.client._dispatch_event(
+            {
+                "event": "propertiesObserved",
+                "deviceSn": SERIAL,
+                "source": "rtc",
+                "observedAtMs": 20000,
+                "properties": {"armingMode": 1},
+            }
+        )
+        self.assertTrue(reconciliation.matches(receipt()))
+        self.assertAlmostEqual(reconciliation.states[SERIAL][0], 20)
+        self.assertEqual(self.client.guard_receipts[SERIAL]["outcome"], "reported")
+        self.assertEqual(reconciliation.timers, {})
+        self.create.assert_not_called()
+        self.hass.services.async_call.assert_not_awaited()
+
+    async def test_late_receipt_is_ordered_by_station_time_not_announcement_arrival(
+        self,
+    ):
+        self.event()
+        self.now = 10
+        self.mode(0)
+        reconciliation = self.client.guard_reconciliation
+        original = reconciliation.states[SERIAL]
+        self.now = 20
+        self.client._dispatch_event(
+            {
+                "event": "propertyChanged",
+                "deviceSn": SERIAL,
+                "property": "armingMode",
+                "value": 1,
+            }
+        )
+        self.client._dispatch_event(
+            {
+                "event": "propertiesObserved",
+                "deviceSn": SERIAL,
+                "source": "rtc",
+                "observedAtMs": 9000,
+                "properties": {"armingMode": 1},
+            }
+        )
+        self.assertEqual(reconciliation.states[SERIAL], original)
+        self.assertFalse(reconciliation.matches(receipt()))
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_arming_mode_arrival_without_receipt_cannot_confirm(self):
+        self.event()
+        self.now = 2
+        self.client._dispatch_event(
+            {"event": "armingModeChanged", "deviceSn": SERIAL, "mode": 1}
+        )
+        self.assertFalse(self.client.guard_reconciliation.matches(receipt()))
+        self.event("not_reported")
+        self.finish_grace()
+        await self.deliveries()
+        self.create.assert_called_once()
+
+    async def test_arming_mode_arrival_with_stale_receipt_cannot_confirm(self):
+        self.now = 10
+        self.event()
+        self.now = 12
+        self.mode(
+            1,
+            evidence={
+                "version": 1,
+                "source": "rtc_push",
+                "status": "current",
+                "receivedAtMs": 9000,
+            },
+        )
+        self.assertFalse(self.client.guard_reconciliation.matches(receipt()))
         self.event("not_reported")
         self.finish_grace()
         await self.deliveries()

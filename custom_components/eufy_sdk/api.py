@@ -1049,8 +1049,13 @@ class EufySdkApiClient(RecordingsApi):
         if not isinstance(serial, str):
             return
         if data.get("event") == "armingModeChanged" and "mode" in data:
-            self.guard_reconciliation.observe(
-                serial, data.get("arming", data["mode"]), time.monotonic()
+            self.guard_reconciliation.observe_snapshot(
+                {
+                    "sn": serial,
+                    "state": {"armingMode": data.get("arming", data["mode"])},
+                    "stateEvidence": {"armingMode": data.get("evidence")},
+                },
+                time.monotonic(),
             )
         elif (
             data.get("event") == "propertyChanged"

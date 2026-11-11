@@ -182,6 +182,8 @@ class GuardReconciliation:
         self.starts: dict[str, float] = {}
         self.identities: dict[str, tuple[str, str]] = {}
         self.states: dict[str, tuple[float, int | None]] = {}
+        self.receipt_arrivals: dict[str, float] = {}
+        self.unqualified_changes: set[str] = set()
         self.preparing: dict[str, object] = {}
         self.lost: dict[str, dict] = {}
         self.timers: dict[str, asyncio.TimerHandle] = {}
@@ -261,6 +263,8 @@ class GuardReconciliation:
             return
         mode = mode if type(mode) is int and mode in MODE_LABELS else None
         self.states[serial] = (started, mode)
+        self.receipt_arrivals[serial] = time.monotonic()
+        self.unqualified_changes.discard(serial)
         lost = self.lost.get(serial)
         if lost and lost["attempts"] == 1 and self.matches(lost):
             self._resolve_loss(serial, matched=True)
@@ -273,6 +277,7 @@ class GuardReconciliation:
             self.identities.get(serial)
             == (receipt["runtimeGeneration"], receipt["handle"])
             and state
+            and serial not in self.unqualified_changes
             and state[0] > self.starts[serial]
             and state[1] == receipt["requestedMode"]
         )
@@ -322,9 +327,12 @@ class GuardReconciliation:
                 }
             )
         previous = self.states.get(serial)
-        if mode is None or (previous is not None and previous[1] != mode):
-            # Missing/changed unqualified cache state cannot preserve a match.
-            self.observe(serial, None, started)
+        if (
+            mode is None or (previous is not None and previous[1] != mode)
+        ) and started >= self.receipt_arrivals.get(serial, float("-inf")):
+            # Invalidate confirmation separately; arrival time cannot order or
+            # replace station receipts that may follow this announcement.
+            self.unqualified_changes.add(serial)
 
     def restart_known(self, receipt: dict) -> bool:
         """Distinguish authoritative rollover from an expired recovery handle."""
@@ -628,7 +636,7 @@ class GuardNotifications:
             getattr(runtime, "client", None), "guard_reconciliation", None
         )
         if receipt["attempts"] == 0:
-            explanation = "The command was not sent to the station."
+            explanation = "The command may not have been sent to the station."
         elif (
             receipt["reason"] == "runtime_closed"
             and reconciliation is not None
