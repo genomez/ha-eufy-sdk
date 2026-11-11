@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import math
 import re
-import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import callback
@@ -216,9 +215,6 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
 
     _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
-    _unrecorded_attributes = frozenset(
-        {"inventory_age_seconds", "inventory_last_success_ms"}
-    )
 
     def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
         """Bind to a device serial and build its HA device_info."""
@@ -240,7 +236,6 @@ class EufySdkDeviceEntity(CoordinatorEntity[EufySdkDataUpdateCoordinator]):
         return inventory_attributes(
             getattr(getattr(self, "coordinator", None), "inventory_evidence", None),
             getattr(self, "_sn", ""),
-            int(time.time() * 1000),
         )
 
     @property

@@ -34,20 +34,31 @@ def evidence(quality="partial"):
 class InventoryEvidenceTests(unittest.IsolatedAsyncioTestCase):
     """Preserve entities and original successful inventory observations."""
 
-    async def test_refresh_timestamps_are_excluded_from_recorder(self):
-        entity = EufySdkDeviceEntity(
-            SimpleNamespace(data={"synthetic-b": {}}, inventory_evidence=evidence()),
-            "synthetic-b",
+    async def test_entity_attributes_are_stable_across_time_and_refreshes(self):
+        coordinator = SimpleNamespace(
+            data={"synthetic-b": {}}, inventory_evidence=evidence()
         )
-        attrs = entity.extra_state_attributes
-        self.assertIn("inventory_age_seconds", attrs)
-        self.assertEqual(attrs["inventory_last_success_ms"], 1000)
-        self.assertTrue(
-            {"inventory_age_seconds", "inventory_last_success_ms"}
-            <= entity._unrecorded_attributes
+        entity = EufySdkDeviceEntity(coordinator, "synthetic-b")
+        first = entity.extra_state_attributes
+        self.assertEqual(
+            first,
+            {"inventory_quality": "retained", "inventory_refresh_quality": "partial"},
         )
-        self.assertNotIn("inventory_quality", entity._unrecorded_attributes)
-        self.assertNotIn("inventory_refresh_quality", entity._unrecorded_attributes)
+        # A later successful roster refresh moves only observation timestamps;
+        # the entity's attributes must not change, or every coordinator update
+        # becomes a state change (and a recorder row) for every entity.
+        refreshed = evidence()
+        refreshed["completedAtMs"] = 9000
+        refreshed["rows"]["synthetic-b"] = {
+            "quality": "retained",
+            "lastSuccessfulObservationMs": 8000,
+        }
+        coordinator.inventory_evidence = refreshed
+        self.assertEqual(entity.extra_state_attributes, first)
+        self.assertEqual(entity.extra_state_attributes, first)
+        self.assertFalse(
+            any("age" in key or key.endswith("_ms") for key in first),
+        )
 
     async def test_api_keeps_atomic_evidence_separate_from_property_state(self):
         client = EufySdkApiClient("synthetic", 3000, Mock())
@@ -95,10 +106,11 @@ class InventoryEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 {"quality": "retained", "lastSuccessfulObservationMs": 1000},
             )
             self.assertEqual(
-                inventory_attributes(
-                    coordinator.inventory_evidence, "synthetic-b", 5000
-                )["inventory_age_seconds"],
-                4,
+                inventory_attributes(coordinator.inventory_evidence, "synthetic-b"),
+                {
+                    "inventory_quality": "retained",
+                    "inventory_refresh_quality": quality,
+                },
             )
 
     async def test_complete_absence_keeps_existing_removal_policy(self):
@@ -120,11 +132,14 @@ class InventoryEvidenceTests(unittest.IsolatedAsyncioTestCase):
             evidence() | {"completedAtMs": -1},
         ):
             self.assertIsNone(inventory_evidence(raw, [{"sn": "synthetic-b"}]))
-        attrs = inventory_attributes(evidence(), "synthetic-b", 500)
-        self.assertIsNone(attrs["inventory_age_seconds"])
+        attrs = inventory_attributes(evidence(), "synthetic-b")
         self.assertEqual(attrs["inventory_quality"], "retained")
         self.assertEqual(
-            inventory_attributes(None, "synthetic-b", 5000)["inventory_quality"],
+            inventory_attributes(None, "synthetic-b"),
+            {"inventory_quality": "unknown"},
+        )
+        self.assertEqual(
+            inventory_attributes(evidence(), "not-in-roster")["inventory_quality"],
             "unknown",
         )
 

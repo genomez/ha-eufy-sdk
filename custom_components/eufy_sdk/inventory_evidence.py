@@ -81,16 +81,18 @@ def inventory_evidence(raw: Any, devices: list[dict]) -> dict | None:
     }
 
 
-def inventory_attributes(evidence: Any, serial: str, now_ms: int) -> dict:
-    """Clock rollback yields unknown age and cannot make cached data fresh."""
+def inventory_attributes(evidence: Any, serial: str) -> dict:
+    """
+    Expose only slow-changing roster quality on every entity.
+
+    Per-entity values that move on each write or each successful roster
+    refresh (ages, observation timestamps) would turn every coordinator
+    update into a state change for every entity, so they are not exposed.
+    """
     if not isinstance(evidence, dict) or not isinstance(evidence.get("rows"), dict):
-        return {"inventory_quality": "unknown", "inventory_age_seconds": None}
+        return {"inventory_quality": "unknown"}
     row = inventory_row(evidence.get("rows", {}).get(serial))
-    at = row.get("lastSuccessfulObservationMs") if row else None
-    age = (now_ms - at) / 1000 if count(at) and now_ms >= at else None
     return {
         "inventory_quality": row["quality"] if row else "unknown",
-        "inventory_age_seconds": age,
         "inventory_refresh_quality": evidence.get("quality", "unknown"),
-        "inventory_last_success_ms": at,
     }
