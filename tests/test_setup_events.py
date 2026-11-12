@@ -153,6 +153,7 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             entity.extra_state_attributes,
             {
+                "device_observed_at": 100,
                 "device_observed_value": False,
                 "device_observation_source": "rtc",
             },
@@ -163,11 +164,10 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(entity.extra_state_attributes["device_observed_value"])
         self.assertEqual(self.scheduled, [])
 
-    async def test_repeated_observation_updates_receipt_without_attribute_churn(self):
+    async def test_repeated_observation_updates_receipt_without_bus_event(self):
         self.coordinator.data = {"synthetic": {"state": {"light": False}}}
         self.coordinator.property_observations = None
         entity = EufySdkSwitch(self.coordinator, "synthetic", {"name": "light"})
-        first = None
         for at in (100, 130, 160):
             with patch(
                 "custom_components.eufy_sdk.property_sync.time", return_value=at
@@ -181,10 +181,7 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
                         "properties": {"light": False},
                     }
                 )
-            attributes = entity.extra_state_attributes
-            if first is None:
-                first = attributes
-            self.assertEqual(attributes, first)
+            self.assertEqual(entity.extra_state_attributes["device_observed_at"], at)
             self.assertEqual(
                 self.coordinator.property_observations["synthetic"]["light"][
                     "observed_at"

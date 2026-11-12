@@ -110,6 +110,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             entity.extra_state_attributes,
             {
+                "device_observed_at": 100,
                 "device_observed_value": not target,
                 "device_observation_source": "rtc",
             },

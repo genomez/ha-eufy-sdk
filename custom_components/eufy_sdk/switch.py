@@ -128,13 +128,17 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Expose observed value separately; exact receipt times stay internal."""
+        """Expose device receipt time and value separately from optimistic state.
+
+        device_observed_at is read by owner scripts that confirm floodlight commands, so it stays.
+        """
         observations = self.coordinator.property_observations or {}
         receipt = observations.get(self._sn, {}).get(self._prop)
         attributes = {}
         if receipt and type(receipt["value"]) is bool:
             attributes.update(
                 {
+                    "device_observed_at": receipt["observed_at"],
                     "device_observed_value": receipt["value"],
                     "device_observation_source": "rtc",
                 }
