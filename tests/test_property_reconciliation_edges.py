@@ -45,7 +45,7 @@ class ReconciliationEdgeTests(unittest.IsolatedAsyncioTestCase):
                 "writeOnly": write_only,
             },
         )
-        entity.hass = Mock()
+        entity.hass = Mock(data={})
         entity.async_write_ha_state = Mock()
         entity.async_on_remove = Mock()
         return entity, coordinator, client
@@ -194,10 +194,15 @@ class ReconciliationEdgeTests(unittest.IsolatedAsyncioTestCase):
     async def test_listener_cleanup_and_stale_callback_after_readd(self):
         entity, coordinator, _client = self._entity()
         first_cancel, second_cancel = Mock(), Mock()
-        entity.hass.bus.async_listen.side_effect = [first_cancel, second_cancel]
+        subscribe = patch(
+            "custom_components.eufy_sdk.entity.async_listen_bridge_event",
+            side_effect=[first_cancel, second_cancel],
+        )
+        listener = subscribe.start()
+        self.addCleanup(subscribe.stop)
         await entity.async_added_to_hass()
-        first_listener = entity.hass.bus.async_listen.call_args.args[1]
-        first_filter = entity.hass.bus.async_listen.call_args.kwargs["event_filter"]
+        first_listener = listener.call_args.args[1]
+        first_filter = listener.call_args.kwargs["event_filter"]
         self.assertTrue(first_filter(self._event()))
         removal = entity.async_on_remove.call_args.args[0]
         await entity.async_will_remove_from_hass()
@@ -207,7 +212,7 @@ class ReconciliationEdgeTests(unittest.IsolatedAsyncioTestCase):
         entity._handle_coordinator_update()
         entity.async_write_ha_state.assert_not_called()
         await entity.async_added_to_hass()
-        second_listener = entity.hass.bus.async_listen.call_args.args[1]
+        second_listener = listener.call_args.args[1]
         with patch(
             "custom_components.eufy_sdk.entity.async_call_later", return_value=Mock()
         ):

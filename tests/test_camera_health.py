@@ -669,6 +669,8 @@ class CameraHealthEntityTests(unittest.IsolatedAsyncioTestCase):
                 revision=8,
                 lastHubReportMs=NOW_MS,
                 lastCloudParamMs=NOW_MS,
+                lastContactMs=NOW_MS,
+                lastContactSource="push",
                 rssi={"value": -60, "valid": True, "lastValidMs": NOW_MS},
                 rawStatus={"p1131": None, "p1182": None, "observedMs": NOW_MS},
             )
@@ -679,6 +681,8 @@ class CameraHealthEntityTests(unittest.IsolatedAsyncioTestCase):
             refreshed = status.extra_state_attributes
             self.assertIsNot(refreshed, first)
             self.assertEqual(refreshed["revision"], 8)
+            self.assertEqual(refreshed["last_contact"], "2026-10-22T14:40:00+00:00")
+            self.assertEqual(refreshed["last_contact_source"], "push")
             self.assertEqual(refreshed["rssi"], -60)
             self.assertEqual(refreshed["last_hub_report"], "2026-10-22T14:40:00+00:00")
             # A meaningful change publishes at once, with the latest routine values.
@@ -702,6 +706,8 @@ class CameraHealthEntityTests(unittest.IsolatedAsyncioTestCase):
     def test_only_routine_fields_wait_for_the_interval(self):
         routine = {
             ("revision",),
+            ("lastContactMs",),
+            ("lastContactSource",),
             ("lastHubReportMs",),
             ("lastCloudParamMs",),
             ("rssi", "value"),
@@ -765,7 +771,7 @@ class CameraHealthEntityTests(unittest.IsolatedAsyncioTestCase):
             (sensor, EufyCameraConnectivityStatusSensor),
         ):
             added = []
-            await platform.async_setup_entry(Mock(), entry, added.extend)
+            await platform.async_setup_entry(Mock(data={}), entry, added.extend)
             diagnostics = [entity for entity in added if isinstance(entity, kind)]
             self.assertEqual(len(diagnostics), 1)
             self.assertEqual(diagnostics[0]._sn, "valid-camera")

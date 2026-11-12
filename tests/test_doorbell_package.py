@@ -58,7 +58,7 @@ class DoorbellPackageTests(unittest.IsolatedAsyncioTestCase):
         self.sensor.async_write_ha_state.assert_not_called()
 
     async def test_restores_a_waiting_package_across_restart(self):
-        self.sensor.hass = Mock()
+        self.sensor.hass = Mock(data={})
         self.sensor.async_get_last_state = AsyncMock(
             return_value=SimpleNamespace(state="on")
         )

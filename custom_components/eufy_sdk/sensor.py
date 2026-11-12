@@ -16,8 +16,9 @@ from homeassistant.util import dt as dt_util
 
 from .api import CAMERA_CONNECTIVITY
 from .bespoke import BITFIELD_SWITCHES
+from .bridge_events import async_listen_bridge_event
 from .camera_health import EufyCameraHealthEntity, camera_health_serials
-from .const import CONF_HOST, EVENT_TYPE, LOGGER, SOLIX_READING_EVENT
+from .const import CONF_HOST, LOGGER, SOLIX_READING_EVENT
 from .entity import (
     EufySdkDeviceEntity,
     EufySdkPropertyEntity,
@@ -461,7 +462,7 @@ async def async_setup_entry(
         if sn:
             _add_new_channels(sn, event.data.get("values") or {})
 
-    entry.async_on_unload(hass.bus.async_listen(EVENT_TYPE, _on_solix_reading))
+    entry.async_on_unload(async_listen_bridge_event(hass, _on_solix_reading))
 
 
 class EufyCameraConnectivityStatusSensor(EufyCameraHealthEntity, SensorEntity):
@@ -635,7 +636,7 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
 
     A `personDetected` push carries only a numeric `person_id`; the bridge resolves
     it against the HomeBase face roster and adds `person_name` (+ `recognized`). So a
-    match shows the person's name, an unmatched face shows Unknown, and an explicit
+    match shows the person's name, an unmatched face shows Human, and an explicit
     `strangerDetected` shows Stranger — letting automations key on "who" was seen,
     not just "a person".
     """
@@ -662,11 +663,11 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to bridge detection events while registered."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
 
     @callback
     def _handle_event(self, event: Event) -> None:
-        """Record the recognized name (or Unknown/Stranger) from a detection."""
+        """Record the recognized name (or Human/Stranger) from a detection."""
         data = event.data
         if data.get("deviceSn") != self._sn:
             return
@@ -676,7 +677,7 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         elif ev == "personDetected":
             person_name = data.get("person_name")
             recognized = bool(data.get("recognized")) and bool(person_name)
-            name = person_name if recognized else "Unknown"
+            name = person_name if recognized else "Human"
             person_id = data.get("person_id")
         else:
             return
@@ -710,7 +711,7 @@ class EufyStreamUrlSensor(EufySdkDeviceEntity, SensorEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to the bridge's streamState events for this device."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
 
     @callback
     def _handle_event(self, event: Event) -> None:

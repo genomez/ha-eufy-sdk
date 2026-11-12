@@ -57,7 +57,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         entity = EufySdkSwitch(
             coordinator, "fixture-device", {"name": prop, "type": "bool"}
         )
-        entity.hass = Mock()
+        entity.hass = Mock(data={})
         entity.hass.state = CoreState.running
         entity.async_on_remove = Mock()
         seen = []
@@ -110,7 +110,6 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             entity.extra_state_attributes,
             {
-                "device_observed_at": 100,
                 "device_observed_value": not target,
                 "device_observation_source": "rtc",
             },
@@ -403,7 +402,7 @@ class FloodlightStateHoldTests(unittest.IsolatedAsyncioTestCase):
         self._receipt(entity, False)
         self.assertEqual(seen, [True, False])
 
-    async def test_setup_callback_and_native_event_bus_preserve_hold(self):
+    async def test_setup_callback_and_private_dispatcher_preserve_hold(self):
         for target in (False, True):
             with self.subTest(target=target):
                 entity, coordinator, client, seen = self._entity(initial=not target)

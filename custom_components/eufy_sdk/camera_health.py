@@ -19,7 +19,14 @@ if TYPE_CHECKING:
 # attributes refresh at most once per interval, so HA does not record a new state row
 # every few seconds. Any other change still publishes immediately.
 ROUTINE_HEALTH_FIELDS = frozenset(
-    {"revision", "lastHubReportMs", "lastCloudParamMs", "rssi"}
+    {
+        "revision",
+        "lastHubReportMs",
+        "lastCloudParamMs",
+        "lastContactMs",
+        "lastContactSource",
+        "rssi",
+    }
 )
 ROUTINE_RAW_STATUS_FIELDS = frozenset({"observedMs"})
 ROUTINE_REFRESH_SECONDS = 900

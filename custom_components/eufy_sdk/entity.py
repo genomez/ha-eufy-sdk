@@ -24,7 +24,8 @@ from .api import (
     command_health_event,
     late_contrary_event,
 )
-from .const import ATTRIBUTION, DOMAIN, EVENT_TYPE, SOLIX_READING_EVENT
+from .bridge_events import async_listen_bridge_event
+from .const import ATTRIBUTION, DOMAIN, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
 from .firmware_metadata import firmware_version
 from .inventory_evidence import inventory_attributes
@@ -154,7 +155,7 @@ class EufySolixEntity(Entity):
         """Subscribe to live readings (and the coordinator snapshot, if tracked)."""
         await super().async_added_to_hass()
         self.async_on_remove(
-            self.hass.bus.async_listen(EVENT_TYPE, self._handle_solix_event)
+            async_listen_bridge_event(self.hass, self._handle_solix_event)
         )
         if self._track_snapshot:
             self.async_on_remove(
@@ -377,8 +378,8 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
             if lifecycle == self._lifecycle_generation:
                 self._handle_property_changed(event)
 
-        self._property_event_unsub = self.hass.bus.async_listen(
-            EVENT_TYPE, handle_report, event_filter=self._property_event_filter
+        self._property_event_unsub = async_listen_bridge_event(
+            self.hass, handle_report, event_filter=self._property_event_filter
         )
         self.async_on_remove(self._remove_property_listener)
         self._sync_command_health()

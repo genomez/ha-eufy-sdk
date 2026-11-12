@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import custom_components.eufy_sdk as integration
 from custom_components.eufy_sdk.alarm_sync import apply_alarm_event, clear_alarm
 from custom_components.eufy_sdk.arming_sync import apply_arming_mode_event
-from custom_components.eufy_sdk.const import CONF_HOST, CONF_PORT, EVENT_TYPE
+from custom_components.eufy_sdk.const import CONF_HOST, CONF_PORT
 
 
 class EarlyEventHelperTests(unittest.TestCase):
@@ -40,7 +40,7 @@ class EarlyEventHelperTests(unittest.TestCase):
 
 class SetupEventGuardTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.hass = Mock()
+        self.hass = Mock(data={}, http=None)
         self.hass.config_entries.async_forward_entry_setups = AsyncMock()
         self.entry = Mock()
         self.entry.data = {CONF_HOST: "bridge", CONF_PORT: 3000}
@@ -104,7 +104,9 @@ class SetupEventGuardTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(integration, "async_reconcile_property_entities"),
             patch.object(
-                integration, "EufySdkDataUpdateCoordinator", return_value=self.coordinator
+                integration,
+                "EufySdkDataUpdateCoordinator",
+                return_value=self.coordinator,
             ),
             patch.object(integration, "EufySdkApiClient", side_effect=make_client),
             patch.object(integration, "async_get_clientsession", return_value=Mock()),
@@ -117,10 +119,8 @@ class SetupEventGuardTests(unittest.IsolatedAsyncioTestCase):
         self.timer = timer
         self.on_event = self.callbacks[0]
 
-    async def test_early_events_still_reach_bus_without_mutation_or_refresh(self):
-        self.assertEqual(self.hass.bus.async_fire.call_count, len(self.early_events))
-        for event in self.early_events:
-            self.hass.bus.async_fire.assert_any_call(EVENT_TYPE, event)
+    async def test_early_telemetry_stays_off_bus_without_mutation_or_refresh(self):
+        self.hass.bus.async_fire.assert_not_called()
         self.entry.async_create_background_task.assert_not_called()
         self.hass.async_create_task.assert_not_called()
         self.coordinator.async_request_refresh.assert_not_called()

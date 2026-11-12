@@ -93,3 +93,8 @@ EVENT_IMAGE_REFRESH = "eventImageUpdated"
 
 # Push carries no "cleared" signal, so a push binary_sensor auto-offs after this delay.
 PUSH_AUTO_OFF_SECONDS = 30
+
+# Public automation events exclude telemetry; internal listeners use the dispatcher.
+PUBLIC_BUS_EVENTS: frozenset[str] = frozenset(
+    set(DETECTION_EVENTS) | {DOORBELL_EVENT, "streamState"}
+)

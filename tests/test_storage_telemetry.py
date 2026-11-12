@@ -307,7 +307,7 @@ class StorageLifecycleTests(unittest.IsolatedAsyncioTestCase):
             async_on_unload=Mock(),
         )
         added = Mock()
-        await async_setup_entry(Mock(), entry, added)
+        await async_setup_entry(Mock(data={}), entry, added)
         entities = added.call_args.args[0]
         self.assertEqual(
             len([entity for entity in entities if "_storage_" in entity.unique_id]), 7

@@ -20,6 +20,7 @@ from .alarm_logic import PHASE_STOPPED
 from .alarm_sync import alarm_event_serial, apply_alarm_event, clear_alarm
 from .api import EufySdkApiClient
 from .arming_sync import apply_arming_mode_event
+from .bridge_events import async_dispatch_bridge_event
 from .const import (
     ALARM_AUTO_CLEAR_SECONDS,
     CONF_HOST,
@@ -42,7 +43,7 @@ from .firmware_metadata import apply_metadata_event
 from .guard_confirmation import GuardNotifications
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
-from .pushmap import DOORBELL_EVENT
+from .pushmap import DOORBELL_EVENT, PUBLIC_BUS_EVENTS
 from .recordings import RecordingRuntime
 from .recordings_http import async_register_view
 
@@ -126,7 +127,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     guard_notifications = GuardNotifications(hass, entry.options, entry)
     coordinator._light_safety_controllers = set()  # noqa: SLF001
 
-    # Forward every bridge event onto the HA event bus for automations — and recover
+    # Deliver bridge messages internally and selected events to automations; recover
     # fast when the bridge comes back. A bridge restart drops the WS and fails one
     # coordinator poll, marking every entity `unavailable`; without a nudge they stay
     # that way (and detections don't show) until the next poll, up to `poll_min` minutes
@@ -166,7 +167,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
 
     entry.async_on_unload(_close_recordings)
 
-    def _on_event(evt: dict) -> None:  # noqa: PLR0912, PLR0915 - explicit bridge event dispatch
+    def _on_event(evt: dict) -> None:  # noqa: C901, PLR0912, PLR0915 - explicit bridge event dispatch
         if evt.get("event") in ("hello", "recordings.capability"):
             _sync_recordings()
             if evt["event"] == "recordings.capability":
@@ -199,10 +200,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
             coordinator.apply_camera_health_event(evt)
         if evt.get("event") == "deviceMetadata":
             apply_metadata_event(coordinator, evt)
-        hass.bus.async_fire(EVENT_TYPE, evt)
+        async_dispatch_bridge_event(hass, evt)
+        if evt.get("event") in PUBLIC_BUS_EVENTS:
+            hass.bus.async_fire(EVENT_TYPE, evt)
         event = evt.get("event")
-        # Pushes can arrive before the first device snapshot. Keep forwarding
-        # them to automations, but do not mutate a cache that is not loaded yet.
+        # Pushes can arrive before the first device snapshot. Keep internal delivery,
+        # but do not mutate a cache that is not loaded yet.
         if coordinator.data is None and event in (
             "contactState",
             "armingModeChanged",

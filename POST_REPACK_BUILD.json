@@ -1,0 +1,128 @@
+{
+  "kind": "local-source-candidate",
+  "branch": "s1-post-repack-build",
+  "base_commit": "af6f2423a222ae724182ccfd8761b779a7a6bd19",
+  "delivery_files": [
+    {
+      "path": "custom_components/eufy_sdk/__init__.py",
+      "sha256": "ac5d040bdb306559647da43e4e2c328d66411f2a89a01d0cf7dbc3cd1a36a143"
+    },
+    {
+      "path": "custom_components/eufy_sdk/binary_sensor.py",
+      "sha256": "7d71ba5fd5ece292057065a3948f5527348acc3adec51aba9f5ee92340463097"
+    },
+    {
+      "path": "custom_components/eufy_sdk/bridge_events.py",
+      "sha256": "b505e1ccdaf60ae17d9a6b4a37ee249c86f8d1082f8c65c689b3c4ec45f843cf"
+    },
+    {
+      "path": "custom_components/eufy_sdk/camera_health.py",
+      "sha256": "419a79d664651456f79ce9eeedd5e5d5fc072879e854c2666e28f21a1250a3c0"
+    },
+    {
+      "path": "custom_components/eufy_sdk/entity.py",
+      "sha256": "c80e5e639aa86800093345ac3c0dde531da893c747a51da9305807a521195aa8"
+    },
+    {
+      "path": "custom_components/eufy_sdk/event.py",
+      "sha256": "6e3cb32cf88bce633c13e95dc72e506f2b38f71941d2180274f08ed3bde24d53"
+    },
+    {
+      "path": "custom_components/eufy_sdk/image.py",
+      "sha256": "2b89f18696215f34ef6b48022362ff6099b3d2f0f2f32d02c8744d00988d6134"
+    },
+    {
+      "path": "custom_components/eufy_sdk/pushmap.py",
+      "sha256": "9f476873f8e4b7d44a164ffa84c9af2e02ce28793083a1fd5eb7c8e773833d82"
+    },
+    {
+      "path": "custom_components/eufy_sdk/sensor.py",
+      "sha256": "d1702db3e32ce42f7b9c756aa1c6740c2b8cd980d39d28052f093042b23c26f3"
+    },
+    {
+      "path": "custom_components/eufy_sdk/switch.py",
+      "sha256": "cf743bf6179f64aeb3ae7b9f3b54a2c2da6f205c6c3a0220cb7bad4423af1b0f"
+    }
+  ],
+  "changed_test_files": [
+    "tests/test_camera_health.py",
+    "tests/test_doorbell_package.py",
+    "tests/test_floodlight_state_hold.py",
+    "tests/test_image_refresh_triggers.py",
+    "tests/test_person_name_routing.py",
+    "tests/test_property_reconciliation_edges.py",
+    "tests/test_property_write_ordering.py",
+    "tests/test_recorder_event_routing.py",
+    "tests/test_recordings_lifecycle.py",
+    "tests/test_restart_restore.py",
+    "tests/test_setup_event_guards.py",
+    "tests/test_setup_events.py",
+    "tests/test_storage_telemetry.py"
+  ],
+  "receipt_file": "POST_REPACK_BUILD.json",
+  "public_bus_events": [
+    "motion",
+    "personDetected",
+    "strangerDetected",
+    "petDetection",
+    "dogDetected",
+    "vehicleDetected",
+    "soundDetected",
+    "cryingDetected",
+    "doorbellPress",
+    "packageDelivered",
+    "packageTaken",
+    "packageStranded",
+    "streamState"
+  ],
+  "internal_delivery": "All formerly forwarded bridge messages reach private dispatcher listeners at the original dispatch point. Existing early returns and doorbell deduplication are unchanged. State, health, Solix, image, property and safety consumers subscribe privately. Device automation triggers continue to use the public bus. eufy_sdk_floodlight_safety is unchanged.",
+  "presentation": {
+    "camera_health": "lastContactMs and lastContactSource join the existing 900-second routine-field attribute cache. Meaningful health/state changes publish immediately. The coordinator projection remains exact.",
+    "switch": "Only device_observed_at is removed from entity attributes. device_observed_value and source remain. property_observations, observed_at and all freshness/safety readers remain exact.",
+    "last_person": "Unrecognized personDetected displays Human; Stranger and recognized names remain unchanged. Four existing assertions updated."
+  },
+  "reader_audit": {
+    "propertyEvidenceChanged": "No integration consumer anywhere in custom_components or tests; bridge removal is safe for this integration.",
+    "last_contact": "Display field in camera_health.py and presentation tests only; raw lastContactMs/lastContactSource validated by api.py and retained in coordinator health.",
+    "device_observed_at": "Display field and two expected-attribute tests only; internal property_sync.py receipts and entity.py/light_correction.py readers use observed_at instead.",
+    "diagnostics_sensor": {
+      "entity": "sensor.eufy_sdk_diagnostics",
+      "definition_in_checkout": false,
+      "attribute_size_bytes": null,
+      "behavior_changed": false,
+      "reason": "No definition or 20-second diagnostic poll exists in the provided integration checkout. Live attributes cannot be measured without prohibited host access. Config-entry diagnostic export and bridge diagnostics remain unchanged."
+    }
+  },
+  "recorder_estimate": {
+    "basis": "Owner audit rate approximately 17 propertyEvidenceChanged messages per second; no live measurement performed.",
+    "events_rows_avoided_per_day": 1468800,
+    "event_data_rows_avoided_per_day_upper_estimate": 1468800,
+    "combined_rows_avoided_per_day_upper_estimate": 2937600,
+    "switch_states_rows_avoided_per_day_per_switch_at_30_second_receipts": 2880,
+    "camera_routine_only_refreshes_per_day_per_entity_upper_estimate": 96,
+    "limits": "event_data reuse and other simultaneous state changes reduce savings; event totals and switch/camera state totals are separate. Other suppressed telemetry is not quantified."
+  },
+  "validation": {
+    "interpreter": "C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe",
+    "command": "& $testPython -B -c \"import platform, runpy; platform.uname(); runpy.run_path('tools/run_offline_tests.py', run_name='__main__')\" tests",
+    "environment": {
+      "EUFY_GUARD_LIFECYCLE_REPLAY": "C:/Dev/eufy-s1-phasec-20261107/ha-eufy-sdk-bridge/.offline/s15-fix/guard-runtime-replay.json",
+      "EUFY_OFFLINE_OUTPUT": ".offline/post-repack"
+    },
+    "reproduce_script": ".offline/post-repack/validate.ps1",
+    "log": ".offline/post-repack/full.log",
+    "passed": 1209,
+    "failed": 0,
+    "skipped": 0,
+    "subtests_passed": 1499,
+    "warnings": 8,
+    "lint": "Ruff passes for all changed integration modules and the new routing tests; legacy test files have pre-existing style findings. git diff --check passes.",
+    "scope": "No SSH, HA API, cloud, push, installation or service actions. Offline Python audit rejects connections, subprocesses and writes outside this repo during test execution. Windows platform cache is warmed before the audit to avoid a platform-detection fallback subprocess during collection."
+  },
+  "owner_followup": [
+    "Install/package only under later authorization; no runtime acceptance claimed.",
+    "Add the separately planned recorder exclusion.",
+    "Measure sensor.eufy_sdk_diagnostics attributes from the owner-managed live configuration; absent from this checkout.",
+    "Public telemetry events and switch device_observed_at are intentionally removed; external dashboard readers were not inspected."
+  ]
+}

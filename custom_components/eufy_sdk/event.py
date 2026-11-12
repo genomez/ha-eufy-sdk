@@ -14,7 +14,8 @@ from homeassistant.components.event import (
 from homeassistant.core import State, callback
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_LEGACY_DOORBELL_PRESSED, EVENT_TYPE
+from .bridge_events import async_listen_bridge_event
+from .const import CONF_LEGACY_DOORBELL_PRESSED
 from .entity import EufySdkDeviceEntity
 from .pushmap import (
     DETECTION_CAPABILITIES,
@@ -96,7 +97,7 @@ class _EufySdkBusEvent(EufySdkDeviceEntity, EventEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to bridge device events while registered."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
 
     @callback
     def _handle_event(self, event: Event) -> None:

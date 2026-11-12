@@ -13,7 +13,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_HOST, CONF_PORT, EVENT_TYPE
+from .bridge_events import async_listen_bridge_event
+from .const import CONF_HOST, CONF_PORT
 from .entity import EufySdkDeviceEntity
 from .event_image import event_time_for_image
 from .pushmap import EVENT_IMAGE_REFRESH, THUMBNAIL_EVENTS
@@ -26,8 +27,6 @@ if TYPE_CHECKING:
 
     from .coordinator import EufySdkDataUpdateCoordinator
     from .data import EufySdkConfigEntry
-
-# Bridge device events are re-fired on the HA bus under this type (see __init__.py).
 
 
 async def async_setup_entry(
@@ -89,7 +88,7 @@ class EufySdkEventImage(EufySdkDeviceEntity, ImageEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to bridge events and pull any already-retained thumbnail."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
         await self._refresh()
 
     @callback

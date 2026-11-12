@@ -53,7 +53,7 @@ class TestPropertyWriteOrdering(IsolatedAsyncioTestCase):
         entity._property_event_unsub = None
         entity._pending_reconcile = None
         entity._removed = False
-        entity.hass = Mock()
+        entity.hass = Mock(data={})
         entity.async_write_ha_state = Mock()
 
         return entity, coordinator, client
@@ -406,7 +406,9 @@ class TestPropertyWriteOrdering(IsolatedAsyncioTestCase):
             await asyncio.gather(*tasks)
             coordinator.async_request_refresh.assert_awaited_once()
 
-    async def test_older_success_after_newer_cancellation_schedules_catch_up(self) -> None:
+    async def test_older_success_after_newer_cancellation_schedules_catch_up(
+        self,
+    ) -> None:
         """Canceling a newer RPC still leaves an older success a bounded read."""
         entity, coordinator, client = self._entity(value=False)
         first = asyncio.Event()

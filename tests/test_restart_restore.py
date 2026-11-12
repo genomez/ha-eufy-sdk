@@ -22,7 +22,8 @@ from test_camera_health_disconnect import OfflineSocket
 
 from custom_components.eufy_sdk.api import EufySdkApiClient
 from custom_components.eufy_sdk.binary_sensor import EufyPackageBinarySensor
-from custom_components.eufy_sdk.const import DOMAIN, EVENT_TYPE
+from custom_components.eufy_sdk.bridge_events import async_dispatch_bridge_event
+from custom_components.eufy_sdk.const import DOMAIN
 from custom_components.eufy_sdk.coordinator import EufySdkDataUpdateCoordinator
 from custom_components.eufy_sdk.event import (
     EufySdkDetectionEvent,
@@ -46,14 +47,14 @@ class RestartRestoreTests(unittest.IsolatedAsyncioTestCase):
         self.client._recv_task = asyncio.create_task(self.client._receive_loop())
         self.client.auth_status = AsyncMock(return_value={"state": "ok"})
         self.client.list_solix_devices = AsyncMock(return_value=[])
-        self.hass.bus.async_fire(
-            EVENT_TYPE, {"deviceSn": "synthetic", "event": "packageDelivered"}
+        async_dispatch_bridge_event(
+            self.hass, {"deviceSn": "synthetic", "event": "packageDelivered"}
         )
-        self.hass.bus.async_fire(
-            EVENT_TYPE, {"deviceSn": "synthetic", "event": "doorbellPress"}
+        async_dispatch_bridge_event(
+            self.hass, {"deviceSn": "synthetic", "event": "doorbellPress"}
         )
-        self.hass.bus.async_fire(
-            EVENT_TYPE,
+        async_dispatch_bridge_event(
+            self.hass,
             {
                 "deviceSn": "synthetic",
                 "event": "vehicleDetected",
@@ -159,8 +160,8 @@ class RestartRestoreTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_stop_then_disconnect_dump_restores_original_event_timestamps(self):
         await self.disconnect_during_refresh(stopping=True)
-        self.hass.bus.async_fire(
-            EVENT_TYPE, {"deviceSn": "synthetic", "event": "motion"}
+        async_dispatch_bridge_event(
+            self.hass, {"deviceSn": "synthetic", "event": "motion"}
         )
         await self.hass.async_block_till_done()
         self.hass.set_state(CoreState.final_write)

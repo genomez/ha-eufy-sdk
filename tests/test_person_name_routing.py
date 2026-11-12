@@ -5,7 +5,6 @@ from unittest.mock import Mock
 
 from custom_components.eufy_sdk.sensor import EufySdkLastPersonSensor
 
-
 # This display name is constructed for offline routing tests only.
 SYNTHETIC_PERSON_NAME = "SYNTHETIC_PERSON_ALPHA"
 
@@ -22,7 +21,7 @@ class PersonNameRoutingTests(unittest.TestCase):
             data={"deviceSn": "T8000P0000000001", "event": "personDetected", **fields}
         )
 
-    def test_name_unknown_and_stranger_remain_distinct(self):
+    def test_name_human_and_stranger_remain_distinct(self):
         entity = self.entity()
         entity._handle_event(
             self.event(person_name=SYNTHETIC_PERSON_NAME, recognized=True)
@@ -30,7 +29,7 @@ class PersonNameRoutingTests(unittest.TestCase):
         self.assertEqual(entity._attr_native_value, SYNTHETIC_PERSON_NAME)
         self.assertTrue(entity.extra_state_attributes["recognized"])
         entity._handle_event(self.event(person_id=7, recognized=False))
-        self.assertEqual(entity._attr_native_value, "Unknown")
+        self.assertEqual(entity._attr_native_value, "Human")
         self.assertFalse(entity.extra_state_attributes["recognized"])
         entity._handle_event(
             self.event(
@@ -70,7 +69,9 @@ class PersonNameRoutingTests(unittest.TestCase):
             )
         )
         entity._handle_event(
-            self.event(event="motion", person_name=SYNTHETIC_PERSON_NAME, recognized=True)
+            self.event(
+                event="motion", person_name=SYNTHETIC_PERSON_NAME, recognized=True
+            )
         )
         entity.async_write_ha_state.assert_not_called()
 
@@ -78,12 +79,12 @@ class PersonNameRoutingTests(unittest.TestCase):
         for fields in ({"person_name": SYNTHETIC_PERSON_NAME}, {"recognized": True}):
             entity = self.entity()
             entity._handle_event(self.event(**fields))
-            self.assertEqual(entity._attr_native_value, "Unknown")
+            self.assertEqual(entity._attr_native_value, "Human")
 
     def test_delayed_name_can_follow_an_unnamed_detection(self):
         entity = self.entity()
         entity._handle_event(self.event(recognized=False))
-        self.assertEqual(entity._attr_native_value, "Unknown")
+        self.assertEqual(entity._attr_native_value, "Human")
         entity._handle_event(
             self.event(person_name=SYNTHETIC_PERSON_NAME, person_id=7, recognized=True)
         )
@@ -97,5 +98,5 @@ class PersonNameRoutingTests(unittest.TestCase):
                 self.event(person_name=SYNTHETIC_PERSON_NAME, recognized=True)
             )
         entity._handle_event(self.event(recognized=False))
-        self.assertEqual(entity._attr_native_value, "Unknown")
+        self.assertEqual(entity._attr_native_value, "Human")
         self.assertFalse(entity.extra_state_attributes["recognized"])

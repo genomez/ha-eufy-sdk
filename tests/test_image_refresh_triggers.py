@@ -16,7 +16,7 @@ from custom_components.eufy_sdk.pushmap import EVENT_IMAGE_REFRESH
 class ImageRefreshTriggerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.tasks = []
-        self.hass = Mock()
+        self.hass = Mock(data={})
 
         def create_task(coro) -> asyncio.Task:
             task = asyncio.create_task(coro)

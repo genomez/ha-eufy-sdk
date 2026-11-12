@@ -16,7 +16,7 @@ from custom_components.eufy_sdk.switch import EufySdkSwitch
 
 class SetupEventTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        hass = Mock()
+        hass = Mock(data={}, http=None)
         hass.bus.async_fire = Mock()
         hass.config_entries.async_forward_entry_setups = AsyncMock()
 
@@ -153,7 +153,6 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             entity.extra_state_attributes,
             {
-                "device_observed_at": 100,
                 "device_observed_value": False,
                 "device_observation_source": "rtc",
             },
@@ -163,6 +162,47 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(entity.is_on)
         self.assertFalse(entity.extra_state_attributes["device_observed_value"])
         self.assertEqual(self.scheduled, [])
+
+    async def test_repeated_observation_updates_receipt_without_attribute_churn(self):
+        self.coordinator.data = {"synthetic": {"state": {"light": False}}}
+        self.coordinator.property_observations = None
+        entity = EufySdkSwitch(self.coordinator, "synthetic", {"name": "light"})
+        first = None
+        for at in (100, 130, 160):
+            with patch(
+                "custom_components.eufy_sdk.property_sync.time", return_value=at
+            ):
+                self.on_event(
+                    {
+                        "event": "propertiesObserved",
+                        "deviceSn": "synthetic",
+                        "source": "rtc",
+                        "observedAtMs": at * 1000,
+                        "properties": {"light": False},
+                    }
+                )
+            attributes = entity.extra_state_attributes
+            if first is None:
+                first = attributes
+            self.assertEqual(attributes, first)
+            self.assertEqual(
+                self.coordinator.property_observations["synthetic"]["light"][
+                    "observed_at"
+                ],
+                at,
+            )
+        self.bus.async_fire.assert_not_called()
+        with patch("custom_components.eufy_sdk.property_sync.time", return_value=200):
+            self.on_event(
+                {
+                    "event": "propertiesObserved",
+                    "deviceSn": "synthetic",
+                    "source": "rtc",
+                    "observedAtMs": 200000,
+                    "properties": {"light": True},
+                }
+            )
+        self.assertTrue(entity.extra_state_attributes["device_observed_value"])
 
     async def test_valueless_arming_event_refreshes_known_device_only(self):
         callbacks = [self.on_event]

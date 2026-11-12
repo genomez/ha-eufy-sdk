@@ -15,7 +15,7 @@ from custom_components.eufy_sdk.media_source import EufyRecordingMediaSource
 
 class LifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.hass = Mock()
+        self.hass = Mock(data={}, http=None)
         self.hass.config_entries.async_forward_entry_setups = AsyncMock()
         self.entry = Mock()
         self.entry.data = {CONF_HOST: "bridge.invalid", CONF_PORT: 3000}
@@ -98,8 +98,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(states[0])
         self.assertIsNotNone(states[1])
         self.assertEqual(len((await self.root()).children), 5)
-        self.hass.bus.async_fire.assert_called_once()
-        self.assertEqual(self.hass.bus.async_fire.call_args.args[1]["event"], "hello")
+        self.hass.bus.async_fire.assert_not_called()
 
     async def test_capability_retirement_and_reconnect_hello_replace_runtime(self):
         await self.deliver({"event": "hello", "recordings": fixture.capability()})

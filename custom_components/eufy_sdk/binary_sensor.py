@@ -14,8 +14,8 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .bridge_events import async_listen_bridge_event
 from .camera_health import EufyCameraHealthEntity, camera_health_serials
-from .const import EVENT_TYPE
 from .coordinator import EufySdkDataUpdateCoordinator
 from .entity import (
     EufySdkDeviceEntity,
@@ -184,9 +184,9 @@ class EufyPushBinarySensor(EufySdkDeviceEntity, BinarySensorEntity):
         self._cancel_off = None
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to the bus and cancel any pending auto-off on removal."""
+        """Subscribe to bridge messages and cancel pending auto-off on removal."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
         self.async_on_remove(self._cancel_timer)
 
     @callback
@@ -238,7 +238,7 @@ class EufyStreamingBinarySensor(EufySdkDeviceEntity, BinarySensorEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe to the bridge's streamState events for this device."""
         await super().async_added_to_hass()
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
 
     @callback
     def _handle_event(self, event: Event) -> None:
@@ -281,7 +281,7 @@ class EufyPackageBinarySensor(EufySdkDeviceEntity, BinarySensorEntity, RestoreEn
         last = await self.async_get_last_state()
         if last is not None:
             self._attr_is_on = last.state == STATE_ON
-        self.async_on_remove(self.hass.bus.async_listen(EVENT_TYPE, self._handle_event))
+        self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
 
     @callback
     def _handle_event(self, event: Event) -> None:
