@@ -13,10 +13,10 @@ DOCUMENTS = {'LICENSE', 'README.md', 'EXPERIMENTAL.md', 'INTEGRATION_NOTICES.md'
 def build(output_dir):
     """Verify the allowlist and write deterministic ZIP/hash/content receipts."""
     metadata = json.loads((ROOT / 'INTEGRATION_PACKAGE.json').read_text(encoding='utf-8'))
-    assert metadata['version'] == '0.3.1-s1.experimental.15'
+    assert metadata['version'] == '0.3.1-s1.experimental.16'
     assert metadata['domain'] == 'eufy_sdk'
     assert metadata['owner'] == 'genomez'
-    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1-s1.experimental.15.zip'
+    assert metadata['filename'] == 'eufy-sdk-s1-0.3.1-s1.experimental.16.zip'
     expected = {item['path']: item['sha256'] for item in metadata['files']}
     assert len(expected) == len(metadata['files']), 'Duplicate allowlist member'
     for rel in expected:
@@ -26,7 +26,7 @@ def build(output_dir):
     actual = set()
     for path in (ROOT / 'custom_components/eufy_sdk').rglob('*'):
         assert not path.is_symlink(), 'Symlinks are not packaged'
-        if path.is_file():
+        if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
             actual.add(path.relative_to(ROOT).as_posix())
     assert actual == {rel for rel in expected if rel.startswith(PREFIX)}, 'Runtime file set changed'
     assert {rel for rel in expected if not rel.startswith(PREFIX)} == DOCUMENTS

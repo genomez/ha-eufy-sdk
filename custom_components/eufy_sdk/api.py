@@ -29,6 +29,7 @@ from .guard_confirmation import (
     guard_runtime,
 )
 from .inventory_evidence import inventory_evidence
+from .light_schedule import validate_entries
 from .manifest_reads import normalize_properties, normalize_snapshot
 from .recordings_api import RecordingsApi
 from .recordings_models import capability as recordings_capability
@@ -1566,6 +1567,23 @@ class EufySdkApiClient(RecordingsApi):
             kwargs["chargeUpperLimit"] = int(charge)
         reply = await self.rpc("solix.setSocLimits", **kwargs)
         return reply.get("params") or {}
+
+    async def quick_responses(self, sn: str) -> list[dict[str, Any]]:
+        """Query once on setup or explicit refresh; never play or retry."""
+        reply = await self.rpc("doorbell.quickResponses", timeout=30, sn=sn)
+        return reply.get("responses") or []
+
+    async def play_quick_response(self, sn: str, voice_id: int) -> None:
+        """One explicit press sends one playback request, with no retry."""
+        await self.rpc(
+            "doorbell.playQuickResponse", timeout=45, sn=sn, voiceId=voice_id
+        )
+
+    async def set_light_schedule(self, sn: str, entries: list) -> None:
+        """Send structured entries through the bridge's typed SDK setter."""
+        await self.rpc(
+            "light.setSchedule", timeout=45, sn=sn, entries=validate_entries(entries)
+        )
 
     async def get_properties(self, sn: str) -> list[dict[str, Any]]:
         """Return a device's property manifest (name/type/unit/writable/enumValues)."""

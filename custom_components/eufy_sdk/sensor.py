@@ -31,6 +31,7 @@ from .entity import (
 )
 from .firmware_metadata import sync_firmware_registry
 from .light import LIGHT_HIDDEN_PROPS
+from .light_schedule import schedule_entries
 from .person_identification import (
     Occurrence,
     detected_at_for,
@@ -353,7 +354,11 @@ async def async_setup_entry(
         for sn in camera_health_serials(coordinator)
     )
     entities.extend(
-        EufySdkPropertySensor(coordinator, sn, spec)
+        (
+            EufyLightScheduleSensor
+            if spec["name"] == "lightSchedule"
+            else EufySdkPropertySensor
+        )(coordinator, sn, spec)
         for sn in coordinator.data
         for spec in entry.runtime_data.properties.get(sn, [])
         if _is_sensor(spec)
@@ -600,6 +605,27 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
         if enum:
             return enum.get(str(v), v)
         return v
+
+
+class EufyLightScheduleSensor(EufySdkPropertyEntity, SensorEntity):
+    """Schedule entry count and sanitized entries, never a free-text control."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:calendar-clock"
+
+    @property
+    def native_value(self) -> int | None:
+        """Show the count without putting JSON into the sensor state."""
+        entries = schedule_entries(self.prop_value)
+        return len(entries) if entries is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Expose entries only; surrounding location fields remain private."""
+        return {
+            **super().extra_state_attributes,
+            "entries": schedule_entries(self.prop_value),
+        }
 
 
 class EufySdkCurrentModeSensor(EufySdkDeviceEntity, SensorEntity):

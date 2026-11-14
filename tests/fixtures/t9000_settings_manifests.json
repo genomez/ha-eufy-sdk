@@ -1,0 +1,3847 @@
+{
+  "sdkPrevious": "18b34fffdaf57e1e2756df51c42022c63d022704",
+  "sdkNext": "85c3cc25ee97af84312922f9065936b9df8475be",
+  "provenance": "Synthetic reported parameters, bound through each SDK facade. Previous bridge scalar hiding applied to floodlights. Not an owner inventory.",
+  "cases": [
+    {
+      "model": "T8425",
+      "previous": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionLightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "lightSchedule",
+          "type": "string",
+          "kind": "text",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionLightDuration",
+          "type": "number",
+          "kind": "seconds",
+          "writable": true,
+          "min": 1,
+          "step": 1
+        },
+        {
+          "name": "motionLightBrightness",
+          "type": "number",
+          "kind": "percent",
+          "writable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "motionLightMode",
+          "type": "number",
+          "kind": "scalar",
+          "writable": true,
+          "min": 0,
+          "step": 1
+        }
+      ],
+      "changes": [
+        {
+          "name": "brightness",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "lightSchedule",
+          "before": null,
+          "after": "sensor"
+        },
+        {
+          "name": "motionLightBrightness",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "motionLightDuration",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "motionLightEnabled",
+          "before": null,
+          "after": "switch"
+        },
+        {
+          "name": "motionLightMode",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "spotlightEnabled",
+          "before": null,
+          "after": "switch"
+        }
+      ]
+    },
+    {
+      "model": "T8416",
+      "previous": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "changes": []
+    },
+    {
+      "model": "T8170",
+      "previous": [
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Optimal Battery Life",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 10,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Optimal Battery Life",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 10,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "changes": [
+        {
+          "name": "light",
+          "before": "switch",
+          "after": "binary_sensor"
+        }
+      ]
+    },
+    {
+      "model": "T8214",
+      "previous": [
+        {
+          "name": "chimeSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "mechanicalChimeSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "wdrSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "ringtoneVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "dingdongVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "dingdongRingtone",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Default",
+            "1": "Silent",
+            "2": "Beacon",
+            "3": "Chord",
+            "4": "Christmas",
+            "5": "Circuit",
+            "6": "Clock",
+            "7": "Ding",
+            "8": "Hillside",
+            "9": "Presto"
+          }
+        },
+        {
+          "name": "videoQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Auto",
+            "1": "Low",
+            "2": "Medium",
+            "3": "High"
+          }
+        },
+        {
+          "name": "notificationMode",
+          "type": "string",
+          "kind": "text",
+          "writable": false
+        },
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Balance Surveillance",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording",
+            "3": "Optimal Battery Life"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 2,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "highCompressionEncoding",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        }
+      ],
+      "next": [
+        {
+          "name": "chimeSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "mechanicalChimeSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "wdrSwitch",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "ringtoneVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "dingdongVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "dingdongRingtone",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Default",
+            "1": "Silent",
+            "2": "Beacon",
+            "3": "Chord",
+            "4": "Christmas",
+            "5": "Circuit",
+            "6": "Clock",
+            "7": "Ding",
+            "8": "Hillside",
+            "9": "Presto"
+          }
+        },
+        {
+          "name": "videoQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Auto",
+            "1": "Low",
+            "2": "Medium",
+            "3": "High"
+          }
+        },
+        {
+          "name": "notificationMode",
+          "type": "string",
+          "kind": "text",
+          "writable": false
+        },
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Balance Surveillance",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording",
+            "3": "Optimal Battery Life"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 2,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "highCompressionEncoding",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        }
+      ],
+      "changes": []
+    },
+    {
+      "model": "T8134",
+      "previous": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "changes": [
+        {
+          "name": "light",
+          "before": "switch",
+          "after": "binary_sensor"
+        }
+      ]
+    },
+    {
+      "model": "T8171",
+      "previous": [
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Optimal Battery Life",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "battery",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "charging",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "powerSource",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Battery",
+            "1": "External Solar Panel"
+          }
+        },
+        {
+          "name": "workingMode",
+          "type": "number",
+          "kind": "enum",
+          "min": 0,
+          "writable": true,
+          "enumValues": {
+            "0": "Optimal Battery Life",
+            "1": "Optimal Surveillance",
+            "2": "Customize Recording"
+          }
+        },
+        {
+          "name": "recordDuration",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 120,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordInterval",
+          "type": "number",
+          "unit": "s",
+          "kind": "seconds",
+          "min": 5,
+          "max": 60,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "recordAutoStop",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "batteryTemperature",
+          "type": "number",
+          "unit": "\u00b0C",
+          "kind": "celsius",
+          "writable": false
+        },
+        {
+          "name": "batteryHealth",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "writable": false
+        },
+        {
+          "name": "solarIntensity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false
+        },
+        {
+          "name": "solarConnected24h",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false
+        },
+        {
+          "name": "batteryPowerStats",
+          "type": "string",
+          "kind": "text",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "cameraInfo",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "changes": []
+    },
+    {
+      "model": "T8426",
+      "previous": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "writable": true,
+          "enumValues": {
+            "1": "HD (720P)",
+            "2": "Full HD (1080P)",
+            "3": "Max"
+          },
+          "kind": "enum"
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        }
+      ],
+      "next": [
+        {
+          "name": "motionDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "aiDetectType",
+          "type": "number",
+          "kind": "bitfield",
+          "writable": true,
+          "raw": true
+        },
+        {
+          "name": "soloSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "indoorSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "pirSensitivityRaw",
+          "type": "number",
+          "kind": "scalar",
+          "writable": false,
+          "unexposed": true
+        },
+        {
+          "name": "snoozeTime",
+          "type": "string",
+          "min": 0,
+          "writable": true,
+          "kind": "seconds"
+        },
+        {
+          "name": "humanOnlyAtNight",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "loiteringDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "imageFlipped",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "watermark",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Timestamp",
+            "2": "Timestamp + Logo"
+          }
+        },
+        {
+          "name": "soundDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "soundDetectionSensitivity",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "soundDetectionType",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Crying",
+            "2": "All Sound"
+          }
+        },
+        {
+          "name": "notificationStyle",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "Text Only",
+            "2": "Included Thumbnail",
+            "3": "Text First, Then Thumbnail"
+          }
+        },
+        {
+          "name": "nightVision",
+          "type": "enum",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "0": "Off",
+            "1": "Infrared",
+            "2": "Full Color"
+          }
+        },
+        {
+          "name": "recordingQuality",
+          "type": "number",
+          "kind": "enum",
+          "writable": true,
+          "enumValues": {
+            "1": "720P",
+            "2": "1080P",
+            "3": "3K"
+          }
+        },
+        {
+          "name": "antiTheftDetection",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "statusLed",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionLightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "lightSchedule",
+          "type": "string",
+          "kind": "text",
+          "writable": true
+        },
+        {
+          "name": "light",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "brightness",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 1,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "spotlightEnabled",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "rotationSpeed",
+          "type": "number",
+          "kind": "scalar",
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "writable": true
+        },
+        {
+          "name": "microphone",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speaker",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "speakerVolume",
+          "type": "number",
+          "unit": "%",
+          "kind": "percent",
+          "min": 0,
+          "max": 100,
+          "writable": true
+        },
+        {
+          "name": "audioRecording",
+          "type": "bool",
+          "kind": "boolean",
+          "writable": true
+        },
+        {
+          "name": "motionLightDuration",
+          "type": "number",
+          "kind": "seconds",
+          "writable": true,
+          "min": 1,
+          "step": 1
+        },
+        {
+          "name": "motionLightBrightness",
+          "type": "number",
+          "kind": "percent",
+          "writable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "motionLightMode",
+          "type": "number",
+          "kind": "scalar",
+          "writable": true,
+          "min": 0,
+          "step": 1
+        }
+      ],
+      "changes": [
+        {
+          "name": "brightness",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "lightSchedule",
+          "before": null,
+          "after": "sensor"
+        },
+        {
+          "name": "motionLightBrightness",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "motionLightDuration",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "motionLightEnabled",
+          "before": null,
+          "after": "switch"
+        },
+        {
+          "name": "motionLightMode",
+          "before": null,
+          "after": "number"
+        },
+        {
+          "name": "spotlightEnabled",
+          "before": null,
+          "after": "switch"
+        }
+      ]
+    }
+  ]
+}

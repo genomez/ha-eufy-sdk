@@ -1,3 +1,9 @@
+# S1 experimental.16 local candidate
+
+HomeBase S1 settings follow SDK writability; recording-quality options, motion-light controls, structured light schedules and explicit doorbell quick-response buttons are supported at the integration boundary. Existing surviving property identities are preserved. See `docs/EXPERIMENTAL16_ENTITY_CHANGES.md` for the model checklist, action contract and unresolved SDK cold-config indexing blocker. No publication or live acceptance is claimed.
+
+## Historical documentation through experimental.15
+
 # S1 experimental.15
 
 Preserve guard receipt timing and floodlight OFF confirmation; reduce recorder churn, retain last-person details and support late identification corrections. Recording day folders are year-safe.

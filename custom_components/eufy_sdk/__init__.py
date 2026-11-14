@@ -41,6 +41,7 @@ from .coordinator import EufySdkDataUpdateCoordinator
 from .data import EufySdkData
 from .firmware_metadata import apply_metadata_event
 from .guard_confirmation import GuardNotifications
+from .light_schedule import register_schedule_service
 from .person_identification import PersonIdentifications
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
@@ -313,6 +314,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
             LOGGER.warning("could not fetch device properties [properties_unavailable]")
     entry.runtime_data.properties = properties
 
+    register_schedule_service(hass, entry)
     async_reconcile_property_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

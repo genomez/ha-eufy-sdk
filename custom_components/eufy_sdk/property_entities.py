@@ -9,6 +9,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
 from .entity import classify
+from .light_schedule import t9000_attached
 
 if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant
@@ -237,6 +238,17 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
             # decoded recording-quality property despite its structured wire value.
             for platform in _PROPERTY_PLATFORMS:
                 decisions[(platform, f"{serial}_{name}")] = obsolete
+        if t9000_attached(entry.runtime_data.coordinator, serial):
+            if "privacy" not in by_name:
+                for platform in _PROPERTY_PLATFORMS:
+                    decisions[(platform, f"{serial}_privacy")] = True
+            for name, spec in by_name.items():
+                platform = classify(spec)
+                if platform in _PROPERTY_PLATFORMS:
+                    for old_platform in _PROPERTY_PLATFORMS:
+                        decisions[(old_platform, f"{serial}_{name}")] = (
+                            old_platform != platform
+                        )
         # snoozeTime was a raw string sensor before its typed seconds projection.
         # Retire only that proven old route, keeping the number's stable identity.
         snooze = by_name.get("snoozeTime")

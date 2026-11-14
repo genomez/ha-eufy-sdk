@@ -1,0 +1,16 @@
+set_light_schedule:
+  name: Set light schedule
+  description: Replace the schedule entries of a supported HomeBase S1 floodlight. Other reported light settings are preserved.
+  fields:
+    device_id:
+      name: Device
+      required: true
+      selector:
+        device:
+          integration: eufy_sdk
+    entries:
+      name: Schedule entries
+      description: A list of vendor schedule entries. Use an empty list to clear the schedule.
+      required: true
+      selector:
+        object:

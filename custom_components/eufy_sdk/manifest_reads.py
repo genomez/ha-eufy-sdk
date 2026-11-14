@@ -118,7 +118,22 @@ def normalize_properties(reply: dict[str, Any]) -> list[dict[str, Any]]:
         result.append(spec)
     for name, mapping in reads.items():
         if name not in names and mapping is not None:
-            result.append({"name": name, **_read_spec(mapping[1])})
+            spec = {"name": name, **_read_spec(mapping[1])}
+            # These T9000-only borrowed light fields have no stored property spec.
+            # Existing properties keep their already resolved numeric domains.
+            if mapping[0] == "light" and name in {
+                "motionLightDuration",
+                "motionLightBrightness",
+                "motionLightMode",
+            }:
+                spec.update(
+                    {
+                        key: mapping[1][key]
+                        for key in ("min", "max", "step")
+                        if _number(mapping[1].get(key))
+                    }
+                )
+            result.append(spec)
     return result
 
 

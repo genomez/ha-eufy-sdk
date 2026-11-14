@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
@@ -11,6 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .api import EufySdkApiClientError
 from .const import DOMAIN
 from .entity import EufySdkDeviceEntity, has_capability
+from .light_schedule import t9000_attached
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -64,6 +66,14 @@ async def async_setup_entry(
             for action, meta in _PTZ_STEPS.items()
         )
     async_add_entities(entities)
+    for sn, dev in coordinator.data.items():
+        if has_capability(dev, "doorbell") and t9000_attached(coordinator, sn):
+            responses = QuickResponseButtons(coordinator, sn, async_add_entities)
+            async_add_entities(
+                [EufyQuickResponseRefreshButton(coordinator, sn, responses)]
+            )
+            with suppress(EufySdkApiClientError):
+                await responses.refresh()
 
 
 class EufySdkRebootButton(EufySdkDeviceEntity, ButtonEntity):
@@ -143,3 +153,105 @@ class EufySdkPtzButton(EufySdkDeviceEntity, ButtonEntity):
                 translation_domain=DOMAIN,
                 translation_key="ptz_ack_timeout",
             ) from err
+
+
+class QuickResponseButtons:
+    """Own an on-demand response catalogue; refresh never plays audio."""
+
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        add_entities: AddEntitiesCallback,
+    ) -> None:
+        """Keep the catalogue local to this platform lifecycle."""
+        self.coordinator = coordinator
+        self.sn = sn
+        self.add_entities = add_entities
+        self.buttons = {}
+        self.responses = {}
+
+    async def refresh(self) -> None:
+        """Replace the catalogue once, adding new IDs and disabling removed IDs."""
+        rows = await self.coordinator.config_entry.runtime_data.client.quick_responses(
+            self.sn
+        )
+        self.responses = {
+            row["voiceId"]: row["name"]
+            for row in rows
+            if isinstance(row, dict)
+            and type(row.get("voiceId")) is int
+            and row["voiceId"] >= 0
+            and isinstance(row.get("name"), str)
+        }
+        added = []
+        for voice_id, name in self.responses.items():
+            if voice_id not in self.buttons:
+                button = self.buttons[voice_id] = EufyQuickResponseButton(
+                    self.coordinator, self.sn, voice_id, self
+                )
+                added.append(button)
+            self.buttons[voice_id].update_name(name)
+        if added:
+            self.add_entities(added)
+        for button in self.buttons.values():
+            if button.hass is not None:
+                button.async_write_ha_state()
+
+
+class EufyQuickResponseButton(EufySdkDeviceEntity, ButtonEntity):
+    """An explicit, non-restoring, non-retrying doorbell audio action."""
+
+    _attr_icon = "mdi:account-voice"
+
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        voice_id: int,
+        catalogue: QuickResponseButtons,
+    ) -> None:
+        """Bind a stable voice ID; constructing this entity performs no I/O."""
+        super().__init__(coordinator, sn)
+        self.voice_id = voice_id
+        self.catalogue = catalogue
+        self._attr_unique_id = f"{sn}_quick_response_{voice_id}"
+
+    def update_name(self, name: str) -> None:
+        """Adopt the SDK name without changing the voice ID identity."""
+        self._attr_name = name
+
+    @property
+    def available(self) -> bool:
+        """Removed responses cannot be pressed through stale entity references."""
+        return super().available and self.voice_id in self.catalogue.responses
+
+    async def async_press(self) -> None:
+        """Only this explicit press can play; failure propagates without retry."""
+        if self.voice_id not in self.catalogue.responses:
+            message = "Quick response unavailable"
+            raise HomeAssistantError(message)
+        await self.client.play_quick_response(self._sn, self.voice_id)
+
+
+class EufyQuickResponseRefreshButton(EufySdkDeviceEntity, ButtonEntity):
+    """Refresh response names and IDs on demand without a polling timer."""
+
+    _attr_name = "Refresh quick responses"
+    _attr_icon = "mdi:refresh"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        catalogue: QuickResponseButtons,
+    ) -> None:
+        """Bind the manual catalogue refresh action."""
+        super().__init__(coordinator, sn)
+        self.catalogue = catalogue
+        self._attr_unique_id = f"{sn}_refresh_quick_responses"
+
+    async def async_press(self) -> None:
+        """Query response names once without playing a response."""
+        await self.catalogue.refresh()
