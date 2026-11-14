@@ -31,6 +31,13 @@ from .entity import (
 )
 from .firmware_metadata import sync_firmware_registry
 from .light import LIGHT_HIDDEN_PROPS
+from .person_identification import (
+    Occurrence,
+    detected_at_for,
+    occurrence_for,
+    timestamp_iso,
+    valid_identification,
+)
 from .schedule_logic import current_mode_for, mode_label
 from .storage_telemetry import storage_sensors
 
@@ -649,6 +656,7 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_last_person"
         self._person_attributes: dict[str, Any] = {}
+        self._person_occurrence: Occurrence | None = None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -664,6 +672,37 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         """Subscribe to bridge detection events while registered."""
         await super().async_added_to_hass()
         self.async_on_remove(async_listen_bridge_event(self.hass, self._handle_event))
+        self.async_on_remove(
+            self.coordinator.person_identifications.listen(
+                self._sn, self._apply_identification
+            )
+        )
+
+    @callback
+    def _apply_identification(self, data: dict[str, Any]) -> bool:
+        """Name only the currently displayed, unrecognized occurrence."""
+        occurrence = getattr(self, "_person_occurrence", None)
+        if (
+            not valid_identification(data)
+            or data["deviceSn"] != self._sn
+            or occurrence is None
+            or occurrence != occurrence_for(data)
+            or self._attr_native_value != "Human"
+            or self._person_attributes.get("recognized") is not False
+        ):
+            return False
+        self._attr_native_value = data["person_name"]
+        self._person_attributes = {
+            **self._person_attributes,
+            "recognized": True,
+            "event": "personIdentified",
+            "late_identified": True,
+            "identified_at": timestamp_iso(
+                data.get("identified_at_ms"), milliseconds=True
+            ),
+        }
+        self.async_write_ha_state()
+        return True
 
     @callback
     def _handle_event(self, event: Event) -> None:
@@ -672,6 +711,9 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         if data.get("deviceSn") != self._sn:
             return
         ev = data.get("event")
+        if ev == "personIdentified":
+            self._apply_identification(data)
+            return
         if ev == "strangerDetected":
             name, recognized, person_id = "Stranger", False, None
         elif ev == "personDetected":
@@ -682,11 +724,14 @@ class EufySdkLastPersonSensor(EufySdkDeviceEntity, SensorEntity):
         else:
             return
         self._attr_native_value = name
+        self._person_occurrence = occurrence_for(data)
         self._person_attributes = {
             "recognized": recognized,
             "person_id": person_id,
             "event": ev,
         }
+        if (detected_at := detected_at_for(data)) is not None:
+            self._person_attributes["detected_at"] = detected_at
         self.async_write_ha_state()
 
 

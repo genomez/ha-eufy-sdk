@@ -33,12 +33,14 @@ from .firmware_metadata import sync_firmware_registry
 if TYPE_CHECKING:
     from .api import EufySdkApiClient
     from .data import EufySdkConfigEntry
+    from .person_identification import PersonIdentifications
 
 
 class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     """Keep the bridge connected and expose the device list as `{sn: device}`."""
 
     config_entry: EufySdkConfigEntry
+    person_identifications: PersonIdentifications
 
     # Anker Solix devices (separate account/backend), kept apart from the eufy `data`
     # so the eufy platforms never iterate them: `{sn: {productCode, name, category,

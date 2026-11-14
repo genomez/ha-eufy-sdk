@@ -41,6 +41,7 @@ from .coordinator import EufySdkDataUpdateCoordinator
 from .data import EufySdkData
 from .firmware_metadata import apply_metadata_event
 from .guard_confirmation import GuardNotifications
+from .person_identification import PersonIdentifications
 from .property_entities import async_reconcile_property_entities
 from .property_sync import apply_observation_event, apply_property_event
 from .pushmap import DOORBELL_EVENT, PUBLIC_BUS_EVENTS
@@ -142,6 +143,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.async_on_unload(_stop_recovery)
     entry.async_on_unload(guard_notifications.close)
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
+    coordinator.person_identifications = PersonIdentifications(hass)
+    entry.async_on_unload(coordinator.person_identifications.close)
     doorbell_event_ids: dict[tuple[str, str], None] = {}
     recordings: RecordingRuntime | None = None
 
@@ -168,6 +171,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.async_on_unload(_close_recordings)
 
     def _on_event(evt: dict) -> None:  # noqa: C901, PLR0912, PLR0915 - explicit bridge event dispatch
+        if evt.get("event") == "personIdentified":
+            coordinator.person_identifications.apply(evt)
+            return
         if evt.get("event") in ("hello", "recordings.capability"):
             _sync_recordings()
             if evt["event"] == "recordings.capability":
