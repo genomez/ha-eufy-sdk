@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
   "version": "0.3.1-s1.experimental.15",
-  "inputCommit": "05d9288e5180a4fdab3913546382573f9628e991",
+  "inputCommit": "7ef11708bed967d738a3a81994ea0d6f44cd3032",
+  "publicationParent": "0717bead4427484ff4dd63f4080138ffcbaacaeb",
   "files": {
     ".gitattributes": {
       "bytes": 18,
@@ -16,32 +17,32 @@
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
     "CORE_COMPATIBILITY.md": {
-      "bytes": 13067,
-      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
+      "bytes": 18097,
+      "sha256": "f44db18ccffa9e280394148afe6745d693331781f8ac663efcc06f7394a48cad"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 52571,
-      "sha256": "35fd3491a56cf0d9b3dfc18a848091a1f5cd25f941e866faeb42f4c95d31047b"
+      "bytes": 56509,
+      "sha256": "5edce42881fd436c123bc3c0a68cb8d9a8a0a270e84f46ec8381d1e64f772c0e"
     },
     "INSTALL.md": {
-      "bytes": 40781,
-      "sha256": "4b09aa921a0b6bd5fcb436d51f2ef55c8d3f2e1a29ee7f71892ded18b587d24b"
+      "bytes": 46310,
+      "sha256": "c9c827512691edf68ab1d897c57beb3e32d8ac901dc43cc892be7a0e0242e00f"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 32255,
-      "sha256": "7f9861de3e58816e2d18328e410b9788ae9351c99c6c0d82a2abe0594fa8b0cf"
+      "bytes": 36492,
+      "sha256": "76388b3f806f079fa2ca884e5a3b5fa25cf47ee1c02799311efb53cf29e0dc2b"
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 11580,
-      "sha256": "7d633c38c46edaef4f3dbfc4d1eb886456f6dfdab46e8b7645d0f54a733fecfb"
+      "sha256": "80ce4afe9909ba32e04478bafa73d92bd0ce1ccd1bc0067470eaaf4686f6e053"
     },
     "LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "MODIFICATIONS.md": {
-      "bytes": 3063,
-      "sha256": "2e2ea571b57026c7aacb96b1dd9cddb898497c9dd90bc6a03373e8511a63e7e0"
+      "bytes": 40826,
+      "sha256": "d19e6dc2e05d98a298cabad138a958466f0962116c08df156adc2f66a8d6adcb"
     },
     "POST_REPACK_BUILD.json": {
       "bytes": 6587,
@@ -56,8 +57,8 @@
       "sha256": "cae16ca98ad5edfafd93f97f0eb10b13e3f8a9edc7e23679f08ccd9e6b4cb620"
     },
     "README.md": {
-      "bytes": 26083,
-      "sha256": "f85e54f335ee694fe5eaade3664075141d0c7b91bb764f231f3dea8494217c33"
+      "bytes": 31612,
+      "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
@@ -344,8 +345,8 @@
       "sha256": "9dfe902e972c05c7d827c4b5fec413eb9be9002f1cf06e07f51cd3df22d8ecb7"
     },
     "docs/recordings.md": {
-      "bytes": 4306,
-      "sha256": "02f4a14ad60fa5c41f67d64b953e7baaef453a2ea860a83232d75defa01e2de3"
+      "bytes": 4547,
+      "sha256": "a8b7b579a3962857bb6cef0a9180b3c497a952e75a8d5f9af9e2f2078af10bc8"
     },
     "frontend/scoped-webrtc-camera/lifecycle-trace.js": {
       "bytes": 3171,

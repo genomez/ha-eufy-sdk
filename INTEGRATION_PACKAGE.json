@@ -8,19 +8,19 @@
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "9129d7d01bbf4cb04ee57556b4e5e58131740f5b1787be8c7ae6f3f5fab28699"
+      "sha256": "f44db18ccffa9e280394148afe6745d693331781f8ac663efcc06f7394a48cad"
     },
     {
       "path": "EXPERIMENTAL.md",
-      "sha256": "35fd3491a56cf0d9b3dfc18a848091a1f5cd25f941e866faeb42f4c95d31047b"
+      "sha256": "5edce42881fd436c123bc3c0a68cb8d9a8a0a270e84f46ec8381d1e64f772c0e"
     },
     {
       "path": "INSTALL.md",
-      "sha256": "4b09aa921a0b6bd5fcb436d51f2ef55c8d3f2e1a29ee7f71892ded18b587d24b"
+      "sha256": "c9c827512691edf68ab1d897c57beb3e32d8ac901dc43cc892be7a0e0242e00f"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
-      "sha256": "7f9861de3e58816e2d18328e410b9788ae9351c99c6c0d82a2abe0594fa8b0cf"
+      "sha256": "76388b3f806f079fa2ca884e5a3b5fa25cf47ee1c02799311efb53cf29e0dc2b"
     },
     {
       "path": "LICENSE",
@@ -28,11 +28,11 @@
     },
     {
       "path": "MODIFICATIONS.md",
-      "sha256": "2e2ea571b57026c7aacb96b1dd9cddb898497c9dd90bc6a03373e8511a63e7e0"
+      "sha256": "d19e6dc2e05d98a298cabad138a958466f0962116c08df156adc2f66a8d6adcb"
     },
     {
       "path": "README.md",
-      "sha256": "f85e54f335ee694fe5eaade3664075141d0c7b91bb764f231f3dea8494217c33"
+      "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",

@@ -1,14 +1,82 @@
-# Experimental.15 local release candidate
+# S1 experimental.15
 
 Preserve guard receipt timing and floodlight OFF confirmation; reduce recorder churn, retain last-person details and support late identification corrections. Recording day folders are year-safe.
 
-Prepared for owner review on 2026-11-14. No live-device acceptance or publication is claimed.
+Prepared for experimental.15 publication on 2026-11-14. No live-device acceptance is claimed.
 
 Pair SDK 0.2.1-s1.experimental.15, bridge/integration 0.3.1-s1.experimental.15 and add-on 0.4.1-s1.experimental.15.
 
 Diagnostic switches remain opt-in; no new add-on option is introduced. Playback remains silent and bounded; multi-lens playback guarantees only one view.
 
-## Prior notices
+## Historical public documentation through experimental.14
+
+Modified for genomez experimental.14, 2026-11-09
+
+## .14 changes
+
+- Fixed: S350 (T8416) cameras no longer show a spotlight switch they don't have. A push connection that silently stops delivering events is now detected and reconnected. Camera settings are no longer overwritten by older values when a startup or refresh overlaps a change. Snapshot refreshes are no longer lost when they overlap; queued refreshes stop after a sign-in failure.
+- Changed: Floodlight brightness/spotlight controls that HomeBase S1 can't drive are hidden. Number settings use per-model ranges. Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder. More playback diagnostics.
+- Upgrade: Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.
+- Known limits: Playback is silent; multi-lens cameras show one view; a late update from a camera can still briefly show an old state.
+
+## Previous notices
+
+Modified for genomez experimental.13, 2026-11-07
+
+See MODIFICATIONS.md for current modified paths.
+
+# S1 experimental.12
+
+Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.
+
+- Push-store save failures are caught and reported through push-connection diagnostics (#539).
+- Session and FCM files use an owner-only temporary file and atomic rename where the filesystem permits (#540). On restricted directories or single-file mounts, the existing in-place fallback is non-atomic and retains existing file permissions.
+- Stored snapshots recover after a successful re-login, including when an older in-flight download fails afterwards (#545).
+- Optional HomeBase S1 storage telemetry also supports firmware 4.4.1.4; it remains off by default.
+- After an acknowledged light command, Home Assistant holds the requested display value for up to 45 seconds. A matching boolean report releases it early. The acknowledgement does not confirm the physical light state.
+- A registry identity conflict invalidates the affected child-camera status to unknown.
+- HomeBase firmware metadata updates from newly received inventory without a Home Assistant restart. A new Firmware version sensor exposes the received version.
+- Dated experimental.11 and experimental.12 modification notices are retained, including the restored integration notice.
+
+Defaults are unchanged. Live view and optional floodlight safety remain off by default. Keep battery-camera preload off. Verify the integration ZIP checksum and restart Home Assistant after replacing the integration. Changing live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms.
+
+Known live-view stalls, unexplained floodlight ON events and brightness/spotlight formatting issues remain unresolved. This is an experimental fork.
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.12
+
+Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
+
+Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
+
+Modified for genomez experimental.11, 2026-10-31
+
+Modified for genomez experimental.12, 2026-11-02
+
+## Files modified in experimental.12
+
+- `CORE_COMPATIBILITY.md`
+- `EXPERIMENTAL.md`
+- `INSTALL.md`
+- `INTEGRATION_NOTICES.md`
+- `INTEGRATION_PACKAGE.json`
+- `PUBLICATION.json`
+- `README.md`
+- `SOURCE_MANIFEST.json`
+- `custom_components/eufy_sdk/__init__.py`
+- `custom_components/eufy_sdk/coordinator.py`
+- `custom_components/eufy_sdk/entity.py`
+- `custom_components/eufy_sdk/firmware_metadata.py`
+- `custom_components/eufy_sdk/manifest.json`
+- `custom_components/eufy_sdk/sensor.py`
+- `custom_components/eufy_sdk/storage_telemetry.py`
+- `tests/test_ack_light_display.py`
+- `tests/test_bounded_state_writes.py`
+- `tests/test_camera_health.py`
+- `tests/test_firmware_metadata.py`
+- `tests/test_storage_telemetry.py`
+- `tools/build_integration_zip.py`
+
+## Historical modification notices
 
 # S1 experimental.11 — Integration notices
 
@@ -223,7 +291,7 @@ The official integration ZIP remains frozen at 6bb1365de39615d9e094b44b766511845
 
 # Experimental.8 local preparation
 
-Version `0.3.1-s1.experimental.8` is prepared locally and unpublished. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
+Version `0.3.1-s1.experimental.8` is described in this historical notice. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
 
 RTC late-viewer keyframe gating; bounded refresh backoff and recovery; isolated slow replies; camera connectivity and hub reply evidence; T8171 detection; opt-in floodlight safety with bounded confirmation and problem notices; observation-only media stall evidence.
 

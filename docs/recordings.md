@@ -15,7 +15,7 @@ prefetches covers in the background.
 The HomeBase query sees the latest 20 station-wide events. The bridge accumulates a
 seven-day, evictable catalog, capped at 2,000 rows total and 400 per camera. Each
 camera browse returns up to 100 newest events; a truncated result is disclosed,
-with bounded station paging while a camera folder has interest. An empty folder does not prove that the camera has no history.
+with bounded station paging while a camera folder has interest. Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder. These status entries do not prove that the camera has no history.
 “May no longer be on HomeBase” marks retained events outside the last successful
 station window. Every event is an expandable information folder: video playback,
 downloads and media resolution are unavailable in Phase 1.
@@ -23,7 +23,7 @@ downloads and media resolution are unavailable in Phase 1.
 Day folders and clip titles use Home Assistant's configured time zone, converted
 from absolute UTC timestamps. Today and Yesterday use that local calendar. The
 bridge zone is validated as an IANA zone; legacy bridge zones remain supported.
-Install this integration before the matching bridge. Unknown times have an explicit status. Event
+Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up. Unknown times have an explicit status. Event
 details include UTC when known. Folder titles contain only the trimmed camera name;
 history and cache status appear in a non-playable information child.
 

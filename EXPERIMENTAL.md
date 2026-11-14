@@ -1,14 +1,58 @@
-# Experimental.15 local release candidate
+# S1 experimental.15
 
 Preserve guard receipt timing and floodlight OFF confirmation; reduce recorder churn, retain last-person details and support late identification corrections. Recording day folders are year-safe.
 
-Prepared for owner review on 2026-11-14. No live-device acceptance or publication is claimed.
+Prepared for experimental.15 publication on 2026-11-14. No live-device acceptance is claimed.
 
 Pair SDK 0.2.1-s1.experimental.15, bridge/integration 0.3.1-s1.experimental.15 and add-on 0.4.1-s1.experimental.15.
 
 Diagnostic switches remain opt-in; no new add-on option is introduced. Playback remains silent and bounded; multi-lens playback guarantees only one view.
 
-## Prior notices
+## Historical public documentation through experimental.14
+
+# S1 experimental.14
+
+## .14 changes
+
+- Fixed: S350 (T8416) cameras no longer show a spotlight switch they don't have. A push connection that silently stops delivering events is now detected and reconnected. Camera settings are no longer overwritten by older values when a startup or refresh overlaps a change. Snapshot refreshes are no longer lost when they overlap; queued refreshes stop after a sign-in failure.
+- Changed: Floodlight brightness/spotlight controls that HomeBase S1 can't drive are hidden. Number settings use per-model ranges. Media → Eufy shows "Playback not yet supported for this camera", "No playable recordings yet" or "No recordings yet" instead of an empty camera folder. More playback diagnostics.
+- Upgrade: Update the add-on and integration together, then restart Home Assistant after the add-on is running, so removed controls are cleaned up.
+- Known limits: Playback is silent; multi-lens cameras show one view; a late update from a camera can still briefly show an old state.
+
+SDK 0.2.1-s1.experimental.14; bridge/integration 0.3.1-s1.experimental.14; add-on 0.4.1-s1.experimental.14. Linux amd64.
+
+Recorded playback is progressive by default. Extra camera models are an eligibility opt-in, not proof of codec or lens compatibility. Keep the previous add-on/integration pair and backups for rollback; restore both together and restart Home Assistant. Live view and floodlight safety remain opt-in; keep battery preload off. Command keepalive is 29000 ms.
+
+## Historical documentation through experimental.12
+
+# S1 experimental.12
+
+Update the add-on and integration together: add-on `0.4.1-s1.experimental.12`, integration and bridge `0.3.1-s1.experimental.12`, SDK `0.2.1-s1.experimental.12`.
+
+- Push-store save failures are caught and reported through push-connection diagnostics (#539).
+- Session and FCM files use an owner-only temporary file and atomic rename where the filesystem permits (#540). On restricted directories or single-file mounts, the existing in-place fallback is non-atomic and retains existing file permissions.
+- Stored snapshots recover after a successful re-login, including when an older in-flight download fails afterwards (#545).
+- Optional HomeBase S1 storage telemetry also supports firmware 4.4.1.4; it remains off by default.
+- After an acknowledged light command, Home Assistant holds the requested display value for up to 45 seconds. A matching boolean report releases it early. The acknowledgement does not confirm the physical light state.
+- A registry identity conflict invalidates the affected child-camera status to unknown.
+- HomeBase firmware metadata updates from newly received inventory without a Home Assistant restart. A new Firmware version sensor exposes the received version.
+- Dated experimental.11 and experimental.12 modification notices are retained, including the restored integration notice.
+
+Defaults are unchanged. Live view and optional floodlight safety remain off by default. Keep battery-camera preload off. Verify the integration ZIP checksum and restart Home Assistant after replacing the integration. Changing live-view opt-in requires an add-on restart. Command keepalive remains 29000 ms.
+
+Known live-view stalls, unexplained floodlight ON events and brightness/spotlight formatting issues remain unresolved. This is an experimental fork.
+
+Runtime and corresponding source: https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.12
+
+Integration ZIP and checksum: https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.12
+
+Publication availability is pending. The accepted image is delivered without rebuilding. Earlier release records below are historical.
+
+Modified for genomez experimental.11, 2026-10-31
+
+Modified for genomez experimental.12, 2026-11-02
+
+## Historical documentation before experimental.12 publication
 
 # S1 experimental.11 — Experimental support and limitations
 
@@ -138,7 +182,7 @@ The official integration ZIP remains frozen at 6bb1365de39615d9e094b44b766511845
 
 # Experimental.8 local preparation
 
-Version `0.3.1-s1.experimental.8` is prepared locally and unpublished. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
+Version `0.3.1-s1.experimental.8` is described in this historical notice. Pair add-on `0.4.1-s1.experimental.8`, integration/bridge `0.3.1-s1.experimental.8` and SDK `0.2.1-s1.experimental.8`.
 
 RTC late-viewer keyframe gating; bounded refresh backoff and recovery; isolated slow replies; camera connectivity and hub reply evidence; T8171 detection; opt-in floodlight safety with bounded confirmation and problem notices; observation-only media stall evidence.
 
@@ -254,7 +298,7 @@ The following retained notes describe earlier source and test runs, not current 
 
 ## Local source changes, 2026-10-17
 
-This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1-s1.experimental.6` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is prepared locally; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
+This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1-s1.experimental.6` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is documented in this historical notice; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
 
 - Sirens require a bound `siren` descriptor with both `trigger` and `stop`, or standalone sensor-family `test` and `stop`. Missing, incomplete or malformed manifests create no new siren entities; withdrawn actions make existing entities unavailable and direct calls fail before RPC. HomeBase/camera duration commands retain the 30-second default. Command acknowledgements and elapsed durations never establish sounding state: without a reported boolean it remains unknown.
 - Doorbell presses publish legacy `pressed`, then standard `ring`, with a separate write for each. Existing event types and entity identities remain. Automations filtered to either type each receive one matching event; an unfiltered state automation can run twice. Detection event types remain unchanged.
@@ -328,7 +372,7 @@ Target contributions at `s1-experimental`. The existing default branch belongs t
 
 ## Local source changes, 2026-10-17
 
-This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1-s1.experimental.6` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is prepared locally; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
+This local release candidate packages the reviewed source at `0f4ff70`, including siren/doorbell changes at `cad908c` and floodlight pending-success correction at `c50fe57`. Version `0.3.1-s1.experimental.6` is the integration companion for runtime `0.4.1-s1.experimental.6`. The deterministic ZIP is documented in this historical notice; nothing is installed or published. The source-review test counts below are historical; the preparation receipts record fresh offline verification.
 
 - Sirens require a bound `siren` descriptor with both `trigger` and `stop`, or standalone sensor-family `test` and `stop`. Missing, incomplete or malformed manifests create no new siren entities; withdrawn actions make existing entities unavailable and direct calls fail before RPC. HomeBase/camera duration commands retain the 30-second default. Command acknowledgements and elapsed durations never establish sounding state: without a reported boolean it remains unknown.
 - Doorbell presses publish legacy `pressed`, then standard `ring`, with a separate write for each. Existing event types and entity identities remain. Automations filtered to either type each receive one matching event; an unfiltered state automation can run twice. Detection event types remain unchanged.
