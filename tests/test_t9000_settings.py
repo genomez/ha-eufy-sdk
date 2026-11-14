@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
+from test_property_entities import Entry, Registry
 
 from custom_components.eufy_sdk.api import EufySdkApiClient, EufySdkApiClientError
 from custom_components.eufy_sdk.button import (
@@ -24,7 +26,10 @@ from custom_components.eufy_sdk.light_schedule import (
 )
 from custom_components.eufy_sdk.manifest_reads import normalize_properties
 from custom_components.eufy_sdk.number import EufySdkNumber
-from custom_components.eufy_sdk.property_entities import _presentation_decisions
+from custom_components.eufy_sdk.property_entities import (
+    _presentation_decisions,
+    async_reconcile_property_entities,
+)
 from custom_components.eufy_sdk.select import EufySdkSelect
 from custom_components.eufy_sdk.sensor import EufyLightScheduleSensor
 
@@ -202,6 +207,10 @@ class MetadataTests(unittest.TestCase):
                 (low, high, 1),
             )
             self.assertEqual(entity.unique_id, f"camera_{name}")
+            self.assertEqual(
+                entity.native_unit_of_measurement,
+                {"seconds": "s", "percent": "%"}.get(kind),
+            )
 
     def test_schedule_count_and_private_attributes(self):
         obj = coordinator()
@@ -254,6 +263,109 @@ class MetadataTests(unittest.TestCase):
         self.assertFalse(t9000_attached(obj, "camera"))
         self.assertFalse(_presentation_decisions(entry)[("switch", "camera_light")])
 
+    def test_registry_retire_release_and_user_preferences(self):
+        for preference in (None, "opt_out", "user_disabled"):
+            with self.subTest(preference=preference):
+                obj = coordinator()
+                spec = {"name": "light", "type": "bool", "writable": False}
+                entry = SimpleNamespace(
+                    entry_id="synthetic-entry",
+                    async_on_unload=Mock(),
+                    runtime_data=SimpleNamespace(
+                        coordinator=obj, properties={"camera": [spec]}
+                    ),
+                )
+                original = Entry(
+                    entity_id="switch.light",
+                    domain="switch",
+                    unique_id="camera_light",
+                    disabled_by=er.RegistryEntryDisabler.USER
+                    if preference == "user_disabled"
+                    else None,
+                    options={
+                        "eufy_sdk": {"property_presentation_v2": {"opt_out": True}}
+                    }
+                    if preference == "opt_out"
+                    else {},
+                )
+                registry = Registry([original])
+                hass = Mock(data={})
+                with (
+                    patch.object(er, "async_get", return_value=registry),
+                    patch.object(
+                        er,
+                        "async_entries_for_config_entry",
+                        side_effect=lambda *_, registry=registry: list(
+                            registry.entities.values()
+                        ),
+                    ),
+                ):
+                    async_reconcile_property_entities(hass, entry)
+                    retired = registry.async_get(original.entity_id)
+                    if preference is None:
+                        self.assertEqual(
+                            retired.disabled_by, er.RegistryEntryDisabler.INTEGRATION
+                        )
+                    else:
+                        self.assertEqual(retired, original)
+                    spec["writable"] = True
+                    async_reconcile_property_entities(hass, entry)
+                    self.assertEqual(registry.async_get(original.entity_id), original)
+                    spec["writable"] = False
+                    async_reconcile_property_entities(hass, entry)
+                    if preference:
+                        self.assertEqual(
+                            registry.async_get(original.entity_id), original
+                        )
+
+    def test_registry_unknown_parent_neither_retires_nor_releases(self):
+        for parent in (None, {}, {"error": "unavailable", "model": "T9000"}):
+            for owned in (False, True):
+                with self.subTest(parent=parent, owned=owned):
+                    obj = coordinator()
+                    if parent is None:
+                        obj.data.pop("station")
+                    else:
+                        obj.data["station"] = parent
+                    entry = SimpleNamespace(
+                        entry_id="synthetic-entry",
+                        async_on_unload=Mock(),
+                        runtime_data=SimpleNamespace(
+                            coordinator=obj,
+                            properties={
+                                "camera": [
+                                    {"name": "light", "type": "bool", "writable": False}
+                                ]
+                            },
+                        ),
+                    )
+                    original = Entry(
+                        entity_id="switch.light",
+                        domain="switch",
+                        unique_id="camera_light",
+                        disabled_by=er.RegistryEntryDisabler.INTEGRATION
+                        if owned
+                        else None,
+                        options={
+                            "eufy_sdk": {
+                                "property_presentation_v2": {"owned_disabled": True}
+                            }
+                        }
+                        if owned
+                        else {},
+                    )
+                    registry = Registry([original])
+                    with (
+                        patch.object(er, "async_get", return_value=registry),
+                        patch.object(
+                            er,
+                            "async_entries_for_config_entry",
+                            return_value=[original],
+                        ),
+                    ):
+                        async_reconcile_property_entities(Mock(data={}), entry)
+                    self.assertEqual(registry.async_get(original.entity_id), original)
+
 
 class ActionsTests(unittest.IsolatedAsyncioTestCase):
     async def test_recording_quality_option_mapping(self):
@@ -282,10 +394,19 @@ class ActionsTests(unittest.IsolatedAsyncioTestCase):
     async def test_quick_buttons_setup_refresh_reload_never_play(self):
         obj = coordinator()
         added = []
-        entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=obj))
+        scheduled = []
+        entry = SimpleNamespace(
+            runtime_data=SimpleNamespace(coordinator=obj),
+            async_create_background_task=Mock(
+                side_effect=lambda _hass, coroutine, _name: scheduled.append(coroutine)
+            ),
+        )
         for _ in range(2):
             await async_setup_entry(Mock(), entry, added.extend)
         client = obj.config_entry.runtime_data.client
+        client.quick_responses.assert_not_awaited()
+        for task in scheduled:
+            await task
         client.play_quick_response.assert_not_awaited()
         catalog = QuickResponseButtons(obj, "camera", added.extend)
         await catalog.refresh()
@@ -299,8 +420,9 @@ class ActionsTests(unittest.IsolatedAsyncioTestCase):
         await button.async_press()
         client.play_quick_response.assert_awaited_once_with("camera", 2)
         client.play_quick_response.side_effect = EufySdkApiClientError("failed")
-        with self.assertRaises(EufySdkApiClientError):
+        with self.assertRaisesRegex(HomeAssistantError, "may still play") as raised:
             await button.async_press()
+        self.assertNotIsInstance(raised.exception, EufySdkApiClientError)
         await refresh.async_press()
         self.assertEqual(client.play_quick_response.await_count, 2)
         client.quick_responses.return_value = []
@@ -315,8 +437,71 @@ class ActionsTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(EufySdkApiClientError):
             await client.play_quick_response("camera", 2)
         client.rpc.assert_awaited_once_with(
-            "doorbell.playQuickResponse", timeout=45, sn="camera", voiceId=2
+            "doorbell.playQuickResponse", timeout=75, sn="camera", voiceId=2
         )
+
+    async def test_background_list_retry_recovers_and_is_bounded(self):
+        for recover in (True, False):
+            obj = coordinator()
+            client = obj.config_entry.runtime_data.client
+            client.quick_responses.side_effect = [
+                EufySdkApiClientError("failed"),
+                [{"voiceId": 2, "name": "Leave it here"}]
+                if recover
+                else EufySdkApiClientError("failed"),
+            ]
+            added, tasks = [], []
+            entry = SimpleNamespace(
+                runtime_data=SimpleNamespace(coordinator=obj),
+                async_create_background_task=Mock(
+                    side_effect=lambda _hass, coroutine, _name, tasks=tasks: (
+                        tasks.append(coroutine)
+                    )
+                ),
+            )
+            await async_setup_entry(Mock(), entry, added.extend)
+            client.quick_responses.assert_not_awaited()
+            with patch(
+                "custom_components.eufy_sdk.button.asyncio.sleep",
+                new_callable=AsyncMock,
+            ) as delay:
+                await tasks.pop()
+            delay.assert_awaited_once_with(30)
+            self.assertEqual(client.quick_responses.await_count, 2)
+            catalog = next(
+                button.catalogue
+                for button in added
+                if isinstance(button, EufyQuickResponseRefreshButton)
+            )
+            self.assertEqual(bool(catalog.buttons), recover)
+            if recover:
+                button = catalog.buttons[2]
+                self.assertEqual(button.unique_id, "camera_quick_response_2")
+                client.quick_responses.side_effect = None
+                client.quick_responses.return_value = []
+                await catalog.refresh()
+                self.assertNotIn(2, catalog.responses)
+                client.quick_responses.return_value = [
+                    {"voiceId": 2, "name": "Updated"}
+                ]
+                await catalog.refresh()
+                self.assertIs(catalog.buttons[2], button)
+                self.assertEqual(button.name, "Updated")
+            client.play_quick_response.assert_not_awaited()
+
+    async def test_manual_list_failure_has_short_user_error(self):
+        obj = coordinator()
+        obj.config_entry.runtime_data.client.quick_responses.side_effect = (
+            EufySdkApiClientError("private failure")
+        )
+        button = EufyQuickResponseRefreshButton(
+            obj, "camera", QuickResponseButtons(obj, "camera", Mock())
+        )
+        with self.assertRaisesRegex(HomeAssistantError, "list unavailable") as raised:
+            await button.async_press()
+        self.assertNotIsInstance(raised.exception, EufySdkApiClientError)
+        self.assertNotIn("private failure", str(raised.exception))
+        obj.config_entry.runtime_data.client.play_quick_response.assert_not_awaited()
 
     async def test_schedule_service_target_validation_dispatch_and_unload(self):
         obj = coordinator()
@@ -344,6 +529,15 @@ class ActionsTests(unittest.IsolatedAsyncioTestCase):
             await handler(SimpleNamespace(data=data))
             runtime.client.set_light_schedule.assert_awaited_once_with("camera", [])
             obj.async_request_refresh.assert_awaited_once()
+            runtime.client.set_light_schedule.side_effect = EufySdkApiClientError(
+                "private failure"
+            )
+            with self.assertRaisesRegex(
+                HomeAssistantError, "could not be confirmed"
+            ) as raised:
+                await handler(SimpleNamespace(data=data))
+            self.assertNotIsInstance(raised.exception, EufySdkApiClientError)
+            self.assertNotIn("private failure", str(raised.exception))
             runtime.properties["camera"][0]["writable"] = False
             with self.assertRaises(HomeAssistantError):
                 await handler(SimpleNamespace(data=data))

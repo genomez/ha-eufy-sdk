@@ -66,21 +66,23 @@ def validate_entries(value: Any) -> list:
     return result
 
 
-def t9000_attached(coordinator: EufySdkDataUpdateCoordinator, sn: str) -> bool:
-    """Use explicit parent roster metadata; never infer from a camera model."""
+def t9000_attached(coordinator: EufySdkDataUpdateCoordinator, sn: str) -> bool | None:
+    """Use parent roster metadata; return None when the parent row is unknown."""
     dev = coordinator.data.get(sn, {})
     parent = dev.get("stationSn")
-    return bool(
-        parent
-        and parent != sn
-        and str(coordinator.data.get(parent, {}).get("model", ""))
-        .upper()
-        .startswith("T9000")
-    )
+    if not parent or parent == sn:
+        return False
+    station = coordinator.data.get(parent, {})
+    if station.get("error") or not station.get("model"):
+        return None
+    return str(station["model"]).upper().startswith("T9000")
 
 
 def register_schedule_service(hass: HomeAssistant, entry: EufySdkConfigEntry) -> None:
     """Register one service across entries, releasing it when the last unloads."""
+    # The API imports the schedule validator; defer this import until registration.
+    from .api import EufySdkApiClientError  # noqa: PLC0415
+
     runtimes = hass.data.setdefault(_RUNTIMES, {})
     runtimes[entry.entry_id] = entry.runtime_data
 
@@ -102,7 +104,11 @@ def register_schedule_service(hass: HomeAssistant, entry: EufySdkConfigEntry) ->
             message = "Writable light schedule device unavailable"
             raise HomeAssistantError(message)
         runtime, sn = matches[0]
-        await runtime.client.set_light_schedule(sn, call.data["entries"])
+        try:
+            await runtime.client.set_light_schedule(sn, call.data["entries"])
+        except EufySdkApiClientError:
+            message = "Light schedule update could not be confirmed"
+            raise HomeAssistantError(message) from None
         await runtime.coordinator.async_request_refresh()
 
     if len(runtimes) == 1:

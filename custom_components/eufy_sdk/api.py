@@ -1569,14 +1569,14 @@ class EufySdkApiClient(RecordingsApi):
         return reply.get("params") or {}
 
     async def quick_responses(self, sn: str) -> list[dict[str, Any]]:
-        """Query once on setup or explicit refresh; never play or retry."""
+        """Send one list query; never play or retry within this RPC."""
         reply = await self.rpc("doorbell.quickResponses", timeout=30, sn=sn)
         return reply.get("responses") or []
 
     async def play_quick_response(self, sn: str, voice_id: int) -> None:
         """One explicit press sends one playback request, with no retry."""
         await self.rpc(
-            "doorbell.playQuickResponse", timeout=45, sn=sn, voiceId=voice_id
+            "doorbell.playQuickResponse", timeout=75, sn=sn, voiceId=voice_id
         )
 
     async def set_light_schedule(self, sn: str, entries: list) -> None:

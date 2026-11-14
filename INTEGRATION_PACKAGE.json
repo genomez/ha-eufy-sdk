@@ -56,7 +56,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/api.py",
-      "sha256": "66c04093c739a89bac51b91064914a5acadbf7bec3cb246dce362d7590d83a51"
+      "sha256": "76ea931017ea136ab7c109e0a13b3be1ea2e1d63b924f693fa1167a4fb2c798a"
     },
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
@@ -108,7 +108,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/button.py",
-      "sha256": "e6df84124603ffd2ae0071e8d179a403f9bdf0fb37435043c89a40bc17f938ba"
+      "sha256": "4042a3d861d8dd9efe966533d867984365f1b1999cc84f5d74bcfb0ca152f2a0"
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
@@ -180,7 +180,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/light_schedule.py",
-      "sha256": "35b25d139c3705d738f7d0ee42d62ab67a47614a3a8f516b9a9d643a79e4068c"
+      "sha256": "61904a8319987199bd1e416a43e0bf5368184498dac4f724dd17cf9adbfd0086"
     },
     {
       "path": "custom_components/eufy_sdk/lock.py",
@@ -192,7 +192,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/manifest_reads.py",
-      "sha256": "54d42f2c9f13e2ebe57e27c26dc59dc7c6541530fc5159a189ab9437e1be06fa"
+      "sha256": "09dbd2b07bcbc28fffc9b85fba0e138d92dd0d642dbb7d2cac8f3cbceda26fec"
     },
     {
       "path": "custom_components/eufy_sdk/media_source.py",
@@ -224,7 +224,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/property_entities.py",
-      "sha256": "26de8e92a22929e85b21ef83f20bcb3df8bcebd2fdc35f3080043473b930fd4a"
+      "sha256": "de800a0f14288c6a7b06efe0764b7556d94d2c292ef7eea31f1cc71ce32bfdb0"
     },
     {
       "path": "custom_components/eufy_sdk/property_sync.py",
@@ -276,7 +276,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/services.yaml",
-      "sha256": "711e54d41a0501e8f74afb965e45dba0355a29fcc9150789498b8e4b88d76df9"
+      "sha256": "ac97e7810567fc0c6a94ad04a8efd7629a9d49fba683bfed201cb7939bc30421"
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",

@@ -225,7 +225,9 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
     decisions: dict[tuple[str, str], bool] = {}
     for serial, specs in entry.runtime_data.properties.items():
         device = entry.runtime_data.coordinator.data.get(serial, {})
-        if device.get("error") or not specs:
+        attached = t9000_attached(entry.runtime_data.coordinator, serial)
+        if device.get("error") or not specs or attached is None:
+            # An absent/errored parent cannot prove either retirement or release.
             continue
         by_name = {
             spec["name"]: spec for spec in specs if isinstance(spec.get("name"), str)
@@ -238,7 +240,7 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
             # decoded recording-quality property despite its structured wire value.
             for platform in _PROPERTY_PLATFORMS:
                 decisions[(platform, f"{serial}_{name}")] = obsolete
-        if t9000_attached(entry.runtime_data.coordinator, serial):
+        if attached:
             if "privacy" not in by_name:
                 for platform in _PROPERTY_PLATFORMS:
                     decisions[(platform, f"{serial}_privacy")] = True
@@ -278,5 +280,10 @@ def async_reconcile_property_entities(
         obsolete = decisions.get((entity.domain, entity.unique_id))
         if obsolete is True:
             manager.retire(entity)
-        elif obsolete is False and (_marker(entity) or _marker(entity, _V1_MARKER)):
+        elif (
+            obsolete is False
+            and (_marker(entity) or _marker(entity, _V1_MARKER))
+            and _marker(entity).get("opt_out") is not True
+            and _marker(entity, _V1_MARKER).get("opt_out") is not True
+        ):
             manager.release(entity)

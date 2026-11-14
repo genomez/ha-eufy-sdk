@@ -133,6 +133,10 @@ def normalize_properties(reply: dict[str, Any]) -> list[dict[str, Any]]:
                         if _number(mapping[1].get(key))
                     }
                 )
+                spec["unit"] = mapping[1].get("unit") or {
+                    "motionLightDuration": "s",
+                    "motionLightBrightness": "%",
+                }.get(name)
             result.append(spec)
     return result
 

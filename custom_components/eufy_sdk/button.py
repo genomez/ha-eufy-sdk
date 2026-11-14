@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
+import asyncio
+import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
@@ -33,10 +34,12 @@ _PTZ_STEPS: dict[str, dict[str, Any]] = {
     "left": {"key": "pan_left", "icon": "mdi:arrow-left"},
     "right": {"key": "pan_right", "icon": "mdi:arrow-right"},
 }
+_LOGGER = logging.getLogger(__name__)
+_RESPONSE_LIST_RETRY_SECONDS = 30
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001
+    hass: HomeAssistant,
     entry: EufySdkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
@@ -72,8 +75,9 @@ async def async_setup_entry(
             async_add_entities(
                 [EufyQuickResponseRefreshButton(coordinator, sn, responses)]
             )
-            with suppress(EufySdkApiClientError):
-                await responses.refresh()
+            entry.async_create_background_task(
+                hass, responses.discover(), "Quick response list discovery"
+            )
 
 
 class EufySdkRebootButton(EufySdkDeviceEntity, ButtonEntity):
@@ -171,6 +175,21 @@ class QuickResponseButtons:
         self.buttons = {}
         self.responses = {}
 
+    async def discover(self) -> None:
+        """Query off the startup path, retrying only LIST once after a delay."""
+        for attempt in range(2):
+            try:
+                await self.refresh()
+            except EufySdkApiClientError:
+                if attempt == 0:
+                    await asyncio.sleep(_RESPONSE_LIST_RETRY_SECONDS)
+                else:
+                    _LOGGER.warning(
+                        "Quick response list unavailable; use Refresh quick responses"
+                    )
+            else:
+                return
+
     async def refresh(self) -> None:
         """Replace the catalogue once, adding new IDs and disabling removed IDs."""
         rows = await self.coordinator.config_entry.runtime_data.client.quick_responses(
@@ -231,7 +250,11 @@ class EufyQuickResponseButton(EufySdkDeviceEntity, ButtonEntity):
         if self.voice_id not in self.catalogue.responses:
             message = "Quick response unavailable"
             raise HomeAssistantError(message)
-        await self.client.play_quick_response(self._sn, self.voice_id)
+        try:
+            await self.client.play_quick_response(self._sn, self.voice_id)
+        except EufySdkApiClientError:
+            message = "Quick response could not be confirmed; it may still play"
+            raise HomeAssistantError(message) from None
 
 
 class EufyQuickResponseRefreshButton(EufySdkDeviceEntity, ButtonEntity):
@@ -254,4 +277,8 @@ class EufyQuickResponseRefreshButton(EufySdkDeviceEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Query response names once without playing a response."""
-        await self.catalogue.refresh()
+        try:
+            await self.catalogue.refresh()
+        except EufySdkApiClientError:
+            message = "Quick response list unavailable; try refreshing later"
+            raise HomeAssistantError(message) from None

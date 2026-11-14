@@ -10,7 +10,7 @@ set_light_schedule:
           integration: eufy_sdk
     entries:
       name: Schedule entries
-      description: A list of vendor schedule entries. Use an empty list to clear the schedule.
+      description: A complete list of vendor schedule entries. Use an empty list to clear the schedule. The sensor's entries attribute omits location, account, serial and other identity fields recursively. Copying it back can delete those fields on the device; it is not a lossless backup.
       required: true
       selector:
         object:

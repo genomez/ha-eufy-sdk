@@ -251,6 +251,54 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(self.scheduled, [])
 
+    async def test_structured_light_invalidations_refresh_siblings_without_null_state(
+        self,
+    ):
+        previous = {
+            "motionLightEnabled": True,
+            "lightSchedule": "[]",
+            "motionLightDuration": 30,
+            "motionLightBrightness": 50,
+            "motionLightMode": 1,
+        }
+        self.coordinator.data["homebase"]["state"].update(previous)
+
+        async def refresh() -> None:
+            self.coordinator.data["homebase"]["state"].update(
+                motionLightEnabled=False,
+                lightSchedule='[{"day":1}]',
+                motionLightDuration=45,
+                motionLightBrightness=75,
+                motionLightMode=2,
+            )
+
+        self.coordinator.async_request_refresh.side_effect = refresh
+        for name in (
+            "motionLightEnabled",
+            "lightSchedule",
+            "motionActivateLight",
+            "lightScheduleConfig",
+        ):
+            self.on_event(
+                {"event": "propertyChanged", "deviceSn": "homebase", "property": name}
+            )
+            self.assertEqual(len(self.scheduled), 1)
+            self.assertNotIn(None, self.coordinator.data["homebase"]["state"].values())
+            await self.scheduled.pop()
+        state = self.coordinator.data["homebase"]["state"]
+        self.assertFalse(state["motionLightEnabled"])
+        self.assertEqual(
+            [
+                state[name]
+                for name in (
+                    "motionLightDuration",
+                    "motionLightBrightness",
+                    "motionLightMode",
+                )
+            ],
+            [45, 75, 2],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

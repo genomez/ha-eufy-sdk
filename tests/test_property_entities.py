@@ -522,6 +522,59 @@ class RealRegistryTests(unittest.IsolatedAsyncioTestCase):
     def current(self):
         return self.registry.async_get(self.entity.entity_id)
 
+    async def test_t9000_light_migration_retire_release_unknown_parent_and_opt_out(
+        self,
+    ):
+        runtime = self.config_entry.runtime_data
+        runtime.coordinator.data = {
+            "camera": {"stationSn": "station"},
+            "station": {"model": "T9000"},
+        }
+        spec = {"name": "light", "type": "bool", "writable": False}
+        runtime.properties = {"camera": [spec]}
+        self.entity = self.registry.async_get_or_create(
+            "switch", "eufy_sdk", "camera_light", config_entry=self.config_entry
+        )
+        original = self.current()
+        for parent in (None, {"error": "unavailable", "model": "T9000"}):
+            runtime.coordinator.data["station"] = parent or {}
+            self.apply()
+            await self.hass.async_block_till_done()
+            self.assertEqual(self.current(), original)
+        runtime.coordinator.data["station"] = {"model": "T9000"}
+        self.apply()
+        await self.hass.async_block_till_done()
+        self.assertEqual(
+            self.current().disabled_by, er.RegistryEntryDisabler.INTEGRATION
+        )
+        retired = self.current()
+        for parent in (None, {"error": "unavailable", "model": "T9000"}):
+            runtime.coordinator.data["station"] = parent or {}
+            self.apply()
+            await self.hass.async_block_till_done()
+            self.assertEqual(self.current(), retired)
+        runtime.coordinator.data["station"] = {"model": "T9000"}
+        spec["writable"] = True
+        self.apply()
+        await self.hass.async_block_till_done()
+        self.assertIsNone(self.current().disabled_by)
+        self.assertEqual(self.current().options, {})
+        self.assertEqual(self.current().unique_id, original.unique_id)
+        spec["writable"] = False
+        self.apply()
+        await self.hass.async_block_till_done()
+        self.registry.async_update_entity(self.entity.entity_id, disabled_by=None)
+        await self.hass.async_block_till_done()
+        for writable in (True, False):
+            spec["writable"] = writable
+            self.apply()
+            await self.hass.async_block_till_done()
+            self.assertIsNone(self.current().disabled_by)
+            self.assertEqual(
+                self.current().options["eufy_sdk"]["property_presentation_v2"],
+                {"opt_out": True},
+            )
+
     async def test_new_disable_own_event_does_not_opt_out_and_user_enable_does(self):
         self.apply()
         await self.hass.async_block_till_done()
@@ -584,7 +637,10 @@ class RealRegistryTests(unittest.IsolatedAsyncioTestCase):
         self.apply()
         await self.hass.async_block_till_done()
         self.assertEqual(self.current().disabled_by, er.RegistryEntryDisabler.USER)
-        self.assertEqual(self.current().options, {})
+        self.assertEqual(
+            self.current().options,
+            {"eufy_sdk": {"property_presentation_v2": {"opt_out": True}}},
+        )
 
     async def test_manual_unhide_opts_out_and_releases_only_owned_disable(self):
         self.apply()
