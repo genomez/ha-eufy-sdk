@@ -44,8 +44,8 @@
       "sha256": "2e2ea571b57026c7aacb96b1dd9cddb898497c9dd90bc6a03373e8511a63e7e0"
     },
     "POST_REPACK_BUILD.json": {
-      "bytes": 6744,
-      "sha256": "27a1baa754db3e37b26c5546113923c9288db7c564925f70a30d83b88be4d518"
+      "bytes": 6587,
+      "sha256": "203d7ea907f58f762b6f352ea0bf2a3599d7e0d8054e6662f4d827af1e3636c4"
     },
     "PREVIEW_SOURCE_MANIFEST.json": {
       "bytes": 14151,

@@ -103,10 +103,10 @@
     "limits": "event_data reuse and other simultaneous state changes reduce savings; event totals and switch/camera state totals are separate. Other suppressed telemetry is not quantified."
   },
   "validation": {
-    "interpreter": "C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe",
+    "interpreter": "<local-validation-path-redacted>",
     "command": "& $testPython -B -c \"import platform, runpy; platform.uname(); runpy.run_path('tools/run_offline_tests.py', run_name='__main__')\" tests",
     "environment": {
-      "EUFY_GUARD_LIFECYCLE_REPLAY": "C:/Dev/eufy-s1-phasec-20261107/ha-eufy-sdk-bridge/.offline/s15-fix/guard-runtime-replay.json",
+      "EUFY_GUARD_LIFECYCLE_REPLAY": "<local-validation-path-redacted>",
       "EUFY_OFFLINE_OUTPUT": ".offline/post-repack"
     },
     "reproduce_script": ".offline/post-repack/validate.ps1",
