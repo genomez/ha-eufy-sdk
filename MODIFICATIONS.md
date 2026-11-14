@@ -1,3 +1,15 @@
+# Experimental.15 local release candidate
+
+Preserve guard receipt timing and floodlight OFF confirmation; reduce recorder churn, retain last-person details and support late identification corrections. Recording day folders are year-safe.
+
+Prepared for owner review on 2026-11-14. No live-device acceptance or publication is claimed.
+
+Pair SDK 0.2.1-s1.experimental.15, bridge/integration 0.3.1-s1.experimental.15 and add-on 0.4.1-s1.experimental.15.
+
+Diagnostic switches remain opt-in; no new add-on option is introduced. Playback remains silent and bounded; multi-lens playback guarantees only one view.
+
+## Prior notices
+
 # Local playback modifications
 
 ## Recording day folders, 2026-11-07
