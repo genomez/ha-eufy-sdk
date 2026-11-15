@@ -8,7 +8,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
 from custom_components.eufy_sdk.api import EufySdkApiClient
+from custom_components.eufy_sdk.binary_sensor import (
+    async_setup_entry as setup_binary_sensors,
+)
 from custom_components.eufy_sdk.coordinator import EufySdkDataUpdateCoordinator
 from custom_components.eufy_sdk.manifest_reads import (
     normalize_properties,
@@ -146,7 +151,7 @@ class ManifestReadTests(unittest.TestCase):
         self.assertEqual(result[0]["type"], "number")
 
     def test_decoded_duration_from_string_storage_is_a_number(self):
-        # snoozeTime is stored as a config string; its getter decodes seconds (0 = not snoozed).
+        # snoozeTime is stored as a config string; its getter decodes seconds.
         read = {
             "property": "snoozeTime",
             "accessor": "snoozeTime",
@@ -236,8 +241,94 @@ class ManifestReadTests(unittest.TestCase):
         properties = [{"name": "recordingQuality", "type": "number"}]
         self.assertIs(normalize_properties({"properties": properties}), properties)
 
+    def test_write_only_boolean_survives_both_manifest_property_paths(self):
+        read = {
+            "property": "imageFlipped",
+            "accessor": "imageFlipped",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": True,
+            "writeOnly": True,
+        }
+        for properties in ([], [{"name": "imageFlipped", "type": "bool"}]):
+            with self.subTest(properties=properties):
+                result = normalize_properties(
+                    {
+                        "properties": properties,
+                        "decodedProperties": manifest(read),
+                    }
+                )
+                self.assertTrue(result[0]["writeOnly"])
+                self.assertTrue(result[0]["writable"])
+        source = {
+            "state": {"imageFlipped": False},
+            "decodedProperties": manifest(read),
+            "decodedState": {"camera": {}},
+        }
+        self.assertIsNone(normalize_snapshot(source)["state"]["imageFlipped"])
+
+    def test_solar_panel_translations(self):
+        for filename in ("strings.json", "translations/en.json"):
+            translations = json.loads(
+                (
+                    Path(__file__).resolve().parents[1]
+                    / "custom_components/eufy_sdk"
+                    / filename
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                translations["entity"]["binary_sensor"]["solar_panel_connected"][
+                    "name"
+                ],
+                "Solar panel connected",
+            )
+
 
 class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
+    async def test_solar_panel_sensor_from_derived_manifest_reads(self):
+        read = {
+            "property": "solarPanelConnected",
+            "accessor": "solarPanelConnected",
+            "type": "bool",
+            "kind": "boolean",
+            "writable": False,
+        }
+        properties = normalize_properties(
+            {
+                "properties": [
+                    {"name": "solarConnected24h", "type": "bool", "unexposed": True}
+                ],
+                "decodedProperties": manifest(read),
+            }
+        )
+        coordinator = SimpleNamespace(data={"synthetic-camera": {"state": {}}})
+        entry = SimpleNamespace(
+            runtime_data=SimpleNamespace(
+                coordinator=coordinator,
+                properties={"synthetic-camera": properties},
+            )
+        )
+        add = Mock()
+        await setup_binary_sensors(Mock(), entry, add)
+        entities = add.call_args.args[0]
+        self.assertEqual(len(entities), 1)
+        sensor = entities[0]
+        self.assertEqual(sensor.unique_id, "synthetic-camera_solarPanelConnected")
+        self.assertEqual(sensor.translation_key, "solar_panel_connected")
+        self.assertIsNone(sensor._attr_name)  # Let HA apply the translated name.
+        self.assertEqual(sensor.device_class, BinarySensorDeviceClass.POWER)
+        self.assertIsNone(sensor.entity_category)  # Same primary placement as charging.
+        for value in (True, False, None):
+            with self.subTest(value=value):
+                coordinator.data["synthetic-camera"] = normalize_snapshot(
+                    {
+                        "state": {"solarConnected24h": True},
+                        "decodedProperties": manifest(read),
+                        "decodedState": {"camera": {"solarPanelConnected": value}},
+                    }
+                )
+                self.assertIs(sensor.is_on, value)
+
     async def test_actual_api_boundary_normalizes_without_extra_rpc(self):
         client = EufySdkApiClient("synthetic-bridge", 3000, Mock())
         client.rpc = AsyncMock(return_value={"devices": [snapshot()]})

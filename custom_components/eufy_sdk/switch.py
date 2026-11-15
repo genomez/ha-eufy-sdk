@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .bespoke import BITFIELD_SWITCHES
 from .entity import (
@@ -50,7 +52,12 @@ async def async_setup_entry(
                 continue
             kind = classify(spec, t9000=t9000_attached(coordinator, sn) is True)
             if kind == "switch":
-                entities.append(EufySdkSwitch(coordinator, sn, spec))
+                switch_type = (
+                    EufySdkWriteOnlySwitch
+                    if spec.get("writeOnly") and spec["name"] != "light"
+                    else EufySdkSwitch
+                )
+                entities.append(switch_type(coordinator, sn, spec))
             elif kind == "bitfield" and spec["name"] in BITFIELD_SWITCHES:
                 bf = BITFIELD_SWITCHES[spec["name"]]
                 entities.extend(
@@ -182,6 +189,39 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
     async def async_turn_off(self, **_: Any) -> None:
         """Set the property false."""
         await self.write(value=False)
+
+
+class EufySdkWriteOnlySwitch(EufySdkSwitch, RestoreEntity):
+    """Remember successful HA writes when the device cannot report a value."""
+
+    _attr_assumed_state = True
+
+    @property
+    def prop_value(self) -> bool | None:
+        """Stay unknown until HA writes or restores a successfully written value."""
+        return self._assumed_value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Mark written values so legacy reported states cannot seed restoration."""
+        attributes = super().extra_state_attributes
+        if type(self._assumed_value) is bool:
+            attributes["last_written_value"] = self._assumed_value
+        return attributes
+
+    async def async_added_to_hass(self) -> None:
+        """Restore only a remembered HA write, preserving any newer write."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and self._write_generation == 0 and not self._removed:
+            value = last.attributes.get("last_written_value")
+            if type(value) is bool:
+                self._assumed_value = value
+
+    @callback
+    def _property_event_filter(self, _data: dict[str, Any]) -> bool:
+        """Ignore reports for a property whose value cannot be read back."""
+        return False
 
 
 class EufyBitmaskSwitch(EufySdkPropertyEntity, SwitchEntity):

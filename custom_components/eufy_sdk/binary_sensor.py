@@ -46,6 +46,7 @@ _DEVICE_CLASS_BY_NAME: list[tuple[str, BinarySensorDeviceClass]] = [
     ("contact", BinarySensorDeviceClass.OPENING),
     ("door", BinarySensorDeviceClass.DOOR),
     ("charging", BinarySensorDeviceClass.BATTERY_CHARGING),
+    ("solarpanelconnected", BinarySensorDeviceClass.POWER),
     ("battery", BinarySensorDeviceClass.BATTERY),
     ("sound", BinarySensorDeviceClass.SOUND),
     ("online", BinarySensorDeviceClass.CONNECTIVITY),
@@ -154,6 +155,9 @@ class EufySdkBinarySensor(EufySdkPropertyEntity, BinarySensorEntity):
         """Infer a device_class from the property name."""
         super().__init__(coordinator, sn, spec)
         self._attr_device_class = _device_class(self._prop)
+        if self._prop == "solarPanelConnected":
+            self._attr_name = None
+            self._attr_translation_key = "solar_panel_connected"
 
     @property
     def is_on(self) -> bool | None:
