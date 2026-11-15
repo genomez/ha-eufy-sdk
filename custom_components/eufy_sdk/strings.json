@@ -1,8 +1,8 @@
 {
   "entity": {
     "binary_sensor": {
-      "solar_panel_connected": {
-        "name": "Solar panel connected"
+      "solar_charging": {
+        "name": "Solar charging"
       },
       "streaming": {
         "name": "Streaming"

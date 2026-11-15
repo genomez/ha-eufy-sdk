@@ -158,7 +158,7 @@ class EufySdkBinarySensor(EufySdkPropertyEntity, BinarySensorEntity):
         super().__init__(coordinator, sn, spec)
         self._attr_device_class = _device_class(self._prop)
         if self._named_by_translation:
-            self._attr_translation_key = "solar_panel_connected"
+            self._attr_translation_key = "solar_charging"
 
     @property
     def is_on(self) -> bool | None:

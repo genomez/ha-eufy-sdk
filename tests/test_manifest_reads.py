@@ -277,10 +277,10 @@ class ManifestReadTests(unittest.TestCase):
                 ).read_text(encoding="utf-8")
             )
             self.assertEqual(
-                translations["entity"]["binary_sensor"]["solar_panel_connected"][
+                translations["entity"]["binary_sensor"]["solar_charging"][
                     "name"
                 ],
-                "Solar panel connected",
+                "Solar charging",
             )
 
 
@@ -314,7 +314,7 @@ class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(entities), 1)
         sensor = entities[0]
         self.assertEqual(sensor.unique_id, "synthetic-camera_solarPanelConnected")
-        self.assertEqual(sensor.translation_key, "solar_panel_connected")
+        self.assertEqual(sensor.translation_key, "solar_charging")
         # No _attr_name at all: HA lets any _attr_name (even None, which means
         # "use the device name") win over the translation key.
         self.assertFalse(hasattr(sensor, "_attr_name"))

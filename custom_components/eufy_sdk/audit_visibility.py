@@ -31,6 +31,8 @@ _ALWAYS = frozenset(
     }
 )
 _UNKNOWN = frozenset({"soundDetection", "soundDetectionSensitivity"})
+# powerSource value for "External Solar Panel".
+_SOLAR_PANEL = "1"
 _RUNTIMES = f"{DOMAIN}_audit_visibility"
 
 
@@ -75,6 +77,23 @@ def _unsupported(spec: dict | None) -> bool:
     )
 
 
+def solar_hidden_default(
+    coordinator: EufySdkDataUpdateCoordinator, sn: str, specs: list[dict]
+) -> bool | None:
+    """Hide solar charging unless the device runs on a solar panel; None until known.
+
+    Battery status 2111 only shows solar values while a panel is charging, so the
+    sensor says nothing useful on a HomeBase or a camera powered another way.
+    """
+    if not any(spec.get("name") == "powerSource" for spec in specs):
+        return True
+    value = device_value(coordinator, sn, "powerSource")
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    return not (text == _SOLAR_PANEL or "solar" in text.lower())
+
+
 def device_value(coordinator: EufySdkDataUpdateCoordinator, sn: str, name: str) -> Any:
     """Read the already normalized cached value without device I/O."""
     return (coordinator.data.get(sn, {}).get("state") or {}).get(name)
@@ -103,6 +122,10 @@ def async_migrate_audit_visibility(
                     decisions[(domain, f"{sn}_{name}")] = hidden_default(
                         coordinator, sn, name, spec
                     )
+        if any(spec["name"] == "solarPanelConnected" for spec in specs):
+            hide = solar_hidden_default(coordinator, sn, specs)
+            if hide is not None:
+                decisions[("binary_sensor", f"{sn}_solarPanelConnected")] = hide
         if reviewed_control(coordinator, sn, "refresh_last_event"):
             decisions[("button", f"{sn}_refresh_last_event")] = True
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):

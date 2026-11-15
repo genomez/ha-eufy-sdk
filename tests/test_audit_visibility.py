@@ -113,6 +113,56 @@ class AuditVisibilityTests(unittest.TestCase):
         )
         self.assertIsNone(registry.async_get("select.other").hidden_by)
 
+    def test_solar_charging_hidden_unless_solar_powered(self):
+        solar = {"name": "solarPanelConnected"}
+        power = {"name": "powerSource"}
+        self.coordinator.data.update(
+            {
+                "panel": {"model": "T8170", "state": {"powerSource": 1}},
+                "labelled": {"model": "T8171", "state": {"powerSource": "External Solar Panel"}},
+                "battery": {"model": "T8134", "state": {"powerSource": 0}},
+                "pending": {"model": "T8170", "state": {}},
+                "hub": {"model": "T9000", "state": {}},
+            }
+        )
+        self.entry.runtime_data.properties = {
+            "panel": [solar, power],
+            "labelled": [solar, power],
+            "battery": [solar, power],
+            "pending": [solar, power],
+            "hub": [solar],
+            "user": [solar, power],
+        }
+        self.coordinator.data["user"] = {"model": "T8134", "state": {"powerSource": "0"}}
+        registry = self.registry_scope(
+            [
+                Entry(
+                    entity_id=f"binary_sensor.{sn}",
+                    domain="binary_sensor",
+                    unique_id=f"{sn}_solarPanelConnected",
+                    hidden_by=er.RegistryEntryHider.USER if sn == "user" else None,
+                )
+                for sn in ("panel", "labelled", "battery", "pending", "hub", "user")
+            ]
+        )
+        async_migrate_audit_visibility(self.hass, self.entry)
+        hidden = {
+            sn: registry.async_get(f"binary_sensor.{sn}").hidden_by
+            for sn in ("panel", "labelled", "battery", "pending", "hub", "user")
+        }
+        self.assertIsNone(hidden["panel"])
+        self.assertIsNone(hidden["labelled"])
+        self.assertEqual(hidden["battery"], er.RegistryEntryHider.INTEGRATION)
+        self.assertEqual(hidden["hub"], er.RegistryEntryHider.INTEGRATION)
+        self.assertEqual(hidden["user"], er.RegistryEntryHider.USER)
+        # Unknown power source: no decision yet, so a later startup can still decide.
+        self.assertIsNone(hidden["pending"])
+        self.assertNotIn(MARKER, registry.async_get("binary_sensor.pending").options.get("eufy_sdk", {}))
+        # Once decided, a user unhide sticks.
+        registry.async_update_entity("binary_sensor.battery", hidden_by=None)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertIsNone(registry.async_get("binary_sensor.battery").hidden_by)
+
     def test_release_only_owned_hides_without_changing_disable_or_other_options(self):
         registry = self.registry_scope(
             [
