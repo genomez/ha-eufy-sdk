@@ -64,7 +64,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/audit_visibility.py",
-      "sha256": "8ce37c6788ea132eac78be527c59a935e2797345211d36bf9eded4a34d50569b"
+      "sha256": "8aaf3fa9c2cf4d2e406cbd0c4d99da9ca1c397b0647f6747c6e65e6452c83823"
     },
     {
       "path": "custom_components/eufy_sdk/bespoke.py",
@@ -148,7 +148,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "3a934040652d696617df8e736d980b88fbc810e331f1bec137c95a5a9e2a3c06"
+      "sha256": "5b5208a8e300e51611576faf31796b936fd53783000cb8867e07ce2883ba5cf9"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -272,7 +272,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/select.py",
-      "sha256": "6745fdd6ecb31402d90a3e85448547d65cb346889d3c7d037d778b64cdd013ca"
+      "sha256": "ff832be4d6222d961e2de09ba285e612fc2429bad5788942c90e7545bfc63cf9"
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",

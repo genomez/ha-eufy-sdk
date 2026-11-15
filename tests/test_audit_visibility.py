@@ -187,6 +187,39 @@ class AuditVisibilityTests(unittest.TestCase):
             )
         )
 
+    def test_duration_number_migration_preserves_identity_and_user_choices(self):
+        self.entry.runtime_data.properties["camera"].append(
+            {"name": "motionLightDuration"}
+        )
+        rows = [
+            Entry(
+                entity_id="number.renamed_timer",
+                domain="number",
+                unique_id="camera_motionLightDuration",
+                disabled_by=er.RegistryEntryDisabler.USER,
+                options={"other": {"keep": True}},
+            ),
+            Entry(
+                entity_id="select.motion_light_timer",
+                domain="select",
+                unique_id="camera_motionLightTimer",
+            ),
+        ]
+        registry = self.registry_scope(rows)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        number = registry.async_get(rows[0].entity_id)
+        self.assertEqual(number.unique_id, rows[0].unique_id)
+        self.assertEqual(number.hidden_by, er.RegistryEntryHider.INTEGRATION)
+        self.assertEqual(number.disabled_by, rows[0].disabled_by)
+        self.assertEqual(number.options["other"], {"keep": True})
+        self.assertTrue(number.options["eufy_sdk"][MARKER]["owned"])
+        self.assertEqual(registry.async_get(rows[1].entity_id), rows[1])
+        registry.async_update_entity(rows[0].entity_id, hidden_by=None)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertIsNone(registry.async_get(rows[0].entity_id).hidden_by)
+        async_release_audit_hides(self.hass, self.entry.entry_id)
+        self.assertIsNone(registry.async_get(rows[0].entity_id).hidden_by)
+
 
 class VolumeTests(unittest.IsolatedAsyncioTestCase):
     async def test_numbers_keep_property_identity_and_percent_bounds(self):

@@ -40,14 +40,20 @@ def reviewed_control(
             str(device.get("model", "")).upper() == "T9000"
             or t9000_attached(coordinator, sn)
         )
-        and name in _ALWAYS | _UNKNOWN | {"refresh_last_event"}
+        and (
+            name in _ALWAYS | _UNKNOWN | {"refresh_last_event"}
+            or (
+                name == "motionLightDuration"
+                and str(device.get("model", "")).upper() in {"T8425", "T8426"}
+            )
+        )
     )
 
 
 def hidden_default(
     coordinator: EufySdkDataUpdateCoordinator, sn: str, name: str
 ) -> bool:
-    """Hide only unknown sound controls; preserve reported controls."""
+    """Hide reviewed controls, retaining reported sound controls."""
     return reviewed_control(coordinator, sn, name) and (
         name not in _UNKNOWN or device_value(coordinator, sn, name) is None
     )

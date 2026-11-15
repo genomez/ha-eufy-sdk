@@ -1,6 +1,6 @@
 {
   "sdkPrevious": "18b34fffdaf57e1e2756df51c42022c63d022704",
-  "sdkNext": "c14bf36a6c20808eeeb9f4a905be762c943788ae",
+  "sdkNext": "daeb1751839989cb0a14b8ee6d300a99b3cdb28b",
   "provenance": "Synthetic reported parameters, bound through each SDK facade. Previous bridge scalar hiding applied to floodlights. Not an owner inventory.",
   "cases": [
     {
@@ -846,7 +846,7 @@
           "enumValues": {
             "1": "720P",
             "2": "1080P",
-            "3": "3K"
+            "3": "2K"
           }
         },
         {

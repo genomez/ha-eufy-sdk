@@ -22,6 +22,7 @@ from .entity import (
     solix_devices_with,
 )
 from .guard_confirmation import guard_attributes
+from .light_schedule import t9000_attached
 from .snapshot_policy import (
     SNAPSHOT_POLICY_DEFAULT,
     SNAPSHOT_POLICY_OPTIONS,
@@ -59,6 +60,14 @@ DISPLAY_TIMEOUT_INDEX: dict[str, int] = {
 }
 DISPLAY_TIMEOUT_LABEL: dict[int, str] = {v: k for k, v in DISPLAY_TIMEOUT_INDEX.items()}
 
+MOTION_LIGHT_TIMER_LABELS: dict[int, str] = {
+    30: "30 s",
+    60: "1 min",
+    180: "3 min",
+    300: "5 min",
+    900: "15 min",
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -73,6 +82,15 @@ async def async_setup_entry(
         for spec in entry.runtime_data.properties.get(sn, [])
         if classify(spec) == "select"
     ]
+    entities.extend(
+        EufyMotionLightTimerSelect(coordinator, sn, spec)
+        for sn, dev in coordinator.data.items()
+        if str(dev.get("model", "")).upper() in {"T8425", "T8426"}
+        and not dev.get("error")
+        and t9000_attached(coordinator, sn)
+        for spec in entry.runtime_data.properties.get(sn, [])
+        if spec["name"] == "motionLightDuration" and classify(spec) == "number"
+    )
     # Anker Solix: Solarbank display screen-off timeout. (The minimum-SOC / discharge
     # cutoff is now the Discharge Limit slider on the number platform.)
     for sn, _ in solix_devices_with(coordinator, "battery"):
@@ -150,6 +168,24 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
         # Send an int when the raw code is numeric, else the raw string.
         value: int | str = int(raw) if raw.lstrip("-").isdigit() else raw
         await self.write(value)
+
+
+class EufyMotionLightTimerSelect(EufySdkSelect):
+    """App timer choices over the existing composite duration write path."""
+
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        spec: dict[str, Any],
+    ) -> None:
+        """Keep the duration property while giving the select its own identity."""
+        super().__init__(
+            coordinator, sn, {**spec, "enumValues": MOTION_LIGHT_TIMER_LABELS}
+        )
+        self._attr_unique_id = f"{sn}_motionLightTimer"
+        self._attr_name = "Motion light timer"
+        self._attr_entity_registry_visible_default = True
 
 
 class EufySdkSnapshotPolicySelect(EufySdkDeviceEntity, SelectEntity, RestoreEntity):

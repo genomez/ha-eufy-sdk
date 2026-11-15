@@ -91,7 +91,12 @@ class MetadataTests(unittest.TestCase):
                 spec for spec in case["next"] if spec["name"] == "recordingQuality"
             )
             self.assertEqual(
-                quality["enumValues"], {"1": "720P", "2": "1080P", "3": "3K"}
+                quality["enumValues"],
+                {
+                    "1": "720P",
+                    "2": "1080P",
+                    "3": "2K" if case["model"] == "T8416" else "3K",
+                },
             )
             for name, platform in after.items():
                 spec = next(spec for spec in case["next"] if spec["name"] == name)
@@ -372,6 +377,10 @@ class MetadataTests(unittest.TestCase):
 
 class ActionsTests(unittest.IsolatedAsyncioTestCase):
     async def test_recording_quality_option_mapping(self):
+        for label in ("2K", "3K"):
+            await self.check_recording_quality_option_mapping(label)
+
+    async def check_recording_quality_option_mapping(self, maximum: str):
         obj = coordinator()
         spec = properties(
             {
@@ -380,14 +389,14 @@ class ActionsTests(unittest.IsolatedAsyncioTestCase):
                 "type": "string",
                 "kind": "enum",
                 "values": [1, 2, 3],
-                "labels": {"1": "720P", "2": "1080P", "3": "3K"},
+                "labels": {"1": "720P", "2": "1080P", "3": maximum},
                 "writable": True,
             }
         )[0]
         entity = EufySdkSelect(obj, "camera", spec)
         entity.write = AsyncMock()
-        self.assertEqual(entity.options, ["720P", "1080P", "3K"])
-        for tier, label in [(1, "720P"), (2, "1080P"), (3, "3K")]:
+        self.assertEqual(entity.options, ["720P", "1080P", maximum])
+        for tier, label in [(1, "720P"), (2, "1080P"), (3, maximum)]:
             obj.data["camera"]["state"]["recordingQuality"] = tier
             self.assertEqual(entity.current_option, label)
             await entity.async_select_option(label)

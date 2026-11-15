@@ -113,3 +113,41 @@ identify the check. The 44 deferred audit corrections comprise 15 night vision, 
 four populated sound sensitivity and 14 clip/interval controls. Controls awaiting separate live
 tests retain their current behavior, except the five explicitly approved hidden motion-light modes.
 No version was bumped. No Home Assistant instance, device or phone was contacted.
+
+## App-verified recording labels and motion-light timer
+
+Read-only app checks on 14 November 2026 paired raw values with unchanged reported
+states. For T8416 attached to T9000, recording tier 3 is **2K**. The options are
+1 = 720P, 2 = 1080P, 3 = 2K; the SDK accepts `2K` as tier 3 and rejects `3K` for
+this topology. The base64 raw-text capture-config write is unchanged. T8425 and
+T8170 retain 3K, and other models/topologies retain their existing maps. The app's
+4K option on T8416 and Auto on T8170 have unverified raw values and are not added.
+Recording-quality entity IDs and unique IDs remain unchanged.
+
+T9000-attached T8425/T8426 gain a **Motion light timer** select with exactly:
+30 s = 30, 1 min = 60, 3 min = 180, 5 min = 300, 15 min = 900 seconds. It writes
+`motionLightDuration` through the existing composite parameter 1422 `time` path,
+preserving the remaining fields. Its unique ID suffix is `_motionLightTimer`;
+the default entity name ends in `_motion_light_timer`. Unlisted reports produce
+an unknown select state without writing or coercing the device value.
+
+The existing duration number and its `_motionLightDuration` unique ID are retained.
+They become hidden by default using the existing once-only audit-visibility policy,
+including its reversible ownership marker and respect for user hides/unhides.
+The active-reference audit contained no `motion_light_duration` number references.
+The new select stays visible. Other models and station topologies are unaffected.
+
+Rotation speed stays a **1–5 number**: the app has a five-stop Slow…Fast slider,
+with raw 3 in the middle. Night-vision labels match the checked app modes:
+**Infrared** on T8416 and **Spotlights** on T8170; they remain unchanged.
+Motion-light activation mode **Fast = 1**; Smart's raw value remains unverified,
+so the existing motion-light-mode number remains hidden. No firmware acceptance
+or live write was performed for this local candidate.
+
+Validation for this app-label candidate: SDK 7,777 passed / 8 skipped; bridge full
+suite 1,463 passed / 53 skipped / zero failed with loopback enabled; integration
+1,260 passed / 1 skipped and ruff passed on changed Python files. Required SDK
+typecheck/build/ESM/examples/snippets and all five guards passed. The installed SDK
+runtime and packed artifact hashes are pinned in the bridge receipt. The package
+allowlist also corrects the stale entity.py hash from the starting commit; that
+runtime file itself is unchanged.
