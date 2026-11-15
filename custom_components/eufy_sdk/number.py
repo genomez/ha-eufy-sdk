@@ -134,16 +134,21 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Write the value (as an int when it's whole, to match the wire)."""
-        if (
-            not _finite_number(value)
-            or value < self._write_min
-            or value > self._write_max
+        current = (self.device.get("state") or {}).get(self._prop)
+        rewrite_interval = (
+            self._prop == "recordInterval"
+            and _finite_number(current)
+            and value == current
+        )
+        if not _finite_number(value) or (
+            not rewrite_interval and not self._write_min <= value <= self._write_max
         ):
             message = "Number value is outside the permitted range"
             raise HomeAssistantError(message)
         steps = (value - self._write_min) / self.native_step
-        if not math.isfinite(steps) or not math.isclose(
-            steps, round(steps), rel_tol=0, abs_tol=1e-8
+        if not rewrite_interval and (
+            not math.isfinite(steps)
+            or not math.isclose(steps, round(steps), rel_tol=0, abs_tol=1e-8)
         ):
             message = "Number value does not match the permitted step"
             raise HomeAssistantError(message)

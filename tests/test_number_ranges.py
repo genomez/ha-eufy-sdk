@@ -168,6 +168,53 @@ class NumberRangeTests(unittest.TestCase):
 
 
 class NumberWriteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_record_interval_can_rewrite_only_its_current_reported_exception(
+        self,
+    ):
+        entity = number(name="recordInterval", min=5, max=60, step=1)
+        record = entity.coordinator.data["synthetic"]
+        for current in (0, 120, 300):
+            record["state"] = {"recordInterval": current}
+            await entity.async_set_native_value(float(current))
+            self.assertEqual(entity.write.await_args.args, (current,))
+            self.assertIs(type(entity.write.await_args.args[0]), int)
+            entity.write.reset_mock()
+            for other in (0, 1, 61, 120, 200, 300):
+                if other == current:
+                    continue
+                with self.assertRaises(HomeAssistantError):
+                    await entity.async_set_native_value(other)
+            entity.write.assert_not_awaited()
+        record["state"] = {"recordInterval": 30}
+        with self.assertRaises(HomeAssistantError):
+            await entity.async_set_native_value(300)
+        await entity.async_set_native_value(30)
+        self.assertEqual(entity.write.await_args.args, (30,))
+
+    async def test_reported_exception_still_validates_other_properties_and_values(self):
+        for name, current in (
+            ("recordDuration", 300),
+            ("recordInterval", True),
+            ("recordInterval", "300"),
+            ("recordInterval", float("inf")),
+            ("recordInterval", None),
+        ):
+            entity = number(name=name, min=5, max=60, step=1)
+            entity.coordinator.data["synthetic"]["state"] = {name: current}
+            with self.assertRaises(HomeAssistantError):
+                await entity.async_set_native_value(300)
+            entity.write.assert_not_awaited()
+
+    async def test_optimistic_interval_does_not_replace_reported_value_evidence(self):
+        entity = number(name="recordInterval", min=5, max=60, step=1)
+        entity.coordinator.data["synthetic"]["state"] = {"recordInterval": 120}
+        entity._assumed_value = 300  # noqa: SLF001 - synthetic optimistic display
+        with self.assertRaises(HomeAssistantError):
+            await entity.async_set_native_value(300)
+        entity.write.assert_not_awaited()
+        await entity.async_set_native_value(120)
+        self.assertEqual(entity.write.await_args.args, (120,))
+
     async def test_out_of_range_nonfinite_and_off_step_do_not_write(self):
         entity = number(min=10, max=120, step=1)
         for value in (
