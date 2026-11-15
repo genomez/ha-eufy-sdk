@@ -87,6 +87,9 @@ def solar_hidden_default(
     """
     if not any(spec.get("name") == "powerSource" for spec in specs):
         return True
+    # A HomeBase offers a power-source control it never reports, and has no panel.
+    if str(coordinator.data.get(sn, {}).get("model", "")).upper().startswith("T9000"):
+        return True
     value = device_value(coordinator, sn, "powerSource")
     if value is None or isinstance(value, bool):
         return None

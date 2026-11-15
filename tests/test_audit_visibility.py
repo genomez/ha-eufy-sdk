@@ -123,6 +123,7 @@ class AuditVisibilityTests(unittest.TestCase):
                 "battery": {"model": "T8134", "state": {"powerSource": 0}},
                 "pending": {"model": "T8170", "state": {}},
                 "hub": {"model": "T9000", "state": {}},
+                "homebase": {"model": "T9000", "state": {}},
             }
         )
         self.entry.runtime_data.properties = {
@@ -131,6 +132,7 @@ class AuditVisibilityTests(unittest.TestCase):
             "battery": [solar, power],
             "pending": [solar, power],
             "hub": [solar],
+            "homebase": [solar, power],
             "user": [solar, power],
         }
         self.coordinator.data["user"] = {"model": "T8134", "state": {"powerSource": "0"}}
@@ -142,18 +144,19 @@ class AuditVisibilityTests(unittest.TestCase):
                     unique_id=f"{sn}_solarPanelConnected",
                     hidden_by=er.RegistryEntryHider.USER if sn == "user" else None,
                 )
-                for sn in ("panel", "labelled", "battery", "pending", "hub", "user")
+                for sn in ("panel", "labelled", "battery", "pending", "hub", "homebase", "user")
             ]
         )
         async_migrate_audit_visibility(self.hass, self.entry)
         hidden = {
             sn: registry.async_get(f"binary_sensor.{sn}").hidden_by
-            for sn in ("panel", "labelled", "battery", "pending", "hub", "user")
+            for sn in ("panel", "labelled", "battery", "pending", "hub", "homebase", "user")
         }
         self.assertIsNone(hidden["panel"])
         self.assertIsNone(hidden["labelled"])
         self.assertEqual(hidden["battery"], er.RegistryEntryHider.INTEGRATION)
         self.assertEqual(hidden["hub"], er.RegistryEntryHider.INTEGRATION)
+        self.assertEqual(hidden["homebase"], er.RegistryEntryHider.INTEGRATION)
         self.assertEqual(hidden["user"], er.RegistryEntryHider.USER)
         # Unknown power source: no decision yet, so a later startup can still decide.
         self.assertIsNone(hidden["pending"])
