@@ -253,7 +253,12 @@ class EufySdkWriteOnlySwitch(EufySdkSwitch, RestoreEntity):
         if type(value) is not bool:
             last = await self.async_get_last_state()
             value = last.attributes.get("last_written_value") if last else None
-        if type(value) is bool and self._write_generation == 0 and not self._removed:
+        # Only a successful write outranks the restored value; a failed one must not.
+        if (
+            type(value) is bool
+            and getattr(self, "_recorded_seq", 0) == 0
+            and not self._removed
+        ):
             self._assumed_value = value
 
     @callback

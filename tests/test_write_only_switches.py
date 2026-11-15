@@ -244,6 +244,18 @@ class WriteOnlySwitchTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(restarted.assumed_state)
                 restarted.client.set_property.assert_not_awaited()
 
+    async def test_failed_write_during_startup_does_not_block_restore(self):
+        entity = self.entity()
+        entity.client.set_property.side_effect = RuntimeError("synthetic failure")
+        with self.assertRaises(RuntimeError):
+            await entity.async_turn_on()
+        entity.async_get_last_extra_data = AsyncMock(
+            return_value=SimpleNamespace(as_dict=lambda: {"last_written_value": True})
+        )
+        with patch("custom_components.eufy_sdk.entity.async_listen_bridge_event"):
+            await entity.async_added_to_hass()
+        self.assertIs(entity.is_on, True)
+
     async def test_legacy_or_unknown_state_does_not_invent_a_written_value(self):
         for state in (
             None,
