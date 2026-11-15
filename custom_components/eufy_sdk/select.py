@@ -145,6 +145,15 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
                 self._label_by_raw = {
                     raw: self._label_by_raw[raw] for raw in ("1", "2", "0")
                 }
+        elif spec["name"] == "nightVision" and self._label_by_raw.keys() == {
+            "0",
+            "1",
+            "3",
+        }:
+            # T8416 order as the Eufy app shows it: Infrared On, Infrared, Off.
+            self._label_by_raw = {
+                raw: self._label_by_raw[raw] for raw in ("3", "1", "0")
+            }
         self._raw_by_label = {v: k for k, v in self._label_by_raw.items()}
         self._attr_options = list(self._label_by_raw.values())
 

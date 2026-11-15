@@ -94,6 +94,18 @@ class SpotlightsPresentationTests(unittest.IsolatedAsyncioTestCase):
             await select.async_select_option("Full Color")
             write.assert_awaited_once_with("color")
 
+    async def test_t8416_modes_follow_app_order_and_roundtrip(self):
+        values = {"0": "Off", "1": "Infrared", "3": "Infrared On"}
+        select = select_for(3, values=values)
+        self.assertEqual(select.options, ["Infrared On", "Infrared", "Off"])
+        self.assertEqual(select.current_option, "Infrared On")
+        self.assertEqual(select.unique_id, "synthetic_nightVision")
+        with patch.object(select, "write", new_callable=AsyncMock) as write:
+            for label, raw in (("Infrared On", 3), ("Infrared", 1), ("Off", 0)):
+                await select.async_select_option(label)
+                write.assert_awaited_with(raw)
+                self.assertIs(type(write.await_args.args[0]), int)
+
     def test_nonmatching_night_vision_modes_keep_their_original_order(self):
         for values, expected in (
             ({"0": "Off", "1": "Infrared"}, ["Off", "Infrared"]),
