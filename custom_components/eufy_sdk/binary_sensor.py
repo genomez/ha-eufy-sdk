@@ -153,10 +153,11 @@ class EufySdkBinarySensor(EufySdkPropertyEntity, BinarySensorEntity):
         spec: dict[str, Any],
     ) -> None:
         """Infer a device_class from the property name."""
+        # A translated name only shows when no generic label is set.
+        self._named_by_translation = spec["name"] == "solarPanelConnected"
         super().__init__(coordinator, sn, spec)
         self._attr_device_class = _device_class(self._prop)
-        if self._prop == "solarPanelConnected":
-            self._attr_name = None
+        if self._named_by_translation:
             self._attr_translation_key = "solar_panel_connected"
 
     @property

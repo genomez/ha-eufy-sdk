@@ -315,7 +315,9 @@ class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
         sensor = entities[0]
         self.assertEqual(sensor.unique_id, "synthetic-camera_solarPanelConnected")
         self.assertEqual(sensor.translation_key, "solar_panel_connected")
-        self.assertIsNone(sensor._attr_name)  # Let HA apply the translated name.
+        # No _attr_name at all: HA lets any _attr_name (even None, which means
+        # "use the device name") win over the translation key.
+        self.assertFalse(hasattr(sensor, "_attr_name"))
         self.assertEqual(sensor.device_class, BinarySensorDeviceClass.POWER)
         self.assertIsNone(sensor.entity_category)  # Same primary placement as charging.
         for value in (True, False, None):

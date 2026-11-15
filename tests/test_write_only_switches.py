@@ -2,6 +2,7 @@
 
 # ruff: noqa: ANN201, D102, FBT003, INP001, PT009, PT027, SLF001
 
+import asyncio
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,6 +142,70 @@ class WriteOnlySwitchTests(unittest.IsolatedAsyncioTestCase):
             await entity.async_turn_off()
         self.assertIs(entity.is_on, True)
 
+    async def test_superseded_success_is_kept_when_newer_write_fails(self):
+        entity = self.entity()
+        release = asyncio.Event()
+        calls = []
+
+        async def set_property(_sn, _prop, value):
+            calls.append(value)
+            if value is True:
+                await release.wait()
+                return
+            raise RuntimeError("synthetic failure")
+
+        entity.client.set_property.side_effect = set_property
+        first = asyncio.ensure_future(entity.async_turn_on())
+        await asyncio.sleep(0)
+        with self.assertRaises(RuntimeError):
+            await entity.async_turn_off()
+        release.set()
+        await first
+        self.assertEqual(calls, [True, False])
+        self.assertIs(entity.is_on, True)
+
+    async def test_older_success_never_overrides_a_newer_success(self):
+        entity = self.entity()
+        release = asyncio.Event()
+
+        async def set_property(_sn, _prop, value):
+            if value is True:
+                await release.wait()
+
+        entity.client.set_property.side_effect = set_property
+        first = asyncio.ensure_future(entity.async_turn_on())
+        await asyncio.sleep(0)
+        await entity.async_turn_off()
+        release.set()
+        await first
+        self.assertIs(entity.is_on, False)
+
+    async def test_restore_survives_a_save_made_while_unavailable(self):
+        entity = self.entity()
+        hass = HomeAssistant(OFFLINE_DIR)
+        entity.hass = hass
+        data = hass.data[DATA_RESTORE_STATE] = RestoreStateData(hass)
+        with patch.object(Entity, "async_internal_added_to_hass", AsyncMock()):
+            await entity.async_internal_added_to_hass()
+        await entity.async_turn_on()
+        # HA saves an unavailable entity without its attributes.
+        hass.states.async_set(ENTITY_ID, "unavailable", {})
+        with patch.object(Entity, "async_internal_will_remove_from_hass", AsyncMock()):
+            await entity.async_internal_will_remove_from_hass()
+        stored = StoredState.from_dict(
+            json_loads(json_dumps(data.last_states[ENTITY_ID].as_dict()))
+        )
+        self.assertNotIn("last_written_value", stored.state.attributes)
+
+        restarted = self.entity()
+        restarted.hass = HomeAssistant(OFFLINE_DIR)
+        restored_data = RestoreStateData(restarted.hass)
+        restored_data.last_states[ENTITY_ID] = stored
+        restarted.hass.data[DATA_RESTORE_STATE] = restored_data
+        with patch("custom_components.eufy_sdk.entity.async_listen_bridge_event"):
+            await restarted.async_added_to_hass()
+        self.assertIs(restarted.is_on, True)
+
     async def test_restore_round_trip_keeps_both_on_and_off_after_removal(self):
         for value in (True, False):
             with self.subTest(value=value):
@@ -188,6 +253,7 @@ class WriteOnlySwitchTests(unittest.IsolatedAsyncioTestCase):
         ):
             entity = self.entity()
             entity.async_get_last_state = AsyncMock(return_value=state)
+            entity.async_get_last_extra_data = AsyncMock(return_value=None)
             with patch("custom_components.eufy_sdk.entity.async_listen_bridge_event"):
                 await entity.async_added_to_hass()
             self.assertIsNone(entity.is_on)

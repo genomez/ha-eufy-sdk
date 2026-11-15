@@ -8,7 +8,11 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import (
+    ExtraStoredData,
+    RestoredExtraData,
+    RestoreEntity,
+)
 
 from .bespoke import BITFIELD_SWITCHES
 from .entity import (
@@ -209,14 +213,48 @@ class EufySdkWriteOnlySwitch(EufySdkSwitch, RestoreEntity):
             attributes["last_written_value"] = self._assumed_value
         return attributes
 
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        """Persist the written value apart from state attributes.
+
+        HA drops attributes while an entity is unavailable, so a value kept only
+        there would be lost by a save made during a bridge outage.
+        """
+        if type(self._assumed_value) is bool:
+            return RestoredExtraData({"last_written_value": self._assumed_value})
+        return None
+
+    async def write(self, value: Any) -> None:
+        """Keep the newest write that succeeded, even when a later one fails.
+
+        The shared write path forgets a successful write once a newer write has
+        started; with no read-back, a failure of that newer write would otherwise
+        leave the value from before both writes.
+        """
+        seq = getattr(self, "_write_seq", 0) + 1
+        self._write_seq = seq
+        lifecycle = self._lifecycle_generation
+        await super().write(value)
+        if (
+            type(value) is bool
+            and seq > getattr(self, "_recorded_seq", 0)
+            and not self._removed
+            and lifecycle == self._lifecycle_generation
+        ):
+            self._recorded_seq = seq
+            self._assumed_value = value
+            self.async_write_ha_state()
+
     async def async_added_to_hass(self) -> None:
         """Restore only a remembered HA write, preserving any newer write."""
         await super().async_added_to_hass()
-        last = await self.async_get_last_state()
-        if last is not None and self._write_generation == 0 and not self._removed:
-            value = last.attributes.get("last_written_value")
-            if type(value) is bool:
-                self._assumed_value = value
+        extra = await self.async_get_last_extra_data()
+        value = extra.as_dict().get("last_written_value") if extra else None
+        if type(value) is not bool:
+            last = await self.async_get_last_state()
+            value = last.attributes.get("last_written_value") if last else None
+        if type(value) is bool and self._write_generation == 0 and not self._removed:
+            self._assumed_value = value
 
     @callback
     def _property_event_filter(self, _data: dict[str, Any]) -> bool:
