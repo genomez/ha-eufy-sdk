@@ -18,7 +18,7 @@ Existing property unique IDs remain `<device identifier>_<SDK property name>`. N
 | T8171 | Recording-quality labels updated; writable settings retained | Only if an actual read exists without its setter | Physical spotlight remains omitted by SDK detection; privacy absent | None |
 | T8426 floodlight | Same seven additions/restorations as T8425 | SDK determines momentary-light writability; the tested floodlight route remains writable | No free-text schedule entity; privacy absent | None |
 
-The fixture `tests/fixtures/t9000_settings_manifests.json` records the .15/.16 schemas and exact generic-platform differences for all seven models. It uses SDK .15 `18b34ff` and .16 `797ff74`, with the .15 bridge's scalar hiding applied. Test device types: 47, 104, 48, 93, 19, 48, 87 respectively. Supplied parameters are synthetic capability evidence, not proof that every model reports every test parameter. Quick-response additions are dynamic and recorded separately from generic properties.
+The fixture `tests/fixtures/t9000_settings_manifests.json` records the .15/.16 schemas and exact generic-platform differences for all seven models. It uses SDK .15 `18b34ff` and .16 `c14bf36`, with the .15 bridge's scalar hiding applied. Test device types: 47, 104, 48, 93, 19, 48, 87 respectively. Supplied parameters are synthetic capability evidence, not proof that every model reports every test parameter. Quick-response additions are dynamic and recorded separately from generic properties.
 
 ## Retained writable controls and values
 
@@ -42,8 +42,12 @@ The bridge's SDK artifact and receipt now pin the cold-index fix. Both releases 
 
 ## Final SDK refresh versus the previous .16 candidate
 
-SDK `797ff74fe7aca2648c05246cf708d24a39a0db96` withholds setters outside its verified-parameter allowlist and serializes composite writes. The regenerated synthetic fixture shows `antiTheftDetection` changing from switch to binary sensor on all seven models; `workingMode` changes from select to sensor on T8170, T8214 and T8171. `snoozeTime` loses its setter on all seven models but already routed to a sensor, so its entity domain stays unchanged. Color temperature, RTSP publish and alarm volume have no exposed writable entity in the previous synthetic fixture; their withheld setters do not represent additional fixture domain changes. Actual retained reads without setters remain read-only.
+SDK `c14bf36a6c20808eeeb9f4a905be762c943788ae` withholds setters outside its verified-parameter allowlist and serializes composite writes. The regenerated synthetic fixture shows `antiTheftDetection` changing from switch to binary sensor on all seven models; `workingMode` changes from select to sensor on T8170, T8214 and T8171. `snoozeTime` loses its setter on all seven models but already routed to a sensor, so its entity domain stays unchanged. Color temperature, RTSP publish and alarm volume have no exposed writable entity in the previous synthetic fixture; their withheld setters do not represent additional fixture domain changes. Actual retained reads without setters remain read-only.
 
 Regeneration reused the original bridge `.offline/experimental16/compare.mjs` generator with the installed SDK, retaining the original .15 fixture baseline, then applied `normalize_properties` and `classify` to rebuild the .16 schemas and differences. Only the original schema fields are retained; identity/location values are excluded. No integration runtime or test code required changes.
 
 The local SDK re-review refresh adds field-baseline ACK patches (120-second TTL), bounded/coalesced unsent writes, bounded quick-response timeout quarantine, and signaling identity redaction. The seven-model fixture was regenerated against the installed repack; all schemas and entity-domain changes are identical, so only its SDK commit pin changed. The original .15 baseline is retained. Integration runtime and package-allowlist files remain unchanged.
+
+## Composite overlay history refresh
+
+The SDK pin is now `c14bf36a6c20808eeeb9f4a905be762c943788ae`. The installed-package seven-model manifest regeneration matches all existing normalized schema fields and entity-domain differences; only fixture metadata changed. ACK history now survives confirmations and reports of intermediate writes for 120 seconds. An app edit to a retained ACKed value is indistinguishable from lag and the latest SDK ACK wins until expiry. Third values retire only their own patches. Integration runtime files are unchanged.

@@ -39,10 +39,20 @@ The current bridge SDK archive, lockfile and artifact receipts were preserved. N
 
 ## Final local SDK refresh
 
-SDK pin: `797ff74fe7aca2648c05246cf708d24a39a0db96`. Bridge installed runtime SHA-256: `2cf4d0cc72818bd6f413743cf888804c098cd8a1e817568705ec341ddeb1382e`; tarball SHA-256: `c586ff2d383f0d834788d4e115859defda10f85d44a9922e60b4f81ae8c895f2`.
+SDK pin: `c14bf36a6c20808eeeb9f4a905be762c943788ae`. Bridge installed runtime SHA-256: `5ff54c887f022f05eb99eb30f652cb13ee0b387c62abe0c2b962f88d1480d7ea`; tarball SHA-256: `44fd29671297fac428da1d698ea85894eeab68a6e47b26da80cff972e7873969`.
 
 The original synthetic generator was rerun against this installed SDK; the .15 baseline was preserved. Bridge full command above: 1,459 passed, 53 skipped, zero failed. Integration full command above after fixture regeneration: 1,246 passed, one skipped, 1,510 subtests passed, zero failed; eight dependency warnings. No bridge or integration runtime/test code changes were necessary. Integration package files are unchanged, so INTEGRATION_PACKAGE.json hashes remain valid. Local source validation only.
 
 The local SDK re-review refresh adds field-baseline ACK patches (120-second TTL), bounded/coalesced unsent writes, bounded quick-response timeout quarantine, and signaling identity redaction. The seven-model fixture was regenerated against the installed repack; all schemas and entity-domain changes are identical, so only its SDK commit pin changed. The original .15 baseline is retained. Integration runtime and package-allowlist files remain unchanged.
 
 Validation after the re-review repack and fixture regeneration: required integration offline command above passed with 1,246 tests, one skipped, 1,510 subtests and eight existing dependency warnings. SDK full suite: 7,652 passed / 8 skipped; expanded focused command: 329 passed; typecheck, build, ESM and all five guards passed. Bridge full suite: 1,459 passed / 53 skipped. No flakes were observed.
+
+## Composite overlay history validation
+
+SDK commit: `c14bf36a6c20808eeeb9f4a905be762c943788ae`. Bridge commit: `f197425fa421cdf2fda85426c3587dbc52d8f718`. Installed runtime SHA-256: `5ff54c887f022f05eb99eb30f652cb13ee0b387c62abe0c2b962f88d1480d7ea`. SDK tarball SHA-256: `44fd29671297fac428da1d698ea85894eeab68a6e47b26da80cff972e7873969`.
+
+The seven-model fixture was regenerated with the installed SDK and checked through `normalize_properties` and `classify`; all schema fields and entity-domain differences match. Only the SDK fixture pin and documentation changed. No integration runtime files changed.
+
+SDK focused regressions: 40 passed. SDK full suite: 7,674 passed, 8 skipped; typecheck, build, ESM and all five guards passed. Bridge focused routes/request evidence: 19 passed; full suite: 1,461 passed, 53 skipped, zero failed. The bridge maps typed superseded slider writes to successful unsent receipts without command or request failure telemetry.
+
+The required integration offline command above passed: 1,246 tests, 1 skipped, 1,510 subtests, zero failed, with eight existing dependency warnings. No remote host, container, HA instance or device was accessed.
