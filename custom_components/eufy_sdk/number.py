@@ -116,6 +116,7 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
                 "using existing fallback fields",
                 spec["name"],
             )
+        self._write_min, self._write_max = low, high
         current = self.prop_value
         if _finite_number(current):
             low, high = min(low, current), max(high, current)
@@ -135,12 +136,12 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
         """Write the value (as an int when it's whole, to match the wire)."""
         if (
             not _finite_number(value)
-            or value < self.native_min_value
-            or value > self.native_max_value
+            or value < self._write_min
+            or value > self._write_max
         ):
             message = "Number value is outside the permitted range"
             raise HomeAssistantError(message)
-        steps = (value - self.native_min_value) / self.native_step
+        steps = (value - self._write_min) / self.native_step
         if not math.isfinite(steps) or not math.isclose(
             steps, round(steps), rel_tol=0, abs_tol=1e-8
         ):

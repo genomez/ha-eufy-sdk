@@ -55,24 +55,27 @@ The SDK pin is now `c14bf36a6c20808eeeb9f4a905be762c943788ae`. The installed-pac
 
 ## Reviewed entity audit changes
 
-The approved control audit adds **82 hidden-by-default controls**: 37 unknown sound controls
+The reviewed audit inventory covers **82 candidate controls**: 37 sound controls
 (15 type selects, 11 switches, 11 sensitivity numbers), 15 RTSP recording-mode selects,
 15 diagnostic event-refresh buttons, station power-source and alarm-tone selects, eight
 camera power-source selects and five motion-light-mode numbers. Arming mode stays visible.
-Reported sound switches and sensitivity numbers retain their presentation, including controls
-awaiting separate live testing. No sensor visibility or orphan cleanup is part of this change.
+Reported sound switches and sensitivity numbers retain their presentation. Cold-cache
+unknown values defer the decision until later setup evidence; they are not hidden or marked.
+Sound-type selects retain the reviewed hidden default. No sensor visibility or orphan cleanup is part of this change.
 These rules have no overlap with active automation/dashboard references except arming mode,
 which is explicitly excluded. No owner device identities are stored in source or fixtures.
 
-New registrations use `entity_registry_visible_default`. Existing registry controls receive
-`hidden_by=integration` only when currently unhidden. The per-entity registry option
+New registrations use `entity_registry_visible_default`. Existing unhidden registry controls
+receive `hidden_by=integration`; unmarked reviewed controls already created hidden by this
+policy are also recorded as owned. The per-entity registry option
 `eufy_sdk.entity_audit_visibility_v1` records the decision once, including decisions to retain
 visible reported sound controls. Reloads never override a later user unhide. User hides,
 disables, names and unrelated registry options are preserved. The migration matches domain
 and stable property unique ID, so renamed entity IDs remain safe. Users can unhide individual
 controls in entity settings. For a controlled bulk rollback,
-`audit_visibility.async_release_audit_hides(hass, entry_id)` releases only hides owned by this
-migration and retains a released marker to prevent reapplication. Rollback source must retain
+the admin-only `eufy_sdk.release_audit_hides` service accepts a loaded `entry_id`, releases
+only audit-owned integration hides and retains a released marker to prevent reapplication.
+It preserves user hides, disables, identities and unrelated options. No additional UI is added. Rollback source must retain
 this helper until those changes are released; no registry rows are deleted.
 
 **22 controls stop being created** on the audited T9000 setup: 13 non-doorbell loitering
@@ -151,3 +154,35 @@ typecheck/build/ESM/examples/snippets and all five guards passed. The installed 
 runtime and packed artifact hashes are pinned in the bridge receipt. The package
 allowlist also corrects the stale entity.py hash from the starting commit; that
 runtime file itself is unchanged.
+
+
+## Review fixes and offline acceptance
+
+Cold-cache `soundDetection` and `soundDetectionSensitivity` values of `None` no longer
+hide controls or write a visibility marker. Every later setup re-evaluates them until
+reported values (including false/zero) or explicit unsupported metadata settle the
+policy. A reported value always takes precedence over unsupported metadata; an earlier
+audit-owned sound hide is released when a value appears. Station model prefixes use
+the same T9000-family test as attached-device detection. Hidden-at-creation controls
+are owned by the policy and can be restored through the admin release service.
+
+Number presentation can expand to include an existing report, but writes still use
+the original validated spec bounds and step origin. Out-of-spec and off-step writes
+are rejected before the bridge call. Read-only AI bitmasks suppress per-bit switches
+and retain a raw-mask sensor only for T9000 attachments. Duplicate writable ringtone
+sensors are also limited to T9000 attachments; other topologies keep their existing
+classification and entity creation.
+
+The SDK candidate corrects night-vision header/payload channels, withholds unsafe
+light aliases and T9000 reboot, requires integer prompt volume, and limits internal
+write-only discovery to reviewed T9000 prompt volume and attached T8214 ringtone
+volume. Dingdong ringtone selection remains withheld on T9000. No additional
+attached-device setter with an outer-channel-zero override was found. The known
+stale-channel evidence on held SDK handles remains a documented residual.
+
+Validation: SDK 7,801 passed / 8 skipped, all required compiler/build/ESM/example/snippet
+checks and five guards passed. Integration 1,269 passed / 1 skipped, with ruff passing
+on changed Python files. The real `async_setup_entry` ordering is covered with
+hidden-at-creation registration, post-forward ownership and admin-only release.
+The bridge receipt pins the refreshed SDK commit, package and runtime hashes.
+No network, HA, device or phone contact, push, image build or deployment occurred.

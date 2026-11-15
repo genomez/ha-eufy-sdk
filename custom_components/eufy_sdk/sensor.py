@@ -31,7 +31,7 @@ from .entity import (
 )
 from .firmware_metadata import sync_firmware_registry
 from .light import LIGHT_HIDDEN_PROPS
-from .light_schedule import schedule_entries
+from .light_schedule import schedule_entries, t9000_attached
 from .person_identification import (
     Occurrence,
     detected_at_for,
@@ -325,10 +325,10 @@ SOLIX_MODE_LABELS: dict[int, str] = {
 }
 
 
-def _is_sensor(spec: dict) -> bool:
+def _is_sensor(spec: dict, *, t9000: bool = False) -> bool:
     """Return True for classify()=="sensor", plus bitfields with no bespoke switches."""
-    kind = classify(spec)
-    if kind == "number" and spec.get("name") == "ringtoneVolume":
+    kind = classify(spec, t9000=t9000)
+    if t9000 and kind == "number" and spec.get("name") == "ringtoneVolume":
         return True
     if kind == "sensor":
         return True
@@ -363,7 +363,7 @@ async def async_setup_entry(
         )(coordinator, sn, spec)
         for sn in coordinator.data
         for spec in entry.runtime_data.properties.get(sn, [])
-        if _is_sensor(spec)
+        if _is_sensor(spec, t9000=t9000_attached(coordinator, sn) is True)
         # A smart_light's effect internals are represented by the light's effect picker.
         and not (
             spec["name"] in LIGHT_HIDDEN_PROPS

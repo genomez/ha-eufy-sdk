@@ -20,6 +20,7 @@ from .alarm_logic import PHASE_STOPPED
 from .alarm_sync import alarm_event_serial, apply_alarm_event, clear_alarm
 from .api import EufySdkApiClient
 from .arming_sync import apply_arming_mode_event
+from .audit_visibility import register_audit_release_service
 from .bridge_events import async_dispatch_bridge_event
 from .const import (
     ALARM_AUTO_CLEAR_SECONDS,
@@ -315,6 +316,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.runtime_data.properties = properties
 
     register_schedule_service(hass, entry)
+    register_audit_release_service(hass, entry)
     async_reconcile_property_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     async_reconcile_property_entities(hass, entry)

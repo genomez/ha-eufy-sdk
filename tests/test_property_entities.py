@@ -72,7 +72,7 @@ class PresentationTests(unittest.TestCase):
             ({"type": "number", "writable": True, "kind": "seconds"}, "number"),
             ({"type": "enum", "writable": True, "enumValues": {"0": "low"}}, "select"),
             ({"type": "string"}, "sensor"),
-            ({"type": "number", "kind": "bitfield"}, "sensor"),
+            ({"type": "number", "kind": "bitfield"}, "bitfield"),
             ({"type": "number", "kind": "bitfield", "writable": True}, "bitfield"),
         ):
             self.assertEqual(classify(spec), expected)

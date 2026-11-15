@@ -1,11 +1,12 @@
 """Reviewed visibility, compatible reads and bounded volume controls."""
 
-# ruff: noqa: ANN201, D101, D102, INP001, PT009
+# ruff: noqa: ANN201, D101, D102, INP001, PT009, PT027
 import unittest
 from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.eufy_sdk.audit_visibility import (
@@ -98,7 +99,7 @@ class AuditVisibilityTests(unittest.TestCase):
         self.assertEqual(
             registry.async_get("select.user").hidden_by, er.RegistryEntryHider.USER
         )
-        self.assertFalse(
+        self.assertTrue(
             registry.async_get("select.other").options["eufy_sdk"][MARKER]["owned"]
         )
         registry.async_update_entity("select.visible", hidden_by=None)
@@ -110,10 +111,7 @@ class AuditVisibilityTests(unittest.TestCase):
         self.assertEqual(
             registry.async_get("select.user").hidden_by, er.RegistryEntryHider.USER
         )
-        self.assertEqual(
-            registry.async_get("select.other").hidden_by,
-            er.RegistryEntryHider.INTEGRATION,
-        )
+        self.assertIsNone(registry.async_get("select.other").hidden_by)
 
     def test_release_only_owned_hides_without_changing_disable_or_other_options(self):
         registry = self.registry_scope(
@@ -155,7 +153,7 @@ class AuditVisibilityTests(unittest.TestCase):
             all(row.hidden_by is None for row in registry.entities.values())
         )
         self.assertFalse(hidden_default(self.coordinator, "station", "armingMode"))
-        self.assertTrue(hidden_default(self.coordinator, "camera", "soundDetection"))
+        self.assertFalse(hidden_default(self.coordinator, "camera", "soundDetection"))
         self.coordinator.data["station"]["model"] = "T8030"
         self.assertFalse(hidden_default(self.coordinator, "camera", "powerSource"))
 
@@ -220,6 +218,60 @@ class AuditVisibilityTests(unittest.TestCase):
         async_release_audit_hides(self.hass, self.entry.entry_id)
         self.assertIsNone(registry.async_get(rows[0].entity_id).hidden_by)
 
+    def test_cold_sound_cache_defers_until_later_evidence(self):
+        self.coordinator.data["camera"]["state"] = {}
+        rows = [
+            Entry(
+                entity_id=f"{domain}.{name}", domain=domain, unique_id=f"camera_{name}"
+            )
+            for domain, name in (
+                ("switch", "soundDetection"),
+                ("number", "soundDetectionSensitivity"),
+            )
+        ]
+        registry = self.registry_scope(rows)
+        for _ in range(2):
+            async_migrate_audit_visibility(self.hass, self.entry)
+            for row in registry.entities.values():
+                self.assertIsNone(row.hidden_by)
+                self.assertNotIn(MARKER, row.options.get("eufy_sdk", {}))
+        self.coordinator.data["camera"]["state"] = {
+            "soundDetection": False,
+            "soundDetectionSensitivity": 0,
+        }
+        async_migrate_audit_visibility(self.hass, self.entry)
+        for row in registry.entities.values():
+            self.assertIsNone(row.hidden_by)
+            self.assertFalse(row.options["eufy_sdk"][MARKER]["owned"])
+
+    def test_definitive_unsupported_sound_can_hide_but_report_wins(self):
+        self.coordinator.data["camera"]["state"] = {}
+        self.entry.runtime_data.properties["camera"] = [
+            {"name": "soundDetection", "supported": False}
+        ]
+        registry = self.registry_scope(
+            [
+                Entry(
+                    entity_id="switch.sound",
+                    domain="switch",
+                    unique_id="camera_soundDetection",
+                )
+            ]
+        )
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertEqual(
+            registry.async_get("switch.sound").hidden_by,
+            er.RegistryEntryHider.INTEGRATION,
+        )
+        self.coordinator.data["camera"]["state"]["soundDetection"] = False
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertIsNone(registry.async_get("switch.sound").hidden_by)
+
+    def test_station_model_prefix_matches_attached_policy(self):
+        self.coordinator.data["station"]["model"] = "T9000-family"
+        self.assertTrue(hidden_default(self.coordinator, "station", "powerSource"))
+        self.assertTrue(hidden_default(self.coordinator, "camera", "powerSource"))
+
 
 class VolumeTests(unittest.IsolatedAsyncioTestCase):
     async def test_numbers_keep_property_identity_and_percent_bounds(self):
@@ -248,7 +300,8 @@ class VolumeTests(unittest.IsolatedAsyncioTestCase):
             await number.async_set_native_value(75)
             number.write.assert_awaited_once_with(75)
             if name == "ringtoneVolume":
-                self.assertTrue(_is_sensor(spec))
+                self.assertTrue(_is_sensor(spec, t9000=True))
+                self.assertFalse(_is_sensor(spec))
                 entry = SimpleNamespace(
                     runtime_data=SimpleNamespace(
                         coordinator=SimpleNamespace(
@@ -278,3 +331,28 @@ class VolumeTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual((number.native_min_value, number.native_max_value), (30, 1200))
+
+    async def test_display_widening_does_not_widen_write_bounds_or_shift_steps(self):
+        for current in (1200, 15):
+            number = EufySdkNumber(
+                Mock(data={"camera": {"state": {"motionLightDuration": current}}}),
+                "camera",
+                {
+                    "name": "motionLightDuration",
+                    "type": "number",
+                    "kind": "seconds",
+                    "min": 30,
+                    "max": 900,
+                    "step": 30,
+                },
+            )
+            number.write = AsyncMock()
+            self.assertEqual(number.native_value, current)
+            for invalid in (15, 1200, 45):
+                with self.assertRaisesRegex(
+                    HomeAssistantError, "permitted (range|step)"
+                ):
+                    await number.async_set_native_value(invalid)
+            number.write.assert_not_awaited()
+            await number.async_set_native_value(60)
+            number.write.assert_awaited_once_with(60)

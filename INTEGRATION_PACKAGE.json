@@ -40,7 +40,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/__init__.py",
-      "sha256": "65c96611f0a1ae14a879bc5460067116643563def4390efd6ae8ab2a77f6a504"
+      "sha256": "561f08a8c27a6ae6eb9b49f22567791476780a686371c43a7fc209474642a48f"
     },
     {
       "path": "custom_components/eufy_sdk/alarm_control_panel.py",
@@ -64,7 +64,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/audit_visibility.py",
-      "sha256": "8aaf3fa9c2cf4d2e406cbd0c4d99da9ca1c397b0647f6747c6e65e6452c83823"
+      "sha256": "ea96f8855d256315362d36531089d77af998b9728d4ee2b79a192cb9b9ac0acf"
     },
     {
       "path": "custom_components/eufy_sdk/bespoke.py",
@@ -148,7 +148,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "5b5208a8e300e51611576faf31796b936fd53783000cb8867e07ce2883ba5cf9"
+      "sha256": "15482e45a3dcdaa53c22de9d61e7d397eac6a34e5c1378aac69fb1db0ea0292d"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -212,7 +212,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/number.py",
-      "sha256": "d633f953e34ca43af63d2b8022b72468306549d1479dc90ce047d56906b9b58c"
+      "sha256": "93c334966305ae88a2dc3157eb3a64bd2e6496af0103c06afea4ba042d8925d7"
     },
     {
       "path": "custom_components/eufy_sdk/person_identification.py",
@@ -228,7 +228,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/property_entities.py",
-      "sha256": "eca4a1f2a8d7020b6c7ad18e58e4c9cdb4d45ab6b0b8f4bdb00d107c5e003772"
+      "sha256": "69b5787caa1e50f62c5dc2933468ab7ce27636c77d46bbb0862a33443a62e1b9"
     },
     {
       "path": "custom_components/eufy_sdk/property_sync.py",
@@ -276,11 +276,11 @@
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "97aa06facae335d45ed5046c11079c985c954d35e80e20595a92ab3743c4602f"
+      "sha256": "60d241f6c39522bbcbc448d64baf5525dfaa3ff66309ba7b27c24721d48d4421"
     },
     {
       "path": "custom_components/eufy_sdk/services.yaml",
-      "sha256": "ac97e7810567fc0c6a94ad04a8efd7629a9d49fba683bfed201cb7939bc30421"
+      "sha256": "440b9c7224d7f815e81d3e13761a7e3e1a37c258a6fc2f567c9049e73dab9e02"
     },
     {
       "path": "custom_components/eufy_sdk/siren.py",
@@ -300,7 +300,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/switch.py",
-      "sha256": "94a5d228507dc9e7fd6a6dadab2320f722a149f30a615121f4a087d7ef9a92bb"
+      "sha256": "ba748924dd492f67b342cceb58b406d67b2121a5b9686328c5aba491cd359b7f"
     },
     {
       "path": "custom_components/eufy_sdk/translations/en.json",

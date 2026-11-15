@@ -18,6 +18,7 @@ from .entity import (
     solix_devices_with,
 )
 from .light import LIGHT_OWNED_PROPS
+from .light_schedule import t9000_attached
 from .lock import LOCK_OWNED_PROPS
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ async def async_setup_entry(
             # The lock platform owns the 'locked' — don't also surface it as a switch.
             if is_lock and spec["name"] in LOCK_OWNED_PROPS:
                 continue
-            kind = classify(spec)
+            kind = classify(spec, t9000=t9000_attached(coordinator, sn) is True)
             if kind == "switch":
                 entities.append(EufySdkSwitch(coordinator, sn, spec))
             elif kind == "bitfield" and spec["name"] in BITFIELD_SWITCHES:
@@ -128,9 +129,10 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Expose device receipt time and value separately from optimistic state.
+        """
+        Expose device receipt time and value separately from optimistic state.
 
-        device_observed_at is read by owner scripts that confirm floodlight commands, so it stays.
+        device_observed_at remains available to scripts confirming floodlight commands.
         """
         observations = self.coordinator.property_observations or {}
         receipt = observations.get(self._sn, {}).get(self._prop)

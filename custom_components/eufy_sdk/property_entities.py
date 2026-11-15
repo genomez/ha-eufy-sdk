@@ -246,7 +246,7 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
                 for platform in _PROPERTY_PLATFORMS:
                     decisions[(platform, f"{serial}_privacy")] = True
             for name, spec in by_name.items():
-                platform = classify(spec)
+                platform = classify(spec, t9000=True)
                 if platform in _PROPERTY_PLATFORMS:
                     for old_platform in _PROPERTY_PLATFORMS:
                         decisions[(old_platform, f"{serial}_{name}")] = (
@@ -257,7 +257,7 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
             {
                 ("sensor", f"{serial}_ringtoneVolume"): False
                 for name in by_name
-                if name == "ringtoneVolume"
+                if attached and name == "ringtoneVolume"
             }
         )
         # snoozeTime was a raw string sensor before its typed seconds projection.

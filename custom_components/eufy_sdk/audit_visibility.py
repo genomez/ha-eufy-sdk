@@ -4,14 +4,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import voluptuous as vol
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.service import async_register_admin_service
 
 from .const import DOMAIN
 from .light_schedule import t9000_attached
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import HomeAssistant, ServiceCall
 
     from .coordinator import EufySdkDataUpdateCoordinator
     from .data import EufySdkConfigEntry
@@ -27,6 +31,7 @@ _ALWAYS = frozenset(
     }
 )
 _UNKNOWN = frozenset({"soundDetection", "soundDetectionSensitivity"})
+_RUNTIMES = f"{DOMAIN}_audit_visibility"
 
 
 def reviewed_control(
@@ -37,7 +42,7 @@ def reviewed_control(
     return bool(
         not device.get("error")
         and (
-            str(device.get("model", "")).upper() == "T9000"
+            str(device.get("model", "")).upper().startswith("T9000")
             or t9000_attached(coordinator, sn)
         )
         and (
@@ -51,11 +56,22 @@ def reviewed_control(
 
 
 def hidden_default(
-    coordinator: EufySdkDataUpdateCoordinator, sn: str, name: str
+    coordinator: EufySdkDataUpdateCoordinator,
+    sn: str,
+    name: str,
+    spec: dict | None = None,
 ) -> bool:
     """Hide reviewed controls, retaining reported sound controls."""
     return reviewed_control(coordinator, sn, name) and (
-        name not in _UNKNOWN or device_value(coordinator, sn, name) is None
+        name not in _UNKNOWN
+        or (device_value(coordinator, sn, name) is None and _unsupported(spec))
+    )
+
+
+def _unsupported(spec: dict | None) -> bool:
+    """Only explicit negative support evidence settles an unread sound control."""
+    return bool(
+        spec and (spec.get("unsupported") is True or spec.get("supported") is False)
     )
 
 
@@ -76,10 +92,16 @@ def async_migrate_audit_visibility(
         for spec in specs:
             name = spec["name"]
             if reviewed_control(coordinator, sn, name):
+                if (
+                    name in _UNKNOWN
+                    and device_value(coordinator, sn, name) is None
+                    and not _unsupported(spec)
+                ):
+                    continue
                 # Keep meaningful read entities visible.
                 for domain in ("select", "switch", "number"):
                     decisions[(domain, f"{sn}_{name}")] = hidden_default(
-                        coordinator, sn, name
+                        coordinator, sn, name, spec
                     )
         if reviewed_control(coordinator, sn, "refresh_last_event"):
             decisions[("button", f"{sn}_refresh_last_event")] = True
@@ -89,8 +111,22 @@ def async_migrate_audit_visibility(
             continue
         options = dict(entity.options.get(DOMAIN, {}))
         if MARKER in options:
+            marker = options[MARKER]
+            if (
+                entity.unique_id.rsplit("_", 1)[-1] in _UNKNOWN
+                and decisions[key] is False
+                and isinstance(marker, dict)
+                and marker.get("owned") is True
+            ):
+                if entity.hidden_by == er.RegistryEntryHider.INTEGRATION:
+                    registry.async_update_entity(entity.entity_id, hidden_by=None)
+                options[MARKER] = {"version": 1, "owned": False}
+                registry.async_update_entity_options(entity.entity_id, DOMAIN, options)
             continue
-        owned = decisions[key] and entity.hidden_by is None
+        owned = decisions[key] and entity.hidden_by in (
+            None,
+            er.RegistryEntryHider.INTEGRATION,
+        )
         options[MARKER] = {"version": 1, "owned": owned}
         registry.async_update_entity_options(entity.entity_id, DOMAIN, options)
         if owned:
@@ -115,3 +151,36 @@ def async_release_audit_hides(hass: HomeAssistant, entry_id: str) -> None:
             options = dict(entity.options.get(DOMAIN, {}))
             options[MARKER] = {"version": 1, "owned": False, "released": True}
             registry.async_update_entity_options(entity.entity_id, DOMAIN, options)
+
+
+def register_audit_release_service(
+    hass: HomeAssistant, entry: EufySdkConfigEntry
+) -> None:
+    """Register an admin-only release for loaded entries, removing it on last unload."""
+    entries = hass.data.setdefault(_RUNTIMES, {})
+    entries[entry.entry_id] = entry
+
+    async def handle(call: ServiceCall) -> None:
+        target = entries.get(call.data["entry_id"])
+        if target is None:
+            message = "Audit visibility entry is not loaded"
+            raise HomeAssistantError(message)
+        async_migrate_audit_visibility(hass, target)
+        async_release_audit_hides(hass, target.entry_id)
+
+    if len(entries) == 1:
+        async_register_admin_service(
+            hass,
+            DOMAIN,
+            "release_audit_hides",
+            handle,
+            schema=vol.Schema({vol.Required("entry_id"): cv.string}),
+        )
+
+    def unload() -> None:
+        entries.pop(entry.entry_id, None)
+        if not entries:
+            hass.services.async_remove(DOMAIN, "release_audit_hides")
+            hass.data.pop(_RUNTIMES, None)
+
+    entry.async_on_unload(unload)

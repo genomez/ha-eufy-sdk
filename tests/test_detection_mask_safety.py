@@ -9,11 +9,12 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
+
 from custom_components.eufy_sdk.property_sync import apply_property_event
 from custom_components.eufy_sdk.sensor import _is_sensor
 from custom_components.eufy_sdk.switch import EufyBitmaskSwitch, async_setup_entry
-from homeassistant.const import EntityCategory
-from homeassistant.exceptions import HomeAssistantError
 
 BASE = 0x30000
 BIT = 4
@@ -55,13 +56,22 @@ VALID_REPORTS = [
 
 
 @pytest.mark.parametrize("writable", [True, False, None])
-async def test_detection_switch_creation_requires_sdk_write_permission(writable) -> None:
+@pytest.mark.parametrize("station_model", ["T9000", "T8030"])
+async def test_detection_switch_creation_requires_sdk_write_permission(
+    *, writable: bool | None, station_model: str
+) -> None:
     """Unsafe or unknown SDK routes retain telemetry without creating bit switches."""
     spec = {"name": "aiDetectType", "type": "number", "kind": "bitfield"}
     if writable is not None:
         spec["writable"] = writable
     coordinator = SimpleNamespace(
-        data={"synthetic-camera": {"state": {"aiDetectType": BASE | BIT}}},
+        data={
+            "synthetic-camera": {
+                "stationSn": "station",
+                "state": {"aiDetectType": BASE | BIT},
+            },
+            "station": {"model": station_model},
+        },
     )
     entry = SimpleNamespace(
         runtime_data=SimpleNamespace(
@@ -72,8 +82,10 @@ async def test_detection_switch_creation_requires_sdk_write_permission(writable)
     add_entities = Mock()
     await async_setup_entry(Mock(), entry, add_entities)
     entities = add_entities.call_args.args[0]
-    assert len(entities) == (4 if writable else 0)
-    assert _is_sensor(spec) is (not bool(writable))
+    assert len(entities) == (4 if writable or station_model != "T9000" else 0)
+    assert _is_sensor(spec, t9000=station_model == "T9000") is (
+        station_model == "T9000" and not bool(writable)
+    )
 
 
 def entity_for(value: object) -> tuple[EufyBitmaskSwitch, SimpleNamespace, Mock]:

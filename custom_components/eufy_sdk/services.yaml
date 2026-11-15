@@ -14,3 +14,14 @@ set_light_schedule:
       required: true
       selector:
         object:
+release_audit_hides:
+  name: Release audit hides
+  description: Admin only. Release integration-owned audit hides for a loaded config entry and prevent reapplication. User hides and disables are preserved.
+  fields:
+    entry_id:
+      name: Config entry
+      description: Loaded Eufy SDK config entry ID.
+      required: true
+      selector:
+        config_entry:
+          integration: eufy_sdk

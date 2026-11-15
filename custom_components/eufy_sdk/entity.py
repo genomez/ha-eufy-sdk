@@ -285,7 +285,7 @@ def is_setting(prop: str) -> bool:
     return prop not in PRIMARY_CONTROL_PROPS
 
 
-def classify(spec: dict[str, Any]) -> str | None:
+def classify(spec: dict[str, Any], *, t9000: bool = False) -> str | None:
     """
     Route one property spec to exactly one platform, so no two platforms claim it.
 
@@ -302,7 +302,7 @@ def classify(spec: dict[str, Any]) -> str | None:
         return None
     t, writable, kind = spec.get("type"), spec.get("writable"), spec.get("kind")
     if kind == "bitfield":
-        return "bitfield" if writable else "sensor"
+        return "sensor" if t9000 and not writable else "bitfield"
     # A fixed set of choices (enumValues) is a select when writable, a labelled sensor
     # otherwise — regardless of the wire `type`, since some enums ride a numeric param
     # (e.g. hubAlarmTone is type "number", kind "enum").
@@ -338,7 +338,7 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         self._prop: str = spec["name"]
         self._attr_entity_registry_visible_default = not (
             classify(spec) in {"select", "switch", "number"}
-            and hidden_default(coordinator, sn, self._prop)
+            and hidden_default(coordinator, sn, self._prop, spec)
         )
         self._attr_unique_id = f"{sn}_{self._prop}"
         if not self._named_by_translation:
