@@ -18,7 +18,7 @@ Existing property unique IDs remain `<device identifier>_<SDK property name>`. N
 | T8171 | Recording-quality labels updated; writable settings retained | Only if an actual read exists without its setter | Physical spotlight remains omitted by SDK detection; privacy absent | None |
 | T8426 floodlight | Same seven additions/restorations as T8425 | SDK determines momentary-light writability; the tested floodlight route remains writable | No free-text schedule entity; privacy absent | None |
 
-The fixture `tests/fixtures/t9000_settings_manifests.json` records the .15/.16 schemas and exact generic-platform differences for all seven models. It uses SDK .15 `18b34ff` and .16 `85c3cc2`, with the .15 bridge's scalar hiding applied. Test device types: 47, 104, 48, 93, 19, 48, 87 respectively. Supplied parameters are synthetic capability evidence, not proof that every model reports every test parameter. Quick-response additions are dynamic and recorded separately from generic properties.
+The fixture `tests/fixtures/t9000_settings_manifests.json` records the .15/.16 schemas and exact generic-platform differences for all seven models. It uses SDK .15 `18b34ff` and .16 `dbdbd6d`, with the .15 bridge's scalar hiding applied. Test device types: 47, 104, 48, 93, 19, 48, 87 respectively. Supplied parameters are synthetic capability evidence, not proof that every model reports every test parameter. Quick-response additions are dynamic and recorded separately from generic properties.
 
 ## Retained writable controls and values
 
@@ -39,3 +39,9 @@ Quick-response unique IDs are `<device identifier>_quick_response_<voiceId>`; na
 - SDK rejection strings now omit station identity. The bridge accepts the sanitized strings when mapping finite error categories.
 
 The bridge's SDK artifact and receipt now pin the cold-index fix. Both releases still need the lead's source review, image build, and separately authorized device acceptance. Concurrent app writes remain outside the SDK's read/merge/write isolation. No devices, hosts, containers or live HA were accessed for this implementation.
+
+## Final SDK refresh versus the previous .16 candidate
+
+SDK `dbdbd6db84bb73d994e6d773314d58fe7da89541` withholds setters outside its verified-parameter allowlist and serializes composite writes. The regenerated synthetic fixture shows `antiTheftDetection` changing from switch to binary sensor on all seven models; `workingMode` changes from select to sensor on T8170, T8214 and T8171. `snoozeTime` loses its setter on all seven models but already routed to a sensor, so its entity domain stays unchanged. Color temperature, RTSP publish and alarm volume have no exposed writable entity in the previous synthetic fixture; their withheld setters do not represent additional fixture domain changes. Actual retained reads without setters remain read-only.
+
+Regeneration reused the original bridge `.offline/experimental16/compare.mjs` generator with the installed SDK, retaining the original .15 fixture baseline, then applied `normalize_properties` and `classify` to rebuild the .16 schemas and differences. Only the original schema fields are retained; identity/location values are excluded. No integration runtime or test code required changes.

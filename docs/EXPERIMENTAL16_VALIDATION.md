@@ -18,7 +18,7 @@ Integration interpreter: `C:/Users/jason/OneDrive/Documents/Cursor/eufy/contribu
 
 Result: 1,240 passed, one skipped, zero failed; 1,501 subtests passed. Eight existing dependency warnings. Runner blocks external network/process I/O and confines output to `.offline`.
 
-Focused command: same interpreter with `-B tools/run_offline_tests.py tests/test_t9000_settings.py tests/test_manifest_reads.py tests/test_property_entities.py` — 48 passed, zero failed at the original candidate. The model fixture was generated with SDK `85c3cc2`, not the pinned `6fea9a7`. The lead must regenerate `tests/fixtures/t9000_settings_manifests.json` after the final SDK pin, then rerun its focused checks. Regeneration is deferred while SDK changes are in progress.
+Focused command: same interpreter with `-B tools/run_offline_tests.py tests/test_t9000_settings.py tests/test_manifest_reads.py tests/test_property_entities.py` — 48 passed, zero failed at the original candidate. The model fixture was generated with SDK `85c3cc2`, not the pinned `6fea9a7`. The final refresh below supersedes this historical fixture pin.
 
 Changed Python modules pass Ruff; changed bridge source/tests pass Prettier. Both diffs pass whitespace checks. These are local source checks, not image-build or hardware acceptance. See `EXPERIMENTAL16_ENTITY_CHANGES.md` for model identities, actions and risks. SDK `6fea9a7` fixed cold-config indexing by promoting retained parameters when station context resolves; this blocker is resolved in the current pin.
 
@@ -35,4 +35,10 @@ Post-correction checks with the existing pinned SDK, before the lead's final rep
 - Integration full command above: 1,246 passed, one skipped, 1,510 subtests passed, zero failed; eight existing dependency warnings.
 - Changed Python files pass Ruff; changed bridge files pass Prettier; both diffs pass whitespace checks. The integration package allowlist hashes were refreshed for the changed runtime files.
 
-The current bridge SDK archive, lockfile and artifact receipts were preserved. No SDK source, remote hosts, containers, HA instances or devices were changed. Final SDK repack, manifest-fixture regeneration and hardware acceptance remain with the lead.
+The current bridge SDK archive, lockfile and artifact receipts were preserved. No SDK source, remote hosts, containers, HA instances or devices were changed. Final SDK repack and manifest-fixture regeneration are recorded below; hardware acceptance remains outstanding.
+
+## Final local SDK refresh
+
+SDK pin: `dbdbd6db84bb73d994e6d773314d58fe7da89541`. Bridge installed runtime SHA-256: `6ccf04fda5530879daf19bd552f2b11c5feca4b4cb91364e67422f0cfcf87e76`; tarball SHA-256: `6eea4551e245906a168ac18a148975c1f2eb726e2c4f5d90e0d255d2e3d93b6c`.
+
+The original synthetic generator was rerun against this installed SDK; the .15 baseline was preserved. Bridge full command above: 1,459 passed, 53 skipped, zero failed. Integration full command above after fixture regeneration: 1,246 passed, one skipped, 1,510 subtests passed, zero failed; eight dependency warnings. No bridge or integration runtime/test code changes were necessary. Integration package files are unchanged, so INTEGRATION_PACKAGE.json hashes remain valid. Local source validation only.

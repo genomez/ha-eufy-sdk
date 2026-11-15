@@ -1,6 +1,6 @@
 {
   "sdkPrevious": "18b34fffdaf57e1e2756df51c42022c63d022704",
-  "sdkNext": "85c3cc25ee97af84312922f9065936b9df8475be",
+  "sdkNext": "dbdbd6db84bb73d994e6d773314d58fe7da89541",
   "provenance": "Synthetic reported parameters, bound through each SDK facade. Previous bridge scalar hiding applied to floodlights. Not an owner inventory.",
   "cases": [
     {
@@ -265,7 +265,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -365,7 +365,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -446,6 +446,7 @@
           "name": "motionLightDuration",
           "type": "number",
           "kind": "seconds",
+          "unit": "s",
           "writable": true,
           "min": 1,
           "step": 1
@@ -454,6 +455,7 @@
           "name": "motionLightBrightness",
           "type": "number",
           "kind": "percent",
+          "unit": "%",
           "writable": true,
           "min": 1,
           "max": 100,
@@ -465,10 +467,16 @@
           "kind": "scalar",
           "writable": true,
           "min": 0,
+          "max": 255,
           "step": 1
         }
       ],
       "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
         {
           "name": "brightness",
           "before": null,
@@ -745,7 +753,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -845,7 +853,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -890,7 +898,13 @@
           "writable": true
         }
       ],
-      "changes": []
+      "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        }
+      ]
     },
     {
       "model": "T8170",
@@ -1236,7 +1250,7 @@
           "type": "number",
           "kind": "enum",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "enumValues": {
             "0": "Optimal Battery Life",
             "1": "Optimal Surveillance",
@@ -1354,7 +1368,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -1454,7 +1468,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -1522,9 +1536,19 @@
       ],
       "changes": [
         {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
+        {
           "name": "light",
           "before": "switch",
           "after": "binary_sensor"
+        },
+        {
+          "name": "workingMode",
+          "before": "select",
+          "after": "sensor"
         }
       ]
     },
@@ -2025,7 +2049,7 @@
           "type": "number",
           "kind": "enum",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "enumValues": {
             "0": "Balance Surveillance",
             "1": "Optimal Surveillance",
@@ -2144,7 +2168,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -2244,7 +2268,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -2316,7 +2340,18 @@
           "writable": false
         }
       ],
-      "changes": []
+      "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
+        {
+          "name": "workingMode",
+          "before": "select",
+          "after": "sensor"
+        }
+      ]
     },
     {
       "model": "T8134",
@@ -2578,7 +2613,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -2678,7 +2713,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -2745,6 +2780,11 @@
         }
       ],
       "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
         {
           "name": "light",
           "before": "switch",
@@ -3075,7 +3115,7 @@
           "type": "number",
           "kind": "enum",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "enumValues": {
             "0": "Optimal Battery Life",
             "1": "Optimal Surveillance",
@@ -3193,7 +3233,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -3293,7 +3333,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -3338,7 +3378,18 @@
           "writable": true
         }
       ],
-      "changes": []
+      "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
+        {
+          "name": "workingMode",
+          "before": "select",
+          "after": "sensor"
+        }
+      ]
     },
     {
       "model": "T8426",
@@ -3602,7 +3653,7 @@
           "name": "snoozeTime",
           "type": "string",
           "min": 0,
-          "writable": true,
+          "writable": false,
           "kind": "seconds"
         },
         {
@@ -3702,7 +3753,7 @@
           "name": "antiTheftDetection",
           "type": "bool",
           "kind": "boolean",
-          "writable": true
+          "writable": false
         },
         {
           "name": "statusLed",
@@ -3783,6 +3834,7 @@
           "name": "motionLightDuration",
           "type": "number",
           "kind": "seconds",
+          "unit": "s",
           "writable": true,
           "min": 1,
           "step": 1
@@ -3791,6 +3843,7 @@
           "name": "motionLightBrightness",
           "type": "number",
           "kind": "percent",
+          "unit": "%",
           "writable": true,
           "min": 1,
           "max": 100,
@@ -3802,10 +3855,16 @@
           "kind": "scalar",
           "writable": true,
           "min": 0,
+          "max": 255,
           "step": 1
         }
       ],
       "changes": [
+        {
+          "name": "antiTheftDetection",
+          "before": "switch",
+          "after": "binary_sensor"
+        },
         {
           "name": "brightness",
           "before": null,
