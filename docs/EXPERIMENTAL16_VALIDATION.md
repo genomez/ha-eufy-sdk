@@ -39,6 +39,10 @@ The current bridge SDK archive, lockfile and artifact receipts were preserved. N
 
 ## Final local SDK refresh
 
-SDK pin: `dbdbd6db84bb73d994e6d773314d58fe7da89541`. Bridge installed runtime SHA-256: `6ccf04fda5530879daf19bd552f2b11c5feca4b4cb91364e67422f0cfcf87e76`; tarball SHA-256: `6eea4551e245906a168ac18a148975c1f2eb726e2c4f5d90e0d255d2e3d93b6c`.
+SDK pin: `797ff74fe7aca2648c05246cf708d24a39a0db96`. Bridge installed runtime SHA-256: `2cf4d0cc72818bd6f413743cf888804c098cd8a1e817568705ec341ddeb1382e`; tarball SHA-256: `c586ff2d383f0d834788d4e115859defda10f85d44a9922e60b4f81ae8c895f2`.
 
 The original synthetic generator was rerun against this installed SDK; the .15 baseline was preserved. Bridge full command above: 1,459 passed, 53 skipped, zero failed. Integration full command above after fixture regeneration: 1,246 passed, one skipped, 1,510 subtests passed, zero failed; eight dependency warnings. No bridge or integration runtime/test code changes were necessary. Integration package files are unchanged, so INTEGRATION_PACKAGE.json hashes remain valid. Local source validation only.
+
+The local SDK re-review refresh adds field-baseline ACK patches (120-second TTL), bounded/coalesced unsent writes, bounded quick-response timeout quarantine, and signaling identity redaction. The seven-model fixture was regenerated against the installed repack; all schemas and entity-domain changes are identical, so only its SDK commit pin changed. The original .15 baseline is retained. Integration runtime and package-allowlist files remain unchanged.
+
+Validation after the re-review repack and fixture regeneration: required integration offline command above passed with 1,246 tests, one skipped, 1,510 subtests and eight existing dependency warnings. SDK full suite: 7,652 passed / 8 skipped; expanded focused command: 329 passed; typecheck, build, ESM and all five guards passed. Bridge full suite: 1,459 passed / 53 skipped. No flakes were observed.
