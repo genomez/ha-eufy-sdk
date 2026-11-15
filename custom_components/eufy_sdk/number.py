@@ -132,6 +132,30 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
         v = self.prop_value
         return float(v) if isinstance(v, (int, float)) else None
 
+    async def write(self, value: Any) -> None:
+        """Note what a write-only control reported before this write."""
+        if self.write_only:
+            self._write_only_baseline = (self.device.get("state") or {}).get(self._prop)
+        await super().write(value)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Let a write-only control show a report that differs from before the write.
+
+        The device never confirms such a write, so the written value is held. A later
+        report that matches it, or changes from what was reported before the write
+        (for example a change made in the Eufy app), replaces the held value.
+        """
+        if self.write_only and self._assumed_value is not None and not self._removed:
+            reported = (self.device.get("state") or {}).get(self._prop)
+            if _finite_number(reported) and (
+                reported == self._assumed_value
+                or reported != getattr(self, "_write_only_baseline", None)
+            ):
+                self._assumed_value = None
+                self._optimistic_owner = None
+        super()._handle_coordinator_update()
+
     async def async_set_native_value(self, value: float) -> None:
         """Write the value (as an int when it's whole, to match the wire)."""
         current = (self.device.get("state") or {}).get(self._prop)

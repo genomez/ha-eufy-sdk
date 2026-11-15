@@ -19,6 +19,7 @@ from custom_components.eufy_sdk.manifest_reads import (
     normalize_properties,
     normalize_snapshot,
 )
+from custom_components.eufy_sdk.number import EufySdkNumber
 from custom_components.eufy_sdk.property_sync import apply_property_event
 
 
@@ -284,7 +285,125 @@ class ManifestReadTests(unittest.TestCase):
             )
 
 
+def prompt_volume_snapshot(state: dict) -> dict:
+    """Mirror the bridge's T9000 action-only prompt-volume report."""
+    return {
+        "sn": "synthetic-homebase",
+        "model": "T9000",
+        "state": state,
+        "stateEvidence": {"promptVolume": {"source": "cloud_poll"}},
+        "decodedProperties": {
+            "bound": True,
+            "details": [
+                {
+                    "capability": "audio",
+                    "accessor": "audio",
+                    "reads": [],
+                    "actions": [
+                        {
+                            "name": "setPromptVolume",
+                            "writeOnly": True,
+                            "form": "momentary",
+                            "args": [
+                                {
+                                    "name": "promptVolume",
+                                    "kind": "percent",
+                                    "min": 0,
+                                    "max": 100,
+                                    "step": 1,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+        "decodedState": {"audio": {}},
+    }
+
+
+class WriteOnlyActionReadTests(unittest.TestCase):
+    def test_action_reports_do_not_bypass_getters_or_ambiguous_mappings(self):
+        source = prompt_volume_snapshot({"promptVolume": 5})
+        audio = source["decodedProperties"]["details"][0]
+        audio["reads"] = [
+            {"property": "promptVolume", "accessor": "promptVolume", "kind": "percent"}
+        ]
+        self.assertIsNone(normalize_snapshot(source)["state"]["promptVolume"])
+        audio["reads"] = []
+        audio["actions"].append(deepcopy(audio["actions"][0]))
+        self.assertIsNone(normalize_snapshot(source)["state"]["promptVolume"])
+
+    def test_only_declared_typed_write_only_action_reports_survive(self):
+        for actions in (None, [None], [{}], [{"writeOnly": True, "args": []}]):
+            source = prompt_volume_snapshot({"promptVolume": 5, "cameraInfo": {}})
+            source["decodedProperties"]["details"][0]["actions"] = actions
+            self.assertEqual(
+                normalize_snapshot(source)["state"],
+                {"promptVolume": None, "cameraInfo": None},
+            )
+        source = prompt_volume_snapshot({"promptVolume": 5})
+        source["decodedProperties"]["details"][0]["actions"][0]["writeOnly"] = False
+        self.assertIsNone(normalize_snapshot(source)["state"]["promptVolume"])
+
+
+class WriteOnlyActionRangeTests(unittest.TestCase):
+    def test_reported_action_value_outside_declared_range_is_unknown(self):
+        for value, expected in ((5, 5), (0, 0), (100, 100), (-1, None), (255, None)):
+            with self.subTest(value=value):
+                source = prompt_volume_snapshot({"promptVolume": value})
+                self.assertEqual(
+                    normalize_snapshot(source)["state"]["promptVolume"], expected
+                )
+
+
 class ManifestApiTests(unittest.IsolatedAsyncioTestCase):
+    async def test_homebase_reported_prompt_volume_reaches_number_from_api(self):
+        client = EufySdkApiClient("synthetic-bridge", 3000, Mock())
+        spec = {
+            "name": "promptVolume",
+            "type": "number",
+            "kind": "percent",
+            "unit": "%",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "writable": True,
+            "writeOnly": True,
+        }
+        for state, expected in (
+            ({"promptVolume": 5}, 5),
+            ({"promptVolume": 0}, 0),
+            ({}, None),
+            ({"promptVolume": None}, None),
+            ({"promptVolume": "5"}, None),
+            ({"promptVolume": True}, None),
+            ({"promptVolume": {}}, None),
+            ({"promptVolume": float("nan")}, None),
+        ):
+            with self.subTest(state=state):
+                source = prompt_volume_snapshot(state)
+                original = deepcopy(source)
+                client.rpc = AsyncMock(return_value={"devices": [source]})
+                devices = await client.list_devices()
+                client.rpc.assert_awaited_once_with("devices.list")
+                properties = normalize_properties(
+                    {
+                        "properties": [spec],
+                        "decodedProperties": source["decodedProperties"],
+                    }
+                )
+                entity = EufySdkNumber(
+                    Mock(data={source["sn"]: devices[0]}), source["sn"], properties[0]
+                )
+                self.assertEqual(entity.unique_id, "synthetic-homebase_promptVolume")
+                self.assertEqual(entity.native_value, expected)
+                self.assertTrue(entity.write_only)
+                self.assertEqual(
+                    (entity.native_min_value, entity.native_max_value), (0, 100)
+                )
+                self.assertEqual(source, original)
+
     async def test_solar_panel_sensor_from_derived_manifest_reads(self):
         read = {
             "property": "solarPanelConnected",

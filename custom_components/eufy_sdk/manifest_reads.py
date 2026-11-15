@@ -74,6 +74,42 @@ def _value(read: dict, value: Any) -> Any:
     return value
 
 
+def _reported_action_values(manifest: Any, raw: dict, reads: dict) -> dict:
+    """Keep typed reports for single-argument write-only actions without getters."""
+    actions = {}
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("details"), list):
+        return actions
+    for capability in manifest["details"]:
+        if not isinstance(capability, dict):
+            continue
+        candidates = capability.get("actions")
+        if not isinstance(candidates, list):
+            continue
+        for action in candidates:
+            if not isinstance(action, dict) or action.get("writeOnly") is not True:
+                continue
+            args = action.get("args")
+            if (
+                not isinstance(args, list)
+                or len(args) != 1
+                or not isinstance(args[0], dict)
+            ):
+                continue
+            arg = args[0]
+            name = arg.get("name")
+            if not isinstance(name, str) or name not in raw or name in reads:
+                continue
+            value = _value(arg, raw[name])
+            low, high = arg.get("min"), arg.get("max")
+            if value is not None and (
+                (_number(low) and value < low) or (_number(high) and value > high)
+            ):
+                value = None
+            # Duplicate action mappings are as ambiguous as duplicate read mappings.
+            actions[name] = None if name in actions else value
+    return actions
+
+
 def normalize_snapshot(device: dict[str, Any]) -> dict[str, Any]:
     """Project this snapshot's decoded values without another RPC or model cache."""
     if "decodedProperties" not in device and "decodedState" not in device:
@@ -81,7 +117,9 @@ def normalize_snapshot(device: dict[str, Any]) -> dict[str, Any]:
     reads = _reads(device.get("decodedProperties"))
     decoded = device.get("decodedState")
     raw = device.get("state")
-    state = dict.fromkeys(raw if isinstance(raw, dict) else ())
+    raw = raw if isinstance(raw, dict) else {}
+    state = dict.fromkeys(raw)
+    state.update(_reported_action_values(device.get("decodedProperties"), raw, reads))
     for name, mapping in reads.items():
         state[name] = None
         if mapping is None or not isinstance(decoded, dict):

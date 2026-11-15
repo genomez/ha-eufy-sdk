@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .data import EufySdkConfigEntry
 
 MARKER = "entity_audit_visibility_v1"
+SOUND_SUPPORT_MARKER = "entity_audit_sound_support_v1"
 _ALWAYS = frozenset(
     {
         "recordingMode",
@@ -31,6 +32,8 @@ _ALWAYS = frozenset(
     }
 )
 _UNKNOWN = frozenset({"soundDetection", "soundDetectionSensitivity"})
+# The Eufy app offers Sound Detection only on this model among T9000-attached cameras.
+_SOUND_SUPPORTED_MODEL = "T8416"
 # powerSource value for "External Solar Panel".
 _SOLAR_PANEL = "1"
 _RUNTIMES = f"{DOMAIN}_audit_visibility"
@@ -63,7 +66,15 @@ def hidden_default(
     name: str,
     spec: dict | None = None,
 ) -> bool:
-    """Hide reviewed controls, retaining reported sound controls."""
+    """Hide reviewed controls using app support for T9000-attached sound controls."""
+    if (
+        reviewed_control(coordinator, sn, name)
+        and name in _UNKNOWN
+        and t9000_attached(coordinator, sn)
+    ):
+        model = _model(coordinator, sn)
+        # Stay visible until the model is known.
+        return bool(model) and not model.startswith(_SOUND_SUPPORTED_MODEL)
     return reviewed_control(coordinator, sn, name) and (
         name not in _UNKNOWN
         or (device_value(coordinator, sn, name) is None and _unsupported(spec))
@@ -97,6 +108,11 @@ def solar_hidden_default(
     return not (text == _SOLAR_PANEL or "solar" in text.lower())
 
 
+def _model(coordinator: EufySdkDataUpdateCoordinator, sn: str) -> str:
+    """The device's model, upper-cased; empty while not yet known."""
+    return str(coordinator.data.get(sn, {}).get("model") or "").strip().upper()
+
+
 def device_value(coordinator: EufySdkDataUpdateCoordinator, sn: str, name: str) -> Any:
     """Read the already normalized cached value without device I/O."""
     return (coordinator.data.get(sn, {}).get("state") or {}).get(name)
@@ -110,21 +126,28 @@ def async_migrate_audit_visibility(
     registry = er.async_get(hass)
     coordinator = entry.runtime_data.coordinator
     decisions = {}
+    sound_decisions = set()
     for sn, specs in entry.runtime_data.properties.items():
         for spec in specs:
             name = spec["name"]
             if reviewed_control(coordinator, sn, name):
+                sound_support = name in _UNKNOWN and t9000_attached(coordinator, sn)
+                if sound_support and not _model(coordinator, sn):
+                    # Decide once the model is known; the marker makes it final.
+                    continue
                 if (
-                    name in _UNKNOWN
+                    not sound_support
+                    and name in _UNKNOWN
                     and device_value(coordinator, sn, name) is None
                     and not _unsupported(spec)
                 ):
                     continue
                 # Keep meaningful read entities visible.
                 for domain in ("select", "switch", "number"):
-                    decisions[(domain, f"{sn}_{name}")] = hidden_default(
-                        coordinator, sn, name, spec
-                    )
+                    key = (domain, f"{sn}_{name}")
+                    decisions[key] = hidden_default(coordinator, sn, name, spec)
+                    if sound_support:
+                        sound_decisions.add(key)
         if any(spec["name"] == "solarPanelConnected" for spec in specs):
             hide = solar_hidden_default(coordinator, sn, specs)
             if hide is not None:
@@ -136,10 +159,12 @@ def async_migrate_audit_visibility(
         if entity.platform != DOMAIN or key not in decisions:
             continue
         options = dict(entity.options.get(DOMAIN, {}))
-        if MARKER in options:
-            marker = options[MARKER]
+        marker_key = SOUND_SUPPORT_MARKER if key in sound_decisions else MARKER
+        if marker_key in options:
+            marker = options[marker_key]
             if (
-                entity.unique_id.rsplit("_", 1)[-1] in _UNKNOWN
+                marker_key == MARKER
+                and entity.unique_id.rsplit("_", 1)[-1] in _UNKNOWN
                 and decisions[key] is False
                 and isinstance(marker, dict)
                 and marker.get("owned") is True
@@ -153,7 +178,22 @@ def async_migrate_audit_visibility(
             None,
             er.RegistryEntryHider.INTEGRATION,
         )
-        options[MARKER] = {"version": 1, "owned": owned}
+        previous = options.get(MARKER, {})
+        if marker_key == SOUND_SUPPORT_MARKER and isinstance(previous, dict):
+            # A released hide or a user unhide of an owned v1 hide stays released.
+            if previous.get("released") or (
+                previous.get("owned") is True
+                and entity.hidden_by != er.RegistryEntryHider.INTEGRATION
+            ):
+                owned = False
+            elif (
+                not decisions[key]
+                and previous.get("owned") is True
+                and entity.hidden_by == er.RegistryEntryHider.INTEGRATION
+            ):
+                registry.async_update_entity(entity.entity_id, hidden_by=None)
+                options[MARKER] = {"version": 1, "owned": False}
+        options[marker_key] = {"version": 1, "owned": owned}
         registry.async_update_entity_options(entity.entity_id, DOMAIN, options)
         if owned:
             registry.async_update_entity(
@@ -166,16 +206,19 @@ def async_release_audit_hides(hass: HomeAssistant, entry_id: str) -> None:
     """Undo only owned integration hides; retain the marker to prevent reapplication."""
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry_id):
-        marker = entity.options.get(DOMAIN, {}).get(MARKER, {})
-        if (
-            entity.platform == DOMAIN
-            and isinstance(marker, dict)
-            and marker.get("owned") is True
-        ):
+        if entity.platform != DOMAIN:
+            continue
+        options = dict(entity.options.get(DOMAIN, {}))
+        owned_markers = [
+            key
+            for key in (MARKER, SOUND_SUPPORT_MARKER)
+            if isinstance(options.get(key), dict) and options[key].get("owned") is True
+        ]
+        if owned_markers:
             if entity.hidden_by == er.RegistryEntryHider.INTEGRATION:
                 registry.async_update_entity(entity.entity_id, hidden_by=None)
-            options = dict(entity.options.get(DOMAIN, {}))
-            options[MARKER] = {"version": 1, "owned": False, "released": True}
+            for key in owned_markers:
+                options[key] = {"version": 1, "owned": False, "released": True}
             registry.async_update_entity_options(entity.entity_id, DOMAIN, options)
 
 
