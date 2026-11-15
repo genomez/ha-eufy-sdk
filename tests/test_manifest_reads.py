@@ -145,6 +145,25 @@ class ManifestReadTests(unittest.TestCase):
         )
         self.assertEqual(result[0]["type"], "number")
 
+    def test_decoded_duration_from_string_storage_is_a_number(self):
+        # snoozeTime is stored as a config string; its getter decodes seconds (0 = not snoozed).
+        read = {
+            "property": "snoozeTime",
+            "accessor": "snoozeTime",
+            "type": "string",
+            "kind": "seconds",
+            "writable": True,
+        }
+        for value, expected in ((0, 0), (3600, 3600), ("", None), (None, None)):
+            source = {
+                "state": {"snoozeTime": ""},
+                "decodedProperties": manifest(read),
+                "decodedState": {"camera": {"snoozeTime": value}},
+            }
+            self.assertEqual(
+                normalize_snapshot(source)["state"]["snoozeTime"], expected
+            )
+
     def test_zero_false_and_original_raw_snapshot_preserved(self):
         source = snapshot()
         original = deepcopy(source)

@@ -47,6 +47,10 @@ def _decoded_type(read: dict) -> str | None:
         if all(isinstance(value, str) for value in values):
             return "string"
         return None
+    # A getter that decodes a duration or percentage out of a structured (string) payload, such
+    # as snoozeTime from its config blob, publishes a number whatever the storage type.
+    if read.get("kind") in ("seconds", "hours", "percent"):
+        return "number"
     return "number" if read.get("type") == "enum" else read.get("type")
 
 
