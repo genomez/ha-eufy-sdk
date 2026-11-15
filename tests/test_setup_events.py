@@ -11,6 +11,12 @@ from custom_components.eufy_sdk.const import (
     MAX_DOORBELL_EVENT_IDS,
 )
 from custom_components.eufy_sdk.event import EufySdkDoorbellEvent
+from custom_components.eufy_sdk.manifest_reads import normalize_snapshot
+from custom_components.eufy_sdk.number import EufySdkNumber
+from custom_components.eufy_sdk.select import (
+    EufyMotionLightActivationSelect,
+    EufyMotionLightTimerSelect,
+)
 from custom_components.eufy_sdk.switch import EufySdkSwitch
 
 
@@ -250,6 +256,91 @@ class SetupEventTests(unittest.IsolatedAsyncioTestCase):
                 }
             )
         self.assertEqual(self.scheduled, [])
+
+    async def test_app_motion_light_invalidation_refreshes_all_decoded_entities(self):
+        fields = {
+            "motionLightEnabled": True,
+            "motionLightDuration": 30,
+            "motionLightBrightness": 50,
+            "motionLightMode": 1,
+        }
+        self.coordinator.data["homebase"]["state"].update(fields)
+        specs = {
+            name: {
+                "name": name,
+                "type": "bool" if type(value) is bool else "number",
+                "kind": "boolean" if type(value) is bool else "scalar",
+                "writable": True,
+                "min": 0,
+                "max": 900,
+                "step": 1,
+            }
+            for name, value in fields.items()
+        }
+        entities = [
+            EufyMotionLightActivationSelect(
+                self.coordinator, "homebase", specs["motionLightMode"]
+            ),
+            EufyMotionLightTimerSelect(
+                self.coordinator, "homebase", specs["motionLightDuration"]
+            ),
+            EufySdkNumber(self.coordinator, "homebase", specs["motionLightBrightness"]),
+            EufySdkSwitch(self.coordinator, "homebase", specs["motionLightEnabled"]),
+        ]
+
+        async def refresh() -> None:
+            snapshot = normalize_snapshot(
+                {
+                    "state": dict.fromkeys(fields, "stale raw value"),
+                    "decodedProperties": {
+                        "details": [
+                            {
+                                "accessor": "light",
+                                "reads": [
+                                    {
+                                        "property": name,
+                                        "accessor": name,
+                                        "type": specs[name]["type"],
+                                    }
+                                    for name in fields
+                                ],
+                            }
+                        ]
+                    },
+                    "decodedState": {"light": dict(fields)},
+                }
+            )
+            self.coordinator.data["homebase"].update(snapshot)
+            self.coordinator.async_update_listeners()
+
+        self.coordinator.async_request_refresh.side_effect = refresh
+        for changes, expected in (
+            ({"motionLightMode": 0}, ("Smart", "30 s", 50, True)),
+            ({"motionLightDuration": 180}, ("Smart", "3 min", 50, True)),
+            ({"motionLightBrightness": 75}, ("Smart", "3 min", 75, True)),
+            ({"motionLightEnabled": False}, ("Smart", "3 min", 75, False)),
+            ({"motionLightMode": 99}, (None, "3 min", 75, False)),
+        ):
+            fields.update(changes)
+            self.on_event(
+                {
+                    "event": "propertyChanged",
+                    "deviceSn": "homebase",
+                    "property": "motionLightEnabled",
+                }
+            )
+            self.assertEqual(len(self.scheduled), 1)
+            await self.scheduled.pop()
+            self.assertEqual(
+                (
+                    entities[0].current_option,
+                    entities[1].current_option,
+                    entities[2].native_value,
+                    entities[3].is_on,
+                ),
+                expected,
+            )
+        self.assertEqual(self.coordinator.async_update_listeners.call_count, 5)
 
     async def test_structured_light_invalidations_refresh_siblings_without_null_state(
         self,

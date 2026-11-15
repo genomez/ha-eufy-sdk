@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 from custom_components.eufy_sdk.audit_visibility import hidden_default
 from custom_components.eufy_sdk.number import EufySdkNumber
 from custom_components.eufy_sdk.select import (
+    EufyMotionLightActivationSelect,
     EufyMotionLightTimerSelect,
     async_setup_entry,
 )
@@ -98,3 +99,71 @@ class TimerTests(unittest.IsolatedAsyncioTestCase):
                     hidden_default(self.coordinator, "camera", "motionLightDuration"),
                     model in {"T8425", "T8426"} and parent == "T9000",
                 )
+
+
+MODE_SPEC = {
+    "name": "motionLightMode",
+    "type": "number",
+    "kind": "scalar",
+    "writable": True,
+    "min": 0,
+    "max": 255,
+    "step": 1,
+}
+
+
+class ActivationTests(unittest.IsolatedAsyncioTestCase):
+    setUp = TimerTests.setUp
+
+    async def test_activation_choices_and_preserved_hidden_number(self):
+        entity = EufyMotionLightActivationSelect(self.coordinator, "camera", MODE_SPEC)
+        entity.write = AsyncMock()
+        self.assertEqual(entity.name, "Motion light activation")
+        self.assertEqual(entity.unique_id, "camera_motionLightActivation")
+        self.assertEqual(entity._prop, "motionLightMode")
+        self.assertEqual(entity.options, ["Fast", "Smart"])
+        self.assertTrue(entity.entity_registry_visible_default)
+        number = EufySdkNumber(self.coordinator, "camera", MODE_SPEC)
+        self.assertEqual(number.unique_id, "camera_motionLightMode")
+        self.assertFalse(number.entity_registry_visible_default)
+        for raw, label in ((1, "Fast"), (0, "Smart")):
+            self.coordinator.data["camera"]["state"]["motionLightMode"] = raw
+            self.assertEqual(entity.current_option, label)
+            await entity.async_select_option(label)
+            entity.write.assert_awaited_with(raw)
+        entity.write.reset_mock()
+        for raw in (2, 255, -1, None, True, "unexpected"):
+            self.coordinator.data["camera"]["state"]["motionLightMode"] = raw
+            self.assertIsNone(entity.current_option)
+        await entity.async_select_option("unexpected")
+        entity.write.assert_not_awaited()
+
+    async def test_activation_setup_requires_model_parent_and_writable_report(self):
+        for model, parent, writable, error, expected in (
+            ("T8425", "T9000", True, False, 1),
+            ("T8426", "T9000", True, False, 1),
+            ("T8416", "T9000", True, False, 0),
+            ("T8425", "T8030", True, False, 0),
+            ("T8425", None, True, False, 0),
+            ("T8425", "T9000", False, False, 0),
+            ("T8425", "T9000", True, True, 0),
+        ):
+            with self.subTest(
+                model=model, parent=parent, writable=writable, error=error
+            ):
+                self.coordinator.data["camera"].update(model=model, error=error)
+                self.coordinator.data["station"] = {"model": parent}
+                entry = SimpleNamespace(
+                    runtime_data=SimpleNamespace(
+                        coordinator=self.coordinator,
+                        properties={"camera": [{**MODE_SPEC, "writable": writable}]},
+                    )
+                )
+                add = Mock()
+                await async_setup_entry(Mock(), entry, add)
+                entities = [
+                    entity
+                    for entity in add.call_args.args[0]
+                    if isinstance(entity, EufyMotionLightActivationSelect)
+                ]
+                self.assertEqual(len(entities), expected)

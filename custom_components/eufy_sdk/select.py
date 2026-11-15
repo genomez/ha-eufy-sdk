@@ -68,6 +68,8 @@ MOTION_LIGHT_TIMER_LABELS: dict[int, str] = {
     900: "15 min",
 }
 
+MOTION_LIGHT_ACTIVATION_LABELS: dict[int, str] = {1: "Fast", 0: "Smart"}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -90,6 +92,15 @@ async def async_setup_entry(
         and t9000_attached(coordinator, sn)
         for spec in entry.runtime_data.properties.get(sn, [])
         if spec["name"] == "motionLightDuration" and classify(spec) == "number"
+    )
+    entities.extend(
+        EufyMotionLightActivationSelect(coordinator, sn, spec)
+        for sn, dev in coordinator.data.items()
+        if str(dev.get("model", "")).upper() in {"T8425", "T8426"}
+        and not dev.get("error")
+        and t9000_attached(coordinator, sn)
+        for spec in entry.runtime_data.properties.get(sn, [])
+        if spec["name"] == "motionLightMode" and classify(spec) == "number"
     )
     # Anker Solix: Solarbank display screen-off timeout. (The minimum-SOC / discharge
     # cutoff is now the Discharge Limit slider on the number platform.)
@@ -185,6 +196,24 @@ class EufyMotionLightTimerSelect(EufySdkSelect):
         )
         self._attr_unique_id = f"{sn}_motionLightTimer"
         self._attr_name = "Motion light timer"
+        self._attr_entity_registry_visible_default = True
+
+
+class EufyMotionLightActivationSelect(EufySdkSelect):
+    """App activation choices over the existing composite mode write path."""
+
+    def __init__(
+        self,
+        coordinator: EufySdkDataUpdateCoordinator,
+        sn: str,
+        spec: dict[str, Any],
+    ) -> None:
+        """Keep the mode number's identity while adding a visible select."""
+        super().__init__(
+            coordinator, sn, {**spec, "enumValues": MOTION_LIGHT_ACTIVATION_LABELS}
+        )
+        self._attr_unique_id = f"{sn}_motionLightActivation"
+        self._attr_name = "Motion light activation"
         self._attr_entity_registry_visible_default = True
 
 

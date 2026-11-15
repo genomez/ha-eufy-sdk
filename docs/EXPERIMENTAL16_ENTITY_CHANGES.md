@@ -186,3 +186,29 @@ on changed Python files. The real `async_setup_entry` ordering is covered with
 hidden-at-creation registration, post-forward ownership and admin-only release.
 The bridge receipt pins the refreshed SDK commit, package and runtime hashes.
 No network, HA, device or phone contact, push, image build or deployment occurred.
+
+
+## Verified app choices and composite update follow-ups
+
+On T9000, recording quality (2731) adds **4K = 4 for T8416 only** and
+**Auto = 0 for T8170 only**, for decoded reads and writes. Existing labels remain
+720P = 1, 1080P = 2, and 2K = 3 on T8416 / 3K = 3 on other models.
+T8425 retains only 3K/1080P/720P. These added raw values were verified by selecting
+them in the app and reading the bridge's decoded state. The base64 capture-config
+write changes only `mode_0.quality`, preserving `cur_mode`, `mode_1` and other fields.
+
+T9000-attached T8425/T8426 gain **Motion light activation**, unique ID suffix
+`_motionLightActivation`, with **Fast = 1** and **Smart = 0** over the existing
+`motionLightMode` composite write (1422, field `mode`). Fast/Smart were verified
+on T8425; **T8426 Smart is inferred from T8425**. The existing
+`_motionLightMode` number remains created and hidden by the existing audit
+visibility policy, like the duration number. Unknown raw modes show unknown.
+
+A 1422 change announces the decoded primary `motionLightEnabled` boolean, even
+when only a sibling field changes. Forwarding that scalar alone left the timer,
+brightness and mode stale in HA. The bridge now sends a valueless invalidation
+for this composite primary, requesting a normalized snapshot refresh of every
+sibling. HA snapshot reads already use `decodedState`, rather than the raw flat
+composite. Offline regressions cover mode-only reports with unchanged enabled,
+timer/brightness/enabled changes, both floodlight models and HA entity read-back.
+No live-device acceptance or SDK repack is included in this local follow-up.
