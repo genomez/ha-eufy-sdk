@@ -272,7 +272,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "fd5b99ea9c46d274cc557aa9cd1a3bab7b24e44b09706fbe7c9e297822b09c1b"
+      "sha256": "79cee681ee471b0d366ddcb894e5ae14dbf2cb0a761148ec1b0c14a7b5269960"
     },
     {
       "path": "custom_components/eufy_sdk/services.yaml",

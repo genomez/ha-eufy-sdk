@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import voluptuous as vol
+from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from test_property_entities import Entry, Registry
@@ -233,6 +234,8 @@ class MetadataTests(unittest.TestCase):
         obj.data["camera"]["state"]["lightSchedule"] = "bad"
         self.assertIsNone(entity.native_value)
         self.assertEqual(entity.unique_id, "camera_lightSchedule")
+        # HA refuses sensors in the config category.
+        self.assertEqual(entity.entity_category, EntityCategory.DIAGNOSTIC)
 
     def test_schedule_validation_without_assumed_entry_schema(self):
         for value in ([], [{"unknown": [1, 2]}], [1, "entry"]):

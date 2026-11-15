@@ -610,7 +610,7 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
 class EufyLightScheduleSensor(EufySdkPropertyEntity, SensorEntity):
     """Schedule entry count and sanitized entries, never a free-text control."""
 
-    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:calendar-clock"
 
     @property
