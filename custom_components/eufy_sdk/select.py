@@ -125,6 +125,11 @@ class EufySdkSelect(EufySdkPropertyEntity, SelectEntity):
         return {
             **super().extra_state_attributes,
             **(
+                {"warning": "Changing this tone sounds the siren at full volume"}
+                if self._prop == "hubAlarmTone"
+                else {}
+            ),
+            **(
                 guard_attributes(self.client, self._sn)
                 if self._prop == "armingMode"
                 else {}

@@ -51,3 +51,65 @@ The local SDK re-review refresh adds field-baseline ACK patches (120-second TTL)
 ## Composite overlay history refresh
 
 The SDK pin is now `c14bf36a6c20808eeeb9f4a905be762c943788ae`. The installed-package seven-model manifest regeneration matches all existing normalized schema fields and entity-domain differences; only fixture metadata changed. ACK history now survives confirmations and reports of intermediate writes for 120 seconds. An app edit to a retained ACKed value is indistinguishable from lag and the latest SDK ACK wins until expiry. Third values retire only their own patches. Integration runtime files are unchanged.
+
+
+## Reviewed entity audit changes
+
+The approved control audit adds **82 hidden-by-default controls**: 37 unknown sound controls
+(15 type selects, 11 switches, 11 sensitivity numbers), 15 RTSP recording-mode selects,
+15 diagnostic event-refresh buttons, station power-source and alarm-tone selects, eight
+camera power-source selects and five motion-light-mode numbers. Arming mode stays visible.
+Reported sound switches and sensitivity numbers retain their presentation, including controls
+awaiting separate live testing. No sensor visibility or orphan cleanup is part of this change.
+These rules have no overlap with active automation/dashboard references except arming mode,
+which is explicitly excluded. No owner device identities are stored in source or fixtures.
+
+New registrations use `entity_registry_visible_default`. Existing registry controls receive
+`hidden_by=integration` only when currently unhidden. The per-entity registry option
+`eufy_sdk.entity_audit_visibility_v1` records the decision once, including decisions to retain
+visible reported sound controls. Reloads never override a later user unhide. User hides,
+disables, names and unrelated registry options are preserved. The migration matches domain
+and stable property unique ID, so renamed entity IDs remain safe. Users can unhide individual
+controls in entity settings. For a controlled bulk rollback,
+`audit_visibility.async_release_audit_hides(hass, entry_id)` releases only hides owned by this
+migration and retains a released marker to prevent reapplication. Rollback source must retain
+this helper until those changes are released; no registry rows are deleted.
+
+**22 controls stop being created** on the audited T9000 setup: 13 non-doorbell loitering
+switches (doorbells retain them), two accessory ringtone selects, two doorbell recording-quality
+selects, four unwritable light switches and one station reboot button. SDK applicability and
+write gates own the property changes; the bridge withholds reboot while RTC lacks a route.
+Meaningful light reads, doorbell video quality and all surviving control identities remain.
+Existing registry entries are retained as orphan/recovery material, subject to existing reversible
+presentation handling. Other station topologies retain their previous behavior.
+
+**Five motion-light duration numbers** use the upstream T8425/T8426 metadata bounds 30–900
+seconds, retaining the existing integer step; upstream named timer values are 30, 60, 180, 300,
+900. All five audit states were 180 seconds. Intermediate-second firmware acceptance remains
+unproven. Numeric presentation expands rather than excluding a currently reported value.
+**Three new percentage numbers** expose two T8214 ringtone volumes (1708) and station prompt
+volume (1292), all 0–100. Existing ringtone sensors remain loaded with their original identities
+and current values. Prompt volume is write-only/assumed state and uses the tested 1350 `{value}`
+command with explicit mValue3 zero; it must not be described as confirmed reflected state.
+The SDK exposes only installed write-only setters. The bridge joins these writes to the matching
+reported property without changing the SDK's same-capability read/setter contract.
+
+### Deferred app verification
+
+No universal option set is established for the 15 night-vision selects. Leave their current
+options/labels unchanged until the following model-specific checks are recorded. This includes
+the existing potentially misleading Spotlight label on models without spotlights.
+
+| Models | Eufy app screen | Record exactly |
+| --- | --- | --- |
+| T8425, T8426, T8170, T8171, T8416, T8134, T8214 | Camera settings → Video settings → Night Vision | Every displayed option and its raw 1277 value; determine whether 0/1/2 exist, whether 2 means color/spotlight and whether it is absent. In particular do not assume 2 on T8416/T8171. |
+| T8425, T8426, T8170, T8171, T8416 | Camera settings → Pan and Tilt settings → Rotation Speed | Displayed labels and raw 6015 values for each stop; verify Slow/Medium/Fast is 1/3/5 and whether 2/4 exist. The SDK's T8410 capture does not establish these models. |
+| T8425, T8416 | Camera settings → Sound Detection → Sensitivity | Displayed labels and raw 6044 values; verify Low/Medium/High is 1/3/5, and whether 2/4 exist. Four populated numbers stay numeric. |
+| T8425, T8426, T8416 | Camera settings → Power Manager/Recording settings → Customize Recording | Minimum, maximum, increment or full choice list for Clip Length (1249) and Retrigger/Record Interval (1250). Preserve currently reported intervals 0, 120 and 300 seconds; unrelated battery defaults must not narrow them. Fourteen numbers keep existing bounds. |
+| T8425, T8426 | Camera settings → Light settings → Motion-activated light → Duration | Confirm choices 30/60/180/300/900 seconds and whether arbitrary integer seconds are accepted; metadata bounds alone do not prove that. |
+
+The exact translated screen names may vary by app version; the named feature and raw parameter
+identify the check. The 44 deferred audit corrections comprise 15 night vision, 11 rotation speed,
+four populated sound sensitivity and 14 clip/interval controls. Controls awaiting separate live
+tests retain their current behavior, except the five explicitly approved hidden motion-light modes.
+No version was bumped. No Home Assistant instance, device or phone was contacted.

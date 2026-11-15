@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 
+from .audit_visibility import async_migrate_audit_visibility
 from .const import DOMAIN
 from .entity import classify
 from .light_schedule import t9000_attached
@@ -251,6 +252,14 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
                         decisions[(old_platform, f"{serial}_{name}")] = (
                             old_platform != platform
                         )
+        # Keep the existing read identity beside the new ringtone volume number.
+        decisions.update(
+            {
+                ("sensor", f"{serial}_ringtoneVolume"): False
+                for name in by_name
+                if name == "ringtoneVolume"
+            }
+        )
         # snoozeTime was a raw string sensor before its typed seconds projection.
         # Retire only that proven old route, keeping the number's stable identity.
         snooze = by_name.get("snoozeTime")
@@ -287,3 +296,5 @@ def async_reconcile_property_entities(
             and _marker(entity, _V1_MARKER).get("opt_out") is not True
         ):
             manager.release(entity)
+
+    async_migrate_audit_visibility(hass, entry)

@@ -24,6 +24,7 @@ from .api import (
     command_health_event,
     late_contrary_event,
 )
+from .audit_visibility import hidden_default
 from .bridge_events import async_listen_bridge_event
 from .const import ATTRIBUTION, DOMAIN, SOLIX_READING_EVENT
 from .coordinator import EufySdkDataUpdateCoordinator
@@ -335,6 +336,10 @@ class EufySdkPropertyEntity(EufySdkDeviceEntity):
         super().__init__(coordinator, sn)
         self._spec = spec
         self._prop: str = spec["name"]
+        self._attr_entity_registry_visible_default = not (
+            classify(spec) in {"select", "switch", "number"}
+            and hidden_default(coordinator, sn, self._prop)
+        )
         self._attr_unique_id = f"{sn}_{self._prop}"
         if not self._named_by_translation:
             self._attr_name = label_for(self._prop)

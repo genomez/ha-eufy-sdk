@@ -328,6 +328,8 @@ SOLIX_MODE_LABELS: dict[int, str] = {
 def _is_sensor(spec: dict) -> bool:
     """Return True for classify()=="sensor", plus bitfields with no bespoke switches."""
     kind = classify(spec)
+    if kind == "number" and spec.get("name") == "ringtoneVolume":
+        return True
     if kind == "sensor":
         return True
     return kind == "bitfield" and spec["name"] not in BITFIELD_SWITCHES

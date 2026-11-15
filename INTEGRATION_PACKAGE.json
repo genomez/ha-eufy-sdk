@@ -40,7 +40,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/__init__.py",
-      "sha256": "d6edf8eefdd98e7641719a7d84c18b82db9031d9b225b534b7b491fc3eb0f270"
+      "sha256": "65c96611f0a1ae14a879bc5460067116643563def4390efd6ae8ab2a77f6a504"
     },
     {
       "path": "custom_components/eufy_sdk/alarm_control_panel.py",
@@ -61,6 +61,10 @@
     {
       "path": "custom_components/eufy_sdk/arming_sync.py",
       "sha256": "b1e16f40ed978e58ac170cfc9ea1aaf4304e421ea0e2c5d32b1b24f2e64afb76"
+    },
+    {
+      "path": "custom_components/eufy_sdk/audit_visibility.py",
+      "sha256": "8ce37c6788ea132eac78be527c59a935e2797345211d36bf9eded4a34d50569b"
     },
     {
       "path": "custom_components/eufy_sdk/bespoke.py",
@@ -108,7 +112,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/button.py",
-      "sha256": "4042a3d861d8dd9efe966533d867984365f1b1999cc84f5d74bcfb0ca152f2a0"
+      "sha256": "b4b610ae70e7ef37dbee3453f4e730e857fb2ef10c9d8391b637e5227f233324"
     },
     {
       "path": "custom_components/eufy_sdk/camera.py",
@@ -144,7 +148,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/entity.py",
-      "sha256": "c80e5e639aa86800093345ac3c0dde531da893c747a51da9305807a521195aa8"
+      "sha256": "3a934040652d696617df8e736d980b88fbc810e331f1bec137c95a5a9e2a3c06"
     },
     {
       "path": "custom_components/eufy_sdk/event.py",
@@ -208,7 +212,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/number.py",
-      "sha256": "616f55e21f2300e4bb86d0e6219bccb61a6650627bea6d49c27afe23f633416e"
+      "sha256": "d633f953e34ca43af63d2b8022b72468306549d1479dc90ce047d56906b9b58c"
     },
     {
       "path": "custom_components/eufy_sdk/person_identification.py",
@@ -224,7 +228,7 @@
     },
     {
       "path": "custom_components/eufy_sdk/property_entities.py",
-      "sha256": "de800a0f14288c6a7b06efe0764b7556d94d2c292ef7eea31f1cc71ce32bfdb0"
+      "sha256": "eca4a1f2a8d7020b6c7ad18e58e4c9cdb4d45ab6b0b8f4bdb00d107c5e003772"
     },
     {
       "path": "custom_components/eufy_sdk/property_sync.py",
@@ -268,11 +272,11 @@
     },
     {
       "path": "custom_components/eufy_sdk/select.py",
-      "sha256": "e39d28ef936973b4933c7e399fd26289d4b244e4ac4abcd3dfb203b743596185"
+      "sha256": "6745fdd6ecb31402d90a3e85448547d65cb346889d3c7d037d778b64cdd013ca"
     },
     {
       "path": "custom_components/eufy_sdk/sensor.py",
-      "sha256": "79cee681ee471b0d366ddcb894e5ae14dbf2cb0a761148ec1b0c14a7b5269960"
+      "sha256": "97aa06facae335d45ed5046c11079c985c954d35e80e20595a92ab3743c4602f"
     },
     {
       "path": "custom_components/eufy_sdk/services.yaml",

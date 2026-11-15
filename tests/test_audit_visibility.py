@@ -1,0 +1,247 @@
+"""Reviewed visibility, compatible reads and bounded volume controls."""
+
+# ruff: noqa: ANN201, D101, D102, INP001, PT009
+import unittest
+from contextlib import ExitStack
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
+
+from homeassistant.helpers import entity_registry as er
+
+from custom_components.eufy_sdk.audit_visibility import (
+    MARKER,
+    async_migrate_audit_visibility,
+    async_release_audit_hides,
+    hidden_default,
+)
+from custom_components.eufy_sdk.entity import EufySdkPropertyEntity
+from custom_components.eufy_sdk.manifest_reads import normalize_properties
+from custom_components.eufy_sdk.number import EufySdkNumber
+from custom_components.eufy_sdk.property_entities import _presentation_decisions
+from custom_components.eufy_sdk.sensor import _is_sensor
+from tests.test_property_entities import Entry, Registry
+
+
+class AuditVisibilityTests(unittest.TestCase):
+    def setUp(self):
+        self.hass = Mock(data={})
+        self.coordinator = SimpleNamespace(
+            data={
+                "camera": {
+                    "model": "T8425",
+                    "stationSn": "station",
+                    "state": {"soundDetection": False, "soundDetectionSensitivity": 3},
+                },
+                "station": {"model": "T9000", "state": {}},
+            }
+        )
+        self.entry = SimpleNamespace(
+            entry_id="synthetic-entry",
+            runtime_data=SimpleNamespace(
+                coordinator=self.coordinator,
+                properties={
+                    "camera": [
+                        {"name": name}
+                        for name in (
+                            "soundDetection",
+                            "soundDetectionSensitivity",
+                            "soundDetectionType",
+                            "recordingMode",
+                            "powerSource",
+                            "motionLightMode",
+                        )
+                    ],
+                    "station": [
+                        {"name": name}
+                        for name in ("armingMode", "hubAlarmTone", "powerSource")
+                    ],
+                },
+            ),
+        )
+
+    def registry_scope(self, entries: list[Entry]):
+        registry = Registry(entries)
+        stack = ExitStack()
+        stack.enter_context(patch.object(er, "async_get", return_value=registry))
+        stack.enter_context(
+            patch.object(
+                er,
+                "async_entries_for_config_entry",
+                side_effect=lambda reg, entry_id: [
+                    e for e in reg.entities.values() if e.config_entry_id == entry_id
+                ],
+            )
+        )
+        self.addCleanup(stack.close)
+        return registry
+
+    def test_once_only_respects_user_hide_and_later_unhide(self):
+        rows = [
+            Entry(
+                entity_id=f"select.{label}",
+                domain="select",
+                unique_id="camera_recordingMode",
+                hidden_by=hidden,
+            )
+            for label, hidden in (
+                ("visible", None),
+                ("user", er.RegistryEntryHider.USER),
+                ("other", er.RegistryEntryHider.INTEGRATION),
+            )
+        ]
+        registry = self.registry_scope(rows)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertEqual(
+            registry.async_get("select.visible").hidden_by,
+            er.RegistryEntryHider.INTEGRATION,
+        )
+        self.assertEqual(
+            registry.async_get("select.user").hidden_by, er.RegistryEntryHider.USER
+        )
+        self.assertFalse(
+            registry.async_get("select.other").options["eufy_sdk"][MARKER]["owned"]
+        )
+        registry.async_update_entity("select.visible", hidden_by=None)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertIsNone(registry.async_get("select.visible").hidden_by)
+        async_release_audit_hides(self.hass, self.entry.entry_id)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertIsNone(registry.async_get("select.visible").hidden_by)
+        self.assertEqual(
+            registry.async_get("select.user").hidden_by, er.RegistryEntryHider.USER
+        )
+        self.assertEqual(
+            registry.async_get("select.other").hidden_by,
+            er.RegistryEntryHider.INTEGRATION,
+        )
+
+    def test_release_only_owned_hides_without_changing_disable_or_other_options(self):
+        registry = self.registry_scope(
+            [
+                Entry(
+                    entity_id="number.synthetic",
+                    domain="number",
+                    unique_id="camera_motionLightMode",
+                    disabled_by=er.RegistryEntryDisabler.USER,
+                    options={"other": {"a": 1}},
+                )
+            ]
+        )
+        async_migrate_audit_visibility(self.hass, self.entry)
+        async_release_audit_hides(self.hass, self.entry.entry_id)
+        result = registry.async_get("number.synthetic")
+        self.assertIsNone(result.hidden_by)
+        self.assertEqual(result.disabled_by, er.RegistryEntryDisabler.USER)
+        self.assertEqual(result.options["other"], {"a": 1})
+
+    def test_reported_sound_and_arming_keep_presentation_across_later_unknown(self):
+        rows = [
+            Entry(
+                entity_id="switch.synthetic",
+                domain="switch",
+                unique_id="camera_soundDetection",
+            ),
+            Entry(
+                entity_id="select.synthetic",
+                domain="select",
+                unique_id="station_armingMode",
+            ),
+        ]
+        registry = self.registry_scope(rows)
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.coordinator.data["camera"]["state"] = {}
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertTrue(
+            all(row.hidden_by is None for row in registry.entities.values())
+        )
+        self.assertFalse(hidden_default(self.coordinator, "station", "armingMode"))
+        self.assertTrue(hidden_default(self.coordinator, "camera", "soundDetection"))
+        self.coordinator.data["station"]["model"] = "T8030"
+        self.assertFalse(hidden_default(self.coordinator, "camera", "powerSource"))
+
+    def test_new_read_entities_keep_visibility(self):
+        for spec in (
+            {"name": "powerSource", "type": "number"},
+            {"name": "soundDetection", "type": "bool"},
+        ):
+            entity = EufySdkPropertyEntity(self.coordinator, "camera", spec)
+            self.assertTrue(entity.entity_registry_visible_default)
+
+    def test_sensor_and_unrelated_platforms_are_never_hidden(self):
+        registry = self.registry_scope(
+            [
+                Entry(unique_id="camera_soundDetectionType"),
+                Entry(
+                    entity_id="switch.other",
+                    domain="switch",
+                    unique_id="camera_soundDetection",
+                    platform="other",
+                ),
+            ]
+        )
+        async_migrate_audit_visibility(self.hass, self.entry)
+        self.assertTrue(
+            all(
+                row.hidden_by is None and row.options == {}
+                for row in registry.entities.values()
+            )
+        )
+
+
+class VolumeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_numbers_keep_property_identity_and_percent_bounds(self):
+        for name in ("ringtoneVolume", "promptVolume"):
+            coordinator = Mock(data={"camera": {"state": {name: 50}}})
+            spec = {
+                "name": name,
+                "type": "number",
+                "kind": "percent",
+                "unit": "%",
+                "writable": True,
+                "min": 0,
+                "max": 100,
+                "step": 1,
+                "writeOnly": name == "promptVolume",
+            }
+            spec = normalize_properties(
+                {"properties": [spec], "decodedProperties": {"details": []}}
+            )[0]
+            number = EufySdkNumber(coordinator, "camera", spec)
+            number.write = AsyncMock()
+            self.assertEqual(number.unique_id, f"camera_{name}")
+            self.assertEqual(
+                (number.native_min_value, number.native_max_value), (0, 100)
+            )
+            await number.async_set_native_value(75)
+            number.write.assert_awaited_once_with(75)
+            if name == "ringtoneVolume":
+                self.assertTrue(_is_sensor(spec))
+                entry = SimpleNamespace(
+                    runtime_data=SimpleNamespace(
+                        coordinator=SimpleNamespace(
+                            data={
+                                "camera": {"stationSn": "station"},
+                                "station": {"model": "T9000"},
+                            }
+                        ),
+                        properties={"camera": [spec]},
+                    )
+                )
+                self.assertFalse(
+                    _presentation_decisions(entry)[("sensor", "camera_ringtoneVolume")]
+                )
+
+    def test_current_report_is_never_excluded_by_new_range(self):
+        coordinator = Mock(data={"camera": {"state": {"motionLightDuration": 1200}}})
+        number = EufySdkNumber(
+            coordinator,
+            "camera",
+            {
+                "name": "motionLightDuration",
+                "type": "number",
+                "kind": "seconds",
+                "min": 30,
+                "max": 900,
+            },
+        )
+        self.assertEqual((number.native_min_value, number.native_max_value), (30, 1200))

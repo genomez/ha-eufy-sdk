@@ -116,6 +116,9 @@ class EufySdkNumber(EufySdkPropertyEntity, NumberEntity):
                 "using existing fallback fields",
                 spec["name"],
             )
+        current = self.prop_value
+        if _finite_number(current):
+            low, high = min(low, current), max(high, current)
         self._attr_native_step = step
         self._attr_native_min_value = low
         self._attr_native_max_value = high

@@ -11,6 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import EufySdkApiClientError
+from .audit_visibility import hidden_default
 from .const import DOMAIN
 from .entity import EufySdkDeviceEntity, has_capability
 from .light_schedule import t9000_attached
@@ -109,6 +110,9 @@ class EufyRefreshEventButton(EufySdkDeviceEntity, ButtonEntity):
         """Bind to a camera/doorbell serial."""
         super().__init__(coordinator, sn)
         self._attr_unique_id = f"{sn}_refresh_last_event"
+        self._attr_entity_registry_visible_default = not hidden_default(
+            coordinator, sn, "refresh_last_event"
+        )
 
     async def async_press(self) -> None:
         """Ask the bridge to re-pull the newest event cover (nudges the Image)."""

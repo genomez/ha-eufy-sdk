@@ -317,6 +317,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     register_schedule_service(hass, entry)
     async_reconcile_property_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    async_reconcile_property_entities(hass, entry)
     return True
 
 
