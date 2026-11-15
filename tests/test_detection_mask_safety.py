@@ -10,7 +10,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from custom_components.eufy_sdk.property_sync import apply_property_event
-from custom_components.eufy_sdk.switch import EufyBitmaskSwitch
+from custom_components.eufy_sdk.sensor import _is_sensor
+from custom_components.eufy_sdk.switch import EufyBitmaskSwitch, async_setup_entry
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
@@ -51,6 +52,28 @@ VALID_REPORTS = [
     "-1",
     "٤",
 ]
+
+
+@pytest.mark.parametrize("writable", [True, False, None])
+async def test_detection_switch_creation_requires_sdk_write_permission(writable) -> None:
+    """Unsafe or unknown SDK routes retain telemetry without creating bit switches."""
+    spec = {"name": "aiDetectType", "type": "number", "kind": "bitfield"}
+    if writable is not None:
+        spec["writable"] = writable
+    coordinator = SimpleNamespace(
+        data={"synthetic-camera": {"state": {"aiDetectType": BASE | BIT}}},
+    )
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(
+            coordinator=coordinator,
+            properties={"synthetic-camera": [spec]},
+        ),
+    )
+    add_entities = Mock()
+    await async_setup_entry(Mock(), entry, add_entities)
+    entities = add_entities.call_args.args[0]
+    assert len(entities) == (4 if writable else 0)
+    assert _is_sensor(spec) is (not bool(writable))
 
 
 def entity_for(value: object) -> tuple[EufyBitmaskSwitch, SimpleNamespace, Mock]:

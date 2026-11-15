@@ -291,7 +291,7 @@ def classify(spec: dict[str, Any]) -> str | None:
 
     A `kind: "bitfield"` (e.g. `aiDetectType`) is never a scalar you'd nudge — it's a
     pack of bits — so it routes to "bitfield" for bespoke handling (see bespoke.py):
-    known ones become per-bit switches, unknown ones a read-only sensor.
+    writable known ones become per-bit switches, others a read-only sensor.
 
     A writable number is only a `number` when it has a real scale (`kind` other than
     bitfield, or a `unit`) — a bounded quantity you'd adjust (brightness %, a timer).
@@ -302,7 +302,7 @@ def classify(spec: dict[str, Any]) -> str | None:
         return None
     t, writable, kind = spec.get("type"), spec.get("writable"), spec.get("kind")
     if kind == "bitfield":
-        return "bitfield"
+        return "bitfield" if writable else "sensor"
     # A fixed set of choices (enumValues) is a select when writable, a labelled sensor
     # otherwise — regardless of the wire `type`, since some enums ride a numeric param
     # (e.g. hubAlarmTone is type "number", kind "enum").
