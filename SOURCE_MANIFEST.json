@@ -33,7 +33,7 @@
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 12182,
-      "sha256": "2e68cda3786af985ccc45f5f15cedf79ecad7549f41ee2430505290d1d575336"
+      "sha256": "f9330881ceb5a6fd979fa5525c9e8ee0adddc1d58143ad506ae75a4572aac255"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -60,8 +60,8 @@
       "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
     },
     "RELEASE_NOTES.md": {
-      "bytes": 2702,
-      "sha256": "ce3c856f5c8659ffb5adc1e653aea12af9628507d93cec76d746ec6989e7c594"
+      "bytes": 2605,
+      "sha256": "3f74812fffb86bd323d238f007c376024bb77044134a246e6008a417249896ab"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,

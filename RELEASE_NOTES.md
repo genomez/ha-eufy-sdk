@@ -20,7 +20,7 @@ Pair: add-on **0.4.1-s1.experimental.16**, integration/bridge **0.3.1-s1.experim
 - An on-demand diagnostic query can request a device's reported solar details. It runs only when requested and reports the full reply or a rejection reason.
 
 ## Upgrade
-Update the add-on and integration together, then restart Home Assistant after the add-on is running. Installation and restarts require separate approval; this local candidate has not been deployed.
+Update the add-on and integration together, then restart Home Assistant after the add-on is running.
 
 ## Known limits
 On SoloCam E30 (T8171) behind a T9000, the image-flip switch is write-only. In testing it changed the pan/tilt aim and did not reliably set picture orientation. Avoid using it to correct orientation.

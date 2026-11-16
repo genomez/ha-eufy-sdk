@@ -36,7 +36,7 @@
     },
     {
       "path": "RELEASE_NOTES.md",
-      "sha256": "ce3c856f5c8659ffb5adc1e653aea12af9628507d93cec76d746ec6989e7c594"
+      "sha256": "3f74812fffb86bd323d238f007c376024bb77044134a246e6008a417249896ab"
     },
     {
       "path": "custom_components/eufy_sdk/LICENSE",
