@@ -10,10 +10,10 @@ $env:EUFY_TEST_SDK_SHA256 = (Get-FileHash -Algorithm SHA256 node_modules/@mega-y
 
 Result: 1,457 passed, 53 skipped, zero failed. Runtime hash and SDK tarball are pinned in the bridge's `docs/EXPERIMENTAL16_ARTIFACT.json`. Probe HTTP endpoints and the settings frame recorder are absent from the .15-based bridge source.
 
-Integration interpreter: `C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe` (existing HA/pytest environment).
+Integration interpreter: `<local-validation-path> (existing HA/pytest environment).
 
 ```powershell
-& C:/Users/jason/OneDrive/Documents/Cursor/eufy/contributions/owned-pr-reconciliation-20261005/ha/checkout/.venv/Scripts/python.exe -B tools/run_offline_tests.py
+& <local-validation-path> -B tools/run_offline_tests.py
 ```
 
 Result: 1,240 passed, one skipped, zero failed; 1,501 subtests passed. Eight existing dependency warnings. Runner blocks external network/process I/O and confines output to `.offline`.

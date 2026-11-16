@@ -344,12 +344,12 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     },
     "docs/EXPERIMENTAL16_ENTITY_CHANGES.md": {
-      "bytes": 21228,
-      "sha256": "cfdd5ec562b502617d69b7b3232b13400a37ff4a2728de0aec29b2661c24fefd"
+      "bytes": 21442,
+      "sha256": "68f8b918b8d88c10d89420e874997c837ed8cae71df9af27f66923a247af959a"
     },
     "docs/EXPERIMENTAL16_VALIDATION.md": {
-      "bytes": 7131,
-      "sha256": "96e67335fc756f0d52874648b3567b967f6fe6de2fca594062148c73d8b4331d"
+      "bytes": 6918,
+      "sha256": "f54094a0164a19f8f38e973768c250d6c032189e240075975cf880fc19b40777"
     },
     "docs/camera-connectivity.md": {
       "bytes": 2459,
@@ -608,8 +608,8 @@
       "sha256": "2f4e5267452ddc43a34968ae3efc7999451ef65f466658466a4b99968c08cccb"
     },
     "tests/test_motion_light_timer.py": {
-      "bytes": 7036,
-      "sha256": "c2c02febbca2eb10476ee007ce5bd2c1bd2e5d8f34755674297696f5b8a75e2e"
+      "bytes": 7205,
+      "sha256": "36445e6ad6188ec6ec0b19debb8f23eeb5288e61d5c3f3265c0fc34a2a73a11d"
     },
     "tests/test_native_webrtc.py": {
       "bytes": 25553,
@@ -716,8 +716,8 @@
       "sha256": "06f0b6199b3cc34fe485081806f970922d12ca2305229116034368b6fea940bb"
     },
     "tests/test_recordings_playback.py": {
-      "bytes": 45962,
-      "sha256": "abc32b25a231c0950bea3985c1b92ffff403aa7fedf605cda801879edb8e465e"
+      "bytes": 47028,
+      "sha256": "414821e8d637a3eafded274dd3e79fe6bc8cf54f7b549b870254deda8e3e1df2"
     },
     "tests/test_recordings_privacy.py": {
       "bytes": 9841,
@@ -752,8 +752,8 @@
       "sha256": "ef2e5ca4e98216f2256fe6a534e3e722b0f7e935dc292a207926df6ad9de8397"
     },
     "tests/test_setup_events.py": {
-      "bytes": 15636,
-      "sha256": "037f173d78872071ed724eee4b07d18f7760b7b84637467618559369c4b3328b"
+      "bytes": 16031,
+      "sha256": "3bd88c99754cdc43c4fb8104d3111182df219643995dfe683dab88b895540877"
     },
     "tests/test_siren_actions.py": {
       "bytes": 9420,
