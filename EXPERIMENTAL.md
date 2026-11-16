@@ -1,8 +1,12 @@
-# S1 experimental.16 local candidate
+# S1 experimental.16 local release candidate
 
-HomeBase S1 settings follow SDK writability; recording-quality options, motion-light controls, structured light schedules and explicit doorbell quick-response buttons are supported at the integration boundary. Existing surviving property identities are preserved. See `docs/EXPERIMENTAL16_ENTITY_CHANGES.md` for the model checklist, action contract and unresolved SDK cold-config indexing blocker. No publication or live acceptance is claimed.
+Modified for genomez, 2026-11-15. Model-specific controls and visibility, new Solar charging sensor, write-only switch restore and reported HomeBase prompt volume.
 
-## Historical documentation through experimental.15
+Pair SDK 0.2.1-s1.experimental.16, bridge/integration 0.3.1-s1.experimental.16 and add-on 0.4.1-s1.experimental.16.
+
+No publication or live-device acceptance is claimed.
+
+## Historical public documentation through experimental.15
 
 # S1 experimental.15
 

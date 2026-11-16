@@ -7,7 +7,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = 'custom_components/eufy_sdk/'
-DOCUMENTS = {'LICENSE', 'README.md', 'EXPERIMENTAL.md', 'INTEGRATION_NOTICES.md', 'INSTALL.md', 'CORE_COMPATIBILITY.md', 'MODIFICATIONS.md'}
+DOCUMENTS = ['CORE_COMPATIBILITY.md', 'EXPERIMENTAL.md', 'INSTALL.md', 'INTEGRATION_NOTICES.md', 'LICENSE', 'MODIFICATIONS.md', 'README.md', 'RELEASE_NOTES.md']
+DOCUMENTS = set(DOCUMENTS)
 
 
 def build(output_dir):
