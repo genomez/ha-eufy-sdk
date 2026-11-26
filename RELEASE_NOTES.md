@@ -19,7 +19,8 @@ Update the add-on and integration together, then restart Home Assistant after th
 ## RTC and recordings
 
 - When a replacement RTC connection fails, the SDK can retain the healthy session and retry renewal. Diagnostics retain bounded failed-connection history and link retries.
-- The early RTC offer cutoff defaults to off. The overall connection deadline still applies. Set EUFY_RTC_OFFER_WAIT_MS to a positive integer in milliseconds to opt in.
+- The early RTC offer cutoff defaults to off. The overall connection deadline still applies. To opt in, standalone bridge users can set `EUFY_RTC_OFFER_WAIT_MS` and direct SDK users can set `rtc.offerWaitMs` to a positive integer in milliseconds. The cutoff stays off in the add-on.
+- The standalone bridge now renews RTC sessions every 270 seconds by default when `BRIDGE_RTC_SESSION_REFRESH_MS` is unset. The add-on image already sets 270,000 ms and keeps that interval.
 - Unchanged recording catalogs skip disk rewrites. Catalog pacing survives sidecar write failures.
 
 ## Known limits

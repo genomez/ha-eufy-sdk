@@ -33,7 +33,7 @@
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 12492,
-      "sha256": "e0ae20132c481f1c7b96423e04138f8f7f1c27b4350736cce5f1143b32cfb4a2"
+      "sha256": "7d417e851c54ac711b2be570486a95ccf40c27d56003043a10a6cca1c57a72a8"
     },
     "LICENSE": {
       "bytes": 1065,
@@ -60,8 +60,8 @@
       "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
     },
     "RELEASE_NOTES.md": {
-      "bytes": 1846,
-      "sha256": "271e576b5be84019b4e9f1b73277a51774a06e30b3d90a1c12da81fdf40f33bb"
+      "bytes": 2150,
+      "sha256": "20a12c6c25a46061a695aa810b4f26a1a38568d7730a0b47f9acd2d203b110ef"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
@@ -432,8 +432,8 @@
       "sha256": "febda4adc8e1a8100b97d832eacfba06d3a2769634fbb673be4d24b5d9c589a5"
     },
     "tests/fixtures/homebase_battery_manifest.json": {
-      "bytes": 17150,
-      "sha256": "29ebdbfa4d64e991f38332654aff6ed57acc2191dbc1be495d8c879c5f5d43f0"
+      "bytes": 16974,
+      "sha256": "310ed22e50e8efaa12878aaadef681584d303e864bb96a13cbdc822e74893397"
     },
     "tests/fixtures/light_route_manifest.json": {
       "bytes": 42408,
