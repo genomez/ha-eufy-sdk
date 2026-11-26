@@ -10,9 +10,8 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import persistent_notification
-from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .device_registry import async_entry_device
 from .notification_delivery import (
     NOTICE_RETRY_DELAYS,
     PHONE_FAILURE_SENTENCE,
@@ -436,8 +435,8 @@ class GuardNotifications:
 
     def _station_name(self, serial: str) -> str:
         """Use the device registry display name, excluding a serial-valued alias."""
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, serial)}
+        device = async_entry_device(
+            self.hass, serial, self.entry.entry_id if self.entry else None
         )
         name = (device.name_by_user or device.name) if device else None
         if (

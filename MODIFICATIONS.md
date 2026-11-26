@@ -1,3 +1,49 @@
+# S1 experimental.17 modifications
+
+Modified by genomez on 2026-11-25. Adds the T8416 Privacy switch with station read-back and reduces Home Assistant recorder writes for floodlight observations.
+
+Changed paths since experimental.16
+
+- `EXPERIMENTAL.md`
+- `INTEGRATION_NOTICES.md`
+- `INTEGRATION_PACKAGE.json`
+- `MODIFICATIONS.md`
+- `PUBLICATION.json`
+- `RELEASE_NOTES.md`
+- `SOURCE_MANIFEST.json`
+- `custom_components/eufy_sdk/__init__.py`
+- `custom_components/eufy_sdk/api.py`
+- `custom_components/eufy_sdk/binary_sensor.py`
+- `custom_components/eufy_sdk/coordinator.py`
+- `custom_components/eufy_sdk/device_registry.py`
+- `custom_components/eufy_sdk/guard_confirmation.py`
+- `custom_components/eufy_sdk/manifest.json`
+- `custom_components/eufy_sdk/manifest_reads.py`
+- `custom_components/eufy_sdk/person_identification.py`
+- `custom_components/eufy_sdk/privacy.py`
+- `custom_components/eufy_sdk/property_entities.py`
+- `custom_components/eufy_sdk/property_sync.py`
+- `custom_components/eufy_sdk/sensor.py`
+- `custom_components/eufy_sdk/switch.py`
+- `docs/EXPERIMENTAL16_ENTITY_CHANGES.md`
+- `tests/fixtures/doorbell_health_manifest.json`
+- `tests/fixtures/generate_doorbell_health.mjs`
+- `tests/fixtures/homebase_battery_manifest.json`
+- `tests/test_device_registry.py`
+- `tests/test_doorbell_health.py`
+- `tests/test_guard_confirmation.py`
+- `tests/test_guard_reconciliation.py`
+- `tests/test_homebase_battery.py`
+- `tests/test_observation_receipts.py`
+- `tests/test_person_identification.py`
+- `tests/test_privacy_binary_sensor.py`
+- `tests/test_property_realtime.py`
+- `tests/test_switch_observation_scope.py`
+- `tests/test_t9000_settings.py`
+- `tools/build_integration_zip.py`
+
+## Earlier modifications
+
 # S1 experimental.16 local release candidate
 
 Modified for genomez, 2026-11-15. Model-specific controls and visibility, new Solar charging sensor, write-only switch restore and reported HomeBase prompt volume.
@@ -5,6 +51,21 @@ Modified for genomez, 2026-11-15. Model-specific controls and visibility, new So
 Pair SDK 0.2.1-s1.experimental.16, bridge/integration 0.3.1-s1.experimental.16 and add-on 0.4.1-s1.experimental.16.
 
 No publication or live-device acceptance is claimed.
+
+## Doorbell health and device registry local candidate
+
+Modified 2026-11-17. Device lookups for guard notifications and late identification
+now include the owning config entry via `async_get_device_by_identifier`. Older
+Home Assistant versions enumerate only that entry's devices; neither path calls
+the deprecated lookup. The supplied test environment is HA 2026.7.0 and lacks the
+new method; the signature was checked against HA Core 2026.11.2 source.
+
+Source SDK-to-bridge fixtures verify that T8214/T8217 health placeholders create no
+sensor, while reported health on supported cameras (including zero) remains.
+Existing health rows use the existing reversible `property_presentation_v2`
+retirement, preserving identities, user settings and `entity_audit_visibility_v1`.
+The bridge package needs a separately rebuilt SDK artifact to carry the model gate.
+No S1 spotlight on/off control or transport change is included.
 
 ## Historical public documentation through experimental.15
 

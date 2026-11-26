@@ -78,12 +78,14 @@ COMMAND_ERROR_CODES = frozenset(
         "command_cancelled_after_send",
         "command_closed_before_send",
         "command_closed_after_send",
+        "privacy_unconfirmed",
     }
 )
 
 BOUNDED_PROFILE = "bounded-state-v1"
 BOUNDED_CALLER_SECONDS = 80
 GUARD_MODE_TIMEOUT_SECONDS = 60
+PRIVACY_TIMEOUT_SECONDS = 90
 BOUNDED_CLOCK_MAX_MS = 1000
 BOUNDED_CLOCK_SAMPLE_GAP_MS = 1
 BOUNDED_CLOCK_MOVEMENT_MS = 3
@@ -1686,6 +1688,7 @@ class EufySdkApiClient(RecordingsApi):
         automatic: bool = False,
         correction_expires_at: float | None = None,
         correction_expires_at_ms: float | None = None,
+        station_privacy: bool = False,
         _send_guard: Callable[[], bool] | None = None,
     ) -> CommandReceipt | None:
         """Opt eligible scalar writes into one frozen caller lifetime."""
@@ -1744,6 +1747,14 @@ class EufySdkApiClient(RecordingsApi):
                         )
                 finally:
                     self.guard_reconciliation.end(sn, guard_preparation)
+            elif name == "privacy" and station_privacy:
+                await self.rpc(
+                    "device.set",
+                    timeout=PRIVACY_TIMEOUT_SECONDS,
+                    sn=sn,
+                    name=name,
+                    value=value,
+                )
             else:
                 await self.rpc("device.set", sn=sn, name=name, value=value)
             return None

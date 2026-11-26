@@ -1,28 +1,29 @@
-# S1 experimental.16
+# S1 experimental.17
 
-Pair: add-on **0.4.1-s1.experimental.16**, integration/bridge **0.3.1-s1.experimental.16**, SDK **0.2.1-s1.experimental.16**.
-
-## HomeBase S1 settings
-- Settings sent through T9000 use the camera's assigned channel. Unsupported controls are hidden, and changes to one part of a shared setting preserve the other parts. Recent successful changes are protected from lagging reports for a bounded period.
-- Installed speaker and doorbell volume controls are available where supported. HomeBase prompt volume shows its reported value.
-- Sound detection is hidden except on S350 (T8416), where the app offers it.
-
-## Recording and lighting
-- Recording quality follows the model's supported tiers, including 4K on S350 (T8416) and Auto on T8170. Existing recording-quality selections may show updated labels; check automations that select them by name.
-- Motion-light activation offers Smart and Fast where supported, with the supported timer choices. Structured light schedules can be set through the integration service.
-- Night-vision choices follow the supported modes and app order. Clip-length minimums follow the model's app settings; mains-powered cameras can show reported clip settings without offering unsupported writes.
-- Doorbell quick responses have individual buttons and an explicit refresh action. Refreshing the list does not play a response.
-
-## State and diagnostics
-- A new **Solar charging** binary sensor shows reported solar power where supported. It is new since .15; existing users do not need to rename a sensor. Unsupported devices and the HomeBase itself do not gain a synthetic charging state.
-- Write-only switches restore their last successful setting across reloads and outages. Failed or superseded writes do not replace that saved value.
-- Retained device handles keep their channel, settings and reported state as device lists and station context refresh.
-- An on-demand diagnostic query can request a device's reported solar details. It runs only when requested and reports the full reply or a rejection reason.
-
-## Upgrade
 Update the add-on and integration together, then restart Home Assistant after the add-on is running.
 
-## Known limits
-On SoloCam E30 (T8171) behind a T9000, the image-flip switch is write-only. In testing it changed the pan/tilt aim and did not reliably set picture orientation. Avoid using it to correct orientation.
+| Component | Version |
+| --- | --- |
+| Add-on | 0.4.1-s1.experimental.17 |
+| Bridge | 0.4.1-s1.experimental.17 |
+| Home Assistant integration | 0.3.1-s1.experimental.17 |
+| SDK | 0.2.1-s1.experimental.17 |
 
-Playback is silent; multi-lens cameras show one view. Shared-setting writes cannot prevent simultaneous edits in the app. Offline tests and the no-account smoke check do not establish live-device acceptance.
+## Privacy and state
+
+- The S350 (T8416) on HomeBase S1 gains a writable Privacy switch. A fresh station read-back confirms the requested value, including a write that matches the current state. The integration reports when confirmation is unavailable.
+- Bridge snapshots prioritize privacy, guard-mode, and floodlight evidence when they reach the 128-receipt limit. Invalid entries leave room for valid evidence.
+- Floodlight switches use fresh device reports to reconcile state. Home Assistant excludes transient floodlight receipt attributes from the recorder.
+- The T8214 doorbell spotlight switch is available through HomeBase S1. HomeBase battery health and estimated battery life appear when the station reports them.
+
+## RTC and recordings
+
+- When a replacement RTC connection fails, the SDK can retain the healthy session and retry renewal. Diagnostics retain bounded failed-connection history and link retries.
+- The early RTC offer cutoff defaults to off. The overall connection deadline still applies. Set EUFY_RTC_OFFER_WAIT_MS to a positive integer in milliseconds to opt in.
+- Unchanged recording catalogs skip disk rewrites. Catalog pacing survives sidecar write failures.
+
+## Known limits
+
+On SoloCam E30 (T8171) behind a T9000, the write-only image-flip switch can change the pan/tilt aim without reliably setting picture orientation. Avoid using it to correct orientation.
+
+Playback is silent. Multi-lens cameras show one view. Simultaneous edits in the Eufy app can race shared-setting writes.

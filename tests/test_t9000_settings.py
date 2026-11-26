@@ -20,6 +20,7 @@ from custom_components.eufy_sdk.button import (
     async_setup_entry,
 )
 from custom_components.eufy_sdk.entity import classify
+from custom_components.eufy_sdk.light_correction import supports_safety
 from custom_components.eufy_sdk.light_schedule import (
     register_schedule_service,
     t9000_attached,
@@ -33,6 +34,10 @@ from custom_components.eufy_sdk.property_entities import (
 )
 from custom_components.eufy_sdk.select import EufySdkSelect
 from custom_components.eufy_sdk.sensor import EufyLightScheduleSensor
+from custom_components.eufy_sdk.switch import (
+    EufySdkSwitch,
+    async_setup_entry as setup_switches,
+)
 
 
 def coordinator():
@@ -65,6 +70,29 @@ def properties(*reads):
             },
         }
     )
+
+
+class DoorbellSpotlightTests(unittest.IsolatedAsyncioTestCase):
+    async def test_writable_spotlight_uses_existing_light_switch(self):
+        obj = coordinator()
+        obj.data["camera"].update(model="T8214", state={"light": False})
+        obj.solix_devices = {}
+        spec = {"name": "light", "type": "bool", "kind": "boolean", "writable": True}
+        entry = SimpleNamespace(
+            runtime_data=SimpleNamespace(coordinator=obj, properties={"camera": [spec]})
+        )
+        add = Mock()
+        await setup_switches(Mock(), entry, add)
+        (switch,) = add.call_args.args[0]
+        self.assertIs(type(switch), EufySdkSwitch)
+        self.assertEqual(switch.unique_id, "camera_light")
+        self.assertEqual(switch.name, "Light")
+        self.assertIs(switch.is_on, False)
+        self.assertFalse(supports_safety(switch))
+
+        decisions = _presentation_decisions(entry)
+        self.assertFalse(decisions[("switch", "camera_light")])
+        self.assertTrue(decisions[("binary_sensor", "camera_light")])
 
 
 class MetadataTests(unittest.TestCase):

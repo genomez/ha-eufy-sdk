@@ -1,3 +1,9 @@
+# S1 experimental.17 integration notices
+
+Adds the T8416 Privacy switch with station read-back and reduces Home Assistant recorder writes for floodlight observations.
+
+## Earlier releases
+
 # S1 experimental.16 local release candidate
 
 Modified for genomez, 2026-11-15. Model-specific controls and visibility, new Solar charging sensor, write-only switch restore and reported HomeBase prompt volume.

@@ -145,7 +145,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
     entry.async_on_unload(_stop_recovery)
     entry.async_on_unload(guard_notifications.close)
     on_alarm = _alarm_lifecycle(hass, entry, coordinator)
-    coordinator.person_identifications = PersonIdentifications(hass)
+    coordinator.person_identifications = PersonIdentifications(hass, entry.entry_id)
     entry.async_on_unload(coordinator.person_identifications.close)
     doorbell_event_ids: dict[tuple[str, str], None] = {}
     recordings: RecordingRuntime | None = None
@@ -295,7 +295,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EufySdkConfigEntry) -> b
 
     # Push the chosen poll interval to the bridge (the cloud-poll cadence lives there).
     try:
-        await client.set_poll_ms(poll_min * 60_000)
+        coordinator.cloud_poll_interval_ms = await client.set_poll_ms(poll_min * 60_000)
     except Exception:  # noqa: BLE001 - a failed config push shouldn't block setup
         LOGGER.warning("could not set bridge poll interval [poll_config_failed]")
 

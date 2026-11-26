@@ -29,6 +29,7 @@ from .api import (
 )
 from .const import LOGGER
 from .firmware_metadata import sync_firmware_registry
+from .privacy import PRIVACY_REPORT_KEY, retain_privacy_report
 
 if TYPE_CHECKING:
     from .api import EufySdkApiClient
@@ -41,6 +42,8 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     config_entry: EufySdkConfigEntry
     person_identifications: PersonIdentifications
+    # SDK default until the bridge acknowledges a configured cloud poll interval.
+    cloud_poll_interval_ms: int = 600_000
 
     # Anker Solix devices (separate account/backend), kept apart from the eufy `data`
     # so the eufy platforms never iterate them: `{sn: {productCode, name, category,
@@ -161,10 +164,25 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._recovery_step = 0
         self._recovery_event_used = False
 
-    def record_state_event(self, serial: str, values: dict) -> None:
+    def record_state_event(
+        self,
+        serial: str,
+        values: dict,
+        *,
+        privacy_receipt: tuple[bool, int] | None = None,
+    ) -> None:
         """Protect only events received while a snapshot request is in progress."""
         pending = getattr(self, "_pending_state_events", None)
         if pending is not None:
+            # Property events are journaled before application. Remember any
+            # transition, including one that a later event reverses.
+            if "privacy" in values:
+                state = (self.data or {}).get(serial, {}).get("state", {})
+                if values["privacy"] is not state.get("privacy"):
+                    self._pending_privacy_changes.add(serial)
+                    self._pending_privacy_receipts.pop(serial, None)
+                if privacy_receipt is not None:
+                    self._pending_privacy_receipts[serial] = privacy_receipt
             pending.setdefault(serial, {}).update(values)
 
     def reset_camera_health(self) -> None:
@@ -331,6 +349,8 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         health_generation = self._command_health_generation
         camera_generation = self._camera_health_generation
         self._pending_state_events: dict[str, dict] | None = {}
+        self._pending_privacy_changes: set[str] = set()
+        self._pending_privacy_receipts: dict[str, tuple[bool, int]] = {}
         self._pending_command_health: dict[str, dict] | None = {}
         self._pending_camera_health: dict[str, dict] | None = {}
         self._pending_metadata_events: dict[str, str | None] | None = {}
@@ -361,6 +381,8 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             return snapshot
         finally:
             self._pending_state_events = None
+            self._pending_privacy_changes.clear()
+            self._pending_privacy_receipts.clear()
             self._pending_command_health = None
             self._pending_camera_health = None
             self._pending_metadata_events = None
@@ -379,14 +401,29 @@ class EufySdkDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         # Alarm lifecycle state belongs to this loaded entry and its bounded
         # stop/auto-clear timers. An ordinary list omitting it is not a stop.
         for serial, device in snapshot.items():
-            previous = (self.data or {}).get(serial, {}).get("state", {})
+            previous = (self.data or {}).get(serial, {})
+            previous_state = previous.get("state", {})
             state = device.setdefault("state", {})
             for key in ("alarmTriggered", "alarmPending", "alarmType"):
-                if key not in state and key in previous:
-                    state[key] = previous[key]
-        for serial, values in self._pending_state_events.items():
-            if serial in snapshot:
-                snapshot[serial].setdefault("state", {}).update(values)
+                if key not in state and key in previous_state:
+                    state[key] = previous_state[key]
+            values = self._pending_state_events.get(serial, {})
+            if serial in self._pending_privacy_changes or (
+                "privacy" in values and values["privacy"] is not state.get("privacy")
+            ):
+                # An untimed change can make the sampled receipt ambiguous.
+                device.pop(PRIVACY_REPORT_KEY, None)
+                report = self._pending_privacy_receipts.get(serial)
+                if (
+                    report is not None
+                    and values.get("privacy") is report[0]
+                    and device.get("stationSn") == previous.get("stationSn")
+                    and device.get("model") == previous.get("model")
+                ):
+                    device[PRIVACY_REPORT_KEY] = report
+            else:
+                retain_privacy_report(device, previous)
+            state.update(values)
         for serial, health in self._pending_command_health.items():
             if serial in snapshot:
                 snapshot[serial]["commandHealth"] = self._project_command_health(

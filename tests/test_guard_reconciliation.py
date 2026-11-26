@@ -39,7 +39,9 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
             async_create_task=asyncio.create_task,
             services=SimpleNamespace(async_call=AsyncMock()),
         )
-        entry = SimpleNamespace(runtime_data=SimpleNamespace(client=self.client))
+        entry = SimpleNamespace(
+            entry_id="synthetic-entry", runtime_data=SimpleNamespace(client=self.client)
+        )
         self.owner = GuardNotifications(
             self.hass, {"light_safety_notify_service": "notify.synthetic"}, entry
         )
@@ -48,13 +50,13 @@ class GuardReconciliationTests(unittest.IsolatedAsyncioTestCase):
             self.owner.apply(event) if event["event"] == "guardConfirmation" else None
         )
         for name, value in (
-            ("dr.async_get", SimpleNamespace(async_get_device=lambda **_kwargs: None)),
+            ("async_entry_device", None),
             ("persistent_notification.async_create", None),
             ("persistent_notification.async_dismiss", None),
         ):
             patcher = patch(
                 f"custom_components.eufy_sdk.guard_confirmation.{name}",
-                **({"return_value": value} if value is not None else {}),
+                **({"return_value": value} if name == "async_entry_device" else {}),
             )
             mocked = patcher.start()
             self.addCleanup(patcher.stop)

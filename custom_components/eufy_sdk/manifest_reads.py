@@ -5,6 +5,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+from .privacy import PRIVACY_REPORT_KEY, is_attached_camera, privacy_report
+
 
 def _reads(manifest: Any) -> dict[str, tuple[str, dict] | None]:
     """Index flat property names, refusing ambiguous capability mappings."""
@@ -112,6 +114,9 @@ def _reported_action_values(manifest: Any, raw: dict, reads: dict) -> dict:
 
 def normalize_snapshot(device: dict[str, Any]) -> dict[str, Any]:
     """Project this snapshot's decoded values without another RPC or model cache."""
+    attached_camera = is_attached_camera(device)
+    if attached_camera:
+        device = {**device, PRIVACY_REPORT_KEY: privacy_report(device)}
     if "decodedProperties" not in device and "decodedState" not in device:
         return device
     reads = _reads(device.get("decodedProperties"))
@@ -128,6 +133,9 @@ def normalize_snapshot(device: dict[str, Any]) -> dict[str, Any]:
         surface = decoded.get(namespace)
         if isinstance(surface, dict):
             state[name] = _value(read, surface.get(read["accessor"]))
+    # Keep the snapshot boolean paired with the receipt and comparable to events.
+    if attached_camera and type(raw.get("privacy")) is bool:
+        state["privacy"] = raw["privacy"]
     return {**device, "state": state}
 
 

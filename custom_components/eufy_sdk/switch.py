@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from time import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import (
     ExtraStoredData,
     RestoredExtraData,
@@ -16,6 +18,7 @@ from homeassistant.helpers.restore_state import (
 
 from .bespoke import BITFIELD_SWITCHES
 from .entity import (
+    EufySdkDeviceEntity,
     EufySdkPropertyEntity,
     EufySolixEntity,
     classify,
@@ -26,6 +29,12 @@ from .entity import (
 from .light import LIGHT_OWNED_PROPS
 from .light_schedule import t9000_attached
 from .lock import LOCK_OWNED_PROPS
+from .privacy import (
+    PRIVACY_REPORT_KEY,
+    is_attached_camera,
+    is_s1_privacy_camera,
+    offers_s1_privacy,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -53,6 +62,14 @@ async def async_setup_entry(
                 continue
             # The lock platform owns the 'locked' — don't also surface it as a switch.
             if is_lock and spec["name"] in LOCK_OWNED_PROPS:
+                continue
+            if (
+                spec["name"] == "privacy"
+                and is_attached_camera(coordinator.data[sn])
+                and t9000_attached(coordinator, sn) is not False
+            ):
+                if offers_s1_privacy(coordinator, sn, spec):
+                    entities.append(EufyPrivacySwitch(coordinator, sn))
                 continue
             kind = classify(spec, t9000=t9000_attached(coordinator, sn) is True)
             if kind == "switch":
@@ -82,6 +99,86 @@ async def async_setup_entry(
     )
 
     async_add_entities(entities)
+
+
+class EufyPrivacySwitch(EufySdkDeviceEntity, SwitchEntity):
+    """Control station privacy and display its time-bounded receipt."""
+
+    _attr_name = "Privacy"
+
+    def __init__(self, coordinator: EufySdkDataUpdateCoordinator, sn: str) -> None:
+        """Bind the station privacy switch to its camera."""
+        super().__init__(coordinator, sn)
+        self._attr_unique_id = f"{sn}_privacy"
+        self._cancel_expiry = None
+
+    def _report_state(self) -> tuple[bool | None, float | None]:
+        if not is_s1_privacy_camera(self.coordinator, self._sn):
+            return None, None
+        report = self.device.get(PRIVACY_REPORT_KEY)
+        if report is None:
+            return None, None
+        value, received_at_ms = report
+        if self.device.get("state", {}).get("privacy") is not value:
+            return None, None
+        # Allow one missed SDK cloud poll and one HA snapshot interval to sample it.
+        interval = self.coordinator.update_interval
+        snapshot_seconds = interval.total_seconds() if interval else 0
+        max_age = snapshot_seconds + 2 * self.coordinator.cloud_poll_interval_ms / 1000
+        age = time() - received_at_ms / 1000
+        if age < 0:
+            return None, min(-age, max_age)
+        if age < max_age:
+            return value, max_age - age
+        return None, None
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return the reported privacy state while the receipt is recent."""
+        return self._report_state()[0]
+
+    async def async_turn_on(self, **_: Any) -> None:
+        """Request privacy on and wait for the station report."""
+        await self.client.set_property(
+            self._sn, "privacy", value=True, station_privacy=True
+        )
+
+    async def async_turn_off(self, **_: Any) -> None:
+        """Request privacy off and wait for the station report."""
+        await self.client.set_property(
+            self._sn, "privacy", value=False, station_privacy=True
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Schedule expiration for the initial observation."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_expiration)
+        self._schedule_expiration()
+
+    @callback
+    def _cancel_expiration(self) -> None:
+        if self._cancel_expiry is not None:
+            self._cancel_expiry()
+            self._cancel_expiry = None
+
+    @callback
+    def _schedule_expiration(self) -> None:
+        self._cancel_expiration()
+        _, delay = self._report_state()
+        if delay is not None:
+            self._cancel_expiry = async_call_later(
+                self.hass, delay, self._expire_report
+            )
+
+    @callback
+    def _expire_report(self, _now: object) -> None:
+        self._cancel_expiry = None
+        self._handle_coordinator_update()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_expiration()
+        super()._handle_coordinator_update()
 
 
 class EufySolixLightSwitch(EufySolixEntity, SwitchEntity):
@@ -127,6 +224,12 @@ class EufySolixLightSwitch(EufySolixEntity, SwitchEntity):
 class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
     """A writable boolean property as a switch."""
 
+    # Floodlight receipts change on every report. Scripts read the live values;
+    # keeping them out of the recorder lets attribute rows deduplicate.
+    _unrecorded_attributes = frozenset(
+        {"device_observed_at", "device_observed_value", "device_observation_source"}
+    )
+
     def __init__(
         self,
         coordinator: EufySdkDataUpdateCoordinator,
@@ -141,21 +244,22 @@ class EufySdkSwitch(EufySdkPropertyEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """
-        Expose device receipt time and value separately from optimistic state.
+        Expose floodlight receipts separately from optimistic state.
 
         device_observed_at remains available to scripts confirming floodlight commands.
         """
-        observations = self.coordinator.property_observations or {}
-        receipt = observations.get(self._sn, {}).get(self._prop)
         attributes = {}
-        if receipt and type(receipt["value"]) is bool:
-            attributes.update(
-                {
-                    "device_observed_at": receipt["observed_at"],
-                    "device_observed_value": receipt["value"],
-                    "device_observation_source": "rtc",
-                }
-            )
+        if self._prop == "light":
+            observations = self.coordinator.property_observations or {}
+            receipt = observations.get(self._sn, {}).get(self._prop)
+            if receipt and type(receipt["value"]) is bool:
+                attributes.update(
+                    {
+                        "device_observed_at": receipt["observed_at"],
+                        "device_observed_value": receipt["value"],
+                        "device_observation_source": "rtc",
+                    }
+                )
         if self._command_profile is not None:
             attributes["command_profile"] = self._command_profile
         if self._command_receipt is not None:
@@ -215,7 +319,8 @@ class EufySdkWriteOnlySwitch(EufySdkSwitch, RestoreEntity):
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
-        """Persist the written value apart from state attributes.
+        """
+        Persist the written value apart from state attributes.
 
         HA drops attributes while an entity is unavailable, so a value kept only
         there would be lost by a save made during a bridge outage.
@@ -225,7 +330,8 @@ class EufySdkWriteOnlySwitch(EufySdkSwitch, RestoreEntity):
         return None
 
     async def write(self, value: Any) -> None:
-        """Keep the newest write that succeeded, even when a later one fails.
+        """
+        Keep the newest write that succeeded, even when a later one fails.
 
         The shared write path forgets a successful write once a newer write has
         started; with no read-back, a failure of that newer write would otherwise

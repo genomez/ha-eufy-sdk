@@ -1,9 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.16",
-  "status": "local-release-candidate",
-  "published": false,
-  "exactInputCommit": "3a5514ce30d0d7d02156c5ffb93799c848e89392",
-  "registryManifestDigest": null,
-  "installationAcceptance": false
+  "version": "0.3.1-s1.experimental.17",
+  "publishedBase": "2942757c5b16af520ff613fdf2e6722a07cc9088",
+  "sourceCommit": "See the source archive Git commit and its packaged provenance."
 }

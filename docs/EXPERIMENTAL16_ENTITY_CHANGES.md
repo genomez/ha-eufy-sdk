@@ -4,6 +4,27 @@ Local source candidate, compared with the experimental.15 release branches. This
 
 ## Identity rules
 
+The doorbell-health candidate omits `sensor.*_battery_health` for T8214 and its
+inherited T8217 app family using SDK model applicability, regardless of whether
+the placeholder is zero or absent. T8214 app behavior was supplied by the owner;
+T8217 is a family inference without hardware acceptance. Other supported models
+retain reported health, including zero. Charge-percentage sensors are unaffected.
+After the updated SDK artifact reaches the bridge and the integration reloads,
+the existing property migration disables obsolete health registry rows using its
+owned `property_presentation_v2` marker. Rows are retained for recovery; names,
+user hides/disables, opt-outs, options and the separate `entity_audit_visibility_v1`
+marker are preserved. The visibility audit does not own this sensor retirement.
+
+T8214/T8217 spotlight on/off remains unavailable on T9000. HomeBase attachment is
+derived from a distinct parent identity, but that alone does not establish an RTC
+encoding. The transport continues to refuse `int-string`; no control is advertised.
+To enable it later, capture the Eufy app's explicit manual spotlight ON followed by
+OFF on an S1-attached doorbell with the existing frame recorder. Preserve command
+ID/envelope, body layout and keys, device-channel routing and correlated responses;
+then verify physical ON/OFF and device-state readback. Capture manual spotlight
+actions separately from master enable, status LED or motion-light settings.
+No capture or device action was performed for this candidate.
+
 Existing property unique IDs remain `<device identifier>_<SDK property name>`. No surviving control is renamed or given a new unique ID. Thus owner-customized entity IDs keep working. A domain change cannot retain an entity ID in its old domain: the old entry is reversibly disabled by the integration, preserving its identity and user preferences; a new read-only entity is created. Existing user disables and migration opt-outs are preserved. Previously integration-disabled floodlight controls are released when the same property becomes writable again.
 
 ## Model checklist

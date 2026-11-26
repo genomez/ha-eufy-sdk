@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
 
@@ -586,6 +586,12 @@ class EufySdkPropertySensor(EufySdkPropertyEntity, SensorEntity):
             self._attr_state_class = SensorStateClass.MEASUREMENT
         elif kind == "celsius":
             self._attr_device_class = SensorDeviceClass.TEMPERATURE
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+        elif self._prop == "batteryLifeEstimate" and kind == "seconds":
+            self._attr_name = "Estimated Battery Life"
+            self._attr_device_class = SensorDeviceClass.DURATION
+            self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+            self._attr_suggested_unit_of_measurement = UnitOfTime.HOURS
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property

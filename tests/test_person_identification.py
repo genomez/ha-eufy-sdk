@@ -193,7 +193,11 @@ class IdentificationRoutingTests(unittest.IsolatedAsyncioTestCase):
             get_properties=AsyncMock(return_value=[]),
             recordings_capability={"scopeId": "synthetic-scope"},
         )
-        entry = Mock(data={"host": "bridge.invalid", "port": 3000}, options={})
+        entry = Mock(
+            entry_id="synthetic-entry",
+            data={"host": "bridge.invalid", "port": 3000},
+            options={},
+        )
         entry.domain = DOMAIN
         with (
             patch.object(integration, "async_reconcile_property_entities"),
@@ -238,9 +242,11 @@ class IdentificationRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.hass.bus.async_listen(PERSON_IDENTIFIED_EVENT, identified))
         self.addCleanup(async_listen_bridge_event(self.hass, internal))
         self.registry = Mock()
-        self.registry.async_get_device.return_value = SimpleNamespace(id="ha-camera-id")
+        self.registry.async_get_device_by_identifier.return_value = SimpleNamespace(
+            id="ha-camera-id"
+        )
         patcher = patch(
-            "custom_components.eufy_sdk.person_identification.dr.async_get",
+            "custom_components.eufy_sdk.device_registry.dr.async_get",
             return_value=self.registry,
         )
         patcher.start()
@@ -271,8 +277,8 @@ class IdentificationRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        self.registry.async_get_device.assert_called_once_with(
-            identifiers={(DOMAIN, SERIAL)}
+        self.registry.async_get_device_by_identifier.assert_called_once_with(
+            (DOMAIN, SERIAL), "synthetic-entry"
         )
         self.assertEqual(self.public, [detection()])
         self.assertEqual(self.internal, [detection()])
@@ -317,7 +323,7 @@ class IdentificationRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.identified[0]["current_last_person"])
 
     async def test_absent_sensor_or_registry_device_still_publishes(self):
-        self.registry.async_get_device.return_value = None
+        self.registry.async_get_device_by_identifier.return_value = None
         self.on_event(correction(deviceSn="absent-camera"))
         await self.drain()
         self.assertIsNone(self.identified[0]["device_id"])
@@ -403,11 +409,11 @@ class IdentificationLedgerTests(unittest.TestCase):
 
     def setUp(self):
         self.hass = Mock()
-        self.router = PersonIdentifications(self.hass)
+        self.router = PersonIdentifications(self.hass, "synthetic-entry")
         self.listener = Mock(return_value=False)
         self.router.listen(SERIAL, self.listener)
         patcher = patch(
-            "custom_components.eufy_sdk.person_identification.dr.async_get",
+            "custom_components.eufy_sdk.device_registry.dr.async_get",
             return_value=Mock(),
         )
         patcher.start()

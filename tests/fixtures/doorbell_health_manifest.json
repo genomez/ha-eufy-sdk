@@ -1,0 +1,228 @@
+{
+  "cases": [
+    {
+      "model": "T8214",
+      "health": 0,
+      "reply": {
+        "properties": [
+          {
+            "name": "battery",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery level 0-100 (verified: param 1101)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8214",
+      "health": null,
+      "reply": {
+        "properties": [
+          {
+            "name": "battery",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery level 0-100 (verified: param 1101)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8217",
+      "health": 0,
+      "reply": {
+        "properties": [
+          {
+            "name": "battery",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery level 0-100 (verified: param 1101)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8134",
+      "health": 0,
+      "reply": {
+        "properties": [
+          {
+            "name": "battery",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery level 0-100 (verified: param 1101)."
+          },
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "model": "T8134",
+      "health": 89,
+      "reply": {
+        "properties": [
+          {
+            "name": "battery",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery level 0-100 (verified: param 1101)."
+          },
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

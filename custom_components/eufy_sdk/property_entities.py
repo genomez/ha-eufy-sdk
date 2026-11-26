@@ -11,6 +11,7 @@ from .audit_visibility import async_migrate_audit_visibility
 from .const import DOMAIN
 from .entity import classify
 from .light_schedule import t9000_attached
+from .privacy import is_homebase_s1_camera, offers_s1_privacy
 
 if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant
@@ -271,6 +272,27 @@ def _presentation_decisions(entry: EufySdkConfigEntry) -> dict[tuple[str, str], 
             decisions[("lock", f"{serial}_lock")] = "lock" not in device.get(
                 "capabilities", []
             )
+
+    decisions.update(_privacy_presentation_decisions(entry))
+    return decisions
+
+
+def _privacy_presentation_decisions(
+    entry: EufySdkConfigEntry,
+) -> dict[tuple[str, str], bool]:
+    """Retire the old S1 sensors and release the verified writable route."""
+    decisions = {}
+    coordinator = entry.runtime_data.coordinator
+    for serial in coordinator.data:
+        if not is_homebase_s1_camera(coordinator, serial):
+            continue
+        specs = entry.runtime_data.properties.get(serial, [])
+        writable = any(offers_s1_privacy(coordinator, serial, spec) for spec in specs)
+        for platform in _PROPERTY_PLATFORMS:
+            decisions[(platform, f"{serial}_privacy")] = (
+                platform != "switch" or not writable
+            )
+        decisions[("binary_sensor", f"{serial}_privacy_cloud")] = True
 
     return decisions
 

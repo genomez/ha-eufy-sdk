@@ -8,9 +8,9 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import callback
-from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN
+from .device_registry import async_entry_device
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -77,9 +77,10 @@ def valid_identification(data: dict[str, Any]) -> bool:
 class PersonIdentifications:
     """Deduplicate corrections before applying a sensor change or bus event."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         """Create an entry-scoped ledger and active Last person subscriptions."""
         self.hass = hass
+        self.entry_id = entry_id
         self._seen: dict[tuple[str, Occurrence], float] = {}
         self._listeners: dict[str, Callable[[dict[str, Any]], bool]] = {}
 
@@ -122,9 +123,7 @@ class PersonIdentifications:
         self._seen[key] = now
         listener = self._listeners.get(serial)
         current = listener(data) if listener is not None else False
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, serial)}
-        )
+        device = async_entry_device(self.hass, serial, self.entry_id)
         names = data.get("person_names")
         if (
             not isinstance(names, list)

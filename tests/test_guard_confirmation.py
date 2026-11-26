@@ -177,8 +177,10 @@ class GuardConfirmationTests(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch(
-                "custom_components.eufy_sdk.guard_confirmation.dr.async_get",
-                return_value=SimpleNamespace(async_get_device=lambda **_kwargs: None),
+                "custom_components.eufy_sdk.device_registry.dr.async_get",
+                return_value=SimpleNamespace(
+                    async_get_device_by_identifier=lambda *_args: None
+                ),
             ),
             patch(
                 "custom_components.eufy_sdk.guard_confirmation.persistent_notification.async_create"
@@ -392,15 +394,21 @@ class GuardNotificationTests(unittest.IsolatedAsyncioTestCase):
             async_create_task=asyncio.create_task,
             services=SimpleNamespace(async_call=AsyncMock()),
         )
-        registry = SimpleNamespace(async_get_device=Mock(return_value=None))
+        registry = SimpleNamespace(
+            async_get_device_by_identifier=Mock(return_value=None)
+        )
         patcher = patch(
-            "custom_components.eufy_sdk.guard_confirmation.dr.async_get",
+            "custom_components.eufy_sdk.device_registry.dr.async_get",
             return_value=registry,
         )
         patcher.start()
         self.addCleanup(patcher.stop)
         self.registry = registry
-        return GuardNotifications(hass, {"light_safety_notify_service": service})
+        return GuardNotifications(
+            hass,
+            {"light_safety_notify_service": service},
+            SimpleNamespace(entry_id="synthetic-entry"),
+        )
 
     async def test_one_problem_per_intent_and_only_later_report_clears(self):
         owner = self.owner()
@@ -507,8 +515,8 @@ class GuardNotificationTests(unittest.IsolatedAsyncioTestCase):
             "custom_components.eufy_sdk.guard_confirmation.persistent_notification.async_create"
         ) as create:
             for generation, (user, name, expected) in enumerate(cases, 1):
-                self.registry.async_get_device.return_value = SimpleNamespace(
-                    name_by_user=user, name=name
+                self.registry.async_get_device_by_identifier.return_value = (
+                    SimpleNamespace(name_by_user=user, name=name)
                 )
                 outcome = "contradicted" if generation % 2 else "not_reported"
                 owner.apply(

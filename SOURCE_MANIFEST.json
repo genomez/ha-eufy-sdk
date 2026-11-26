@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.1-s1.experimental.16",
-  "inputCommit": "3a5514ce30d0d7d02156c5ffb93799c848e89392",
+  "version": "0.3.1-s1.experimental.17",
+  "publishedBase": "2942757c5b16af520ff613fdf2e6722a07cc9088",
   "files": {
     ".gitattributes": {
       "bytes": 18,
@@ -20,28 +20,28 @@
       "sha256": "f44db18ccffa9e280394148afe6745d693331781f8ac663efcc06f7394a48cad"
     },
     "EXPERIMENTAL.md": {
-      "bytes": 56951,
-      "sha256": "a83dba21b0d5632865cbfb2e71a75a7a6feee37034e312acfd18624d1e4c2f31"
+      "bytes": 57120,
+      "sha256": "82d9eb38d89296cc39cb2423ecd12fe08f6b5be95634e03ae952536023a36159"
     },
     "INSTALL.md": {
       "bytes": 46310,
       "sha256": "c9c827512691edf68ab1d897c57beb3e32d8ac901dc43cc892be7a0e0242e00f"
     },
     "INTEGRATION_NOTICES.md": {
-      "bytes": 36934,
-      "sha256": "1146678136632c25d76c29fdf506b2315ea0bfabe6d096819d3dae11ac781def"
+      "bytes": 37123,
+      "sha256": "d9e00d52e408f85b47147689c0abaa9851e316bc58b39946a038fa00c8e180c8"
     },
     "INTEGRATION_PACKAGE.json": {
-      "bytes": 12182,
-      "sha256": "f9330881ceb5a6fd979fa5525c9e8ee0adddc1d58143ad506ae75a4572aac255"
+      "bytes": 12492,
+      "sha256": "7818b8c0a46b506701ba4c67be517eb3d46ca9d94d67f6fa5b5c5b1e73a03699"
     },
     "LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "MODIFICATIONS.md": {
-      "bytes": 41268,
-      "sha256": "a4ca4f4fe253785505919fd170efa562677e452fa002e7f0c4c03c6d99662dda"
+      "bytes": 43903,
+      "sha256": "300e88493c354fee0d1b480969e8b50beb1fa0a0b738c84ba912fc6f6a4b943f"
     },
     "POST_REPACK_BUILD.json": {
       "bytes": 6587,
@@ -52,24 +52,24 @@
       "sha256": "29b1b55405e6c302136f9f0559740da970733a9601d99c0e67738eaf138c3360"
     },
     "PUBLICATION.json": {
-      "bytes": 262,
-      "sha256": "d7584d331627d6875ac10dcc4c29063a5ecdb6dfbc586b3aaeb469869e039f0f"
+      "bytes": 213,
+      "sha256": "1fd2e67f603c09518fe8464166e8b3f86c7a879d80e1dc8eb323a8565faaa6d6"
     },
     "README.md": {
       "bytes": 31612,
       "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
     },
     "RELEASE_NOTES.md": {
-      "bytes": 2605,
-      "sha256": "3f74812fffb86bd323d238f007c376024bb77044134a246e6008a417249896ab"
+      "bytes": 1846,
+      "sha256": "85746323b0aa8524c1f407a41e8453357f5dac739f9558ffdf1c8d0c6c4d5b94"
     },
     "custom_components/eufy_sdk/LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "custom_components/eufy_sdk/__init__.py": {
-      "bytes": 14779,
-      "sha256": "561f08a8c27a6ae6eb9b49f22567791476780a686371c43a7fc209474642a48f"
+      "bytes": 14832,
+      "sha256": "ff04e03c3708d6adb87557c18bbb9ee6299bf952f88b9f6495c99ad7b6912ca2"
     },
     "custom_components/eufy_sdk/alarm_control_panel.py": {
       "bytes": 4417,
@@ -84,8 +84,8 @@
       "sha256": "6ce511b28d0777fb3f9e71550d887c5fd48976bd5c3c31a6532b03fb3d38d400"
     },
     "custom_components/eufy_sdk/api.py": {
-      "bytes": 80055,
-      "sha256": "76ea931017ea136ab7c109e0a13b3be1ea2e1d63b924f693fa1167a4fb2c798a"
+      "bytes": 80438,
+      "sha256": "889c35028f45c9d43f497b433b325f6dd5a66aa7c8e981f7639f01636b72b7e5"
     },
     "custom_components/eufy_sdk/arming_sync.py": {
       "bytes": 1436,
@@ -100,8 +100,8 @@
       "sha256": "7d5d5828d5a5b724349def24cdadb5ba1932e6488216e298d72ddbb373c7c04c"
     },
     "custom_components/eufy_sdk/binary_sensor.py": {
-      "bytes": 14552,
-      "sha256": "290b5bff3e612c0471bb34426b18566eab7584093de083c2cd5a9ac63e7e682c"
+      "bytes": 14681,
+      "sha256": "607b9bb6f6a1a5d7277e9e9ab4fb2bdee47ea67a9e7e5923f712028f6d6acd2a"
     },
     "custom_components/eufy_sdk/brand/dark_icon.png": {
       "bytes": 12656,
@@ -160,12 +160,16 @@
       "sha256": "afdcf32ee05e9ab186dac42858fc010271a841b8491cab82ea1fb11a676f3df8"
     },
     "custom_components/eufy_sdk/coordinator.py": {
-      "bytes": 26216,
-      "sha256": "fd89e47ead5113de91494c6502e08f7a02054b981ac46840b56011290347a201"
+      "bytes": 28057,
+      "sha256": "c68c0f26bceabc78e2e74a06641712538493629139b81bf6c6dcbf43de37afa1"
     },
     "custom_components/eufy_sdk/data.py": {
       "bytes": 1766,
       "sha256": "ff73ffba29c38134ad76a19b33212613f9631835c87d899bce499f6a08df46ba"
+    },
+    "custom_components/eufy_sdk/device_registry.py": {
+      "bytes": 991,
+      "sha256": "7f879f96e220a7d04489562d719d56e2f94e9c66c200c031939e94e962a54feb"
     },
     "custom_components/eufy_sdk/device_trigger.py": {
       "bytes": 4091,
@@ -192,8 +196,8 @@
       "sha256": "1a39c674de66a4dafadb129f7231726d02ef88d2b541d72bedcf167f31647aef"
     },
     "custom_components/eufy_sdk/guard_confirmation.py": {
-      "bytes": 27032,
-      "sha256": "cc8f3b263d65d7c942b244f07424f6b930bf993c79cb5e978f105331352abae6"
+      "bytes": 27008,
+      "sha256": "e3ada1ecdeee999294090efe46d0aa780b67d35636683a276189e65a7a9aed33"
     },
     "custom_components/eufy_sdk/image.py": {
       "bytes": 7642,
@@ -221,11 +225,11 @@
     },
     "custom_components/eufy_sdk/manifest.json": {
       "bytes": 411,
-      "sha256": "305e830002d66b52c11858cfae375d2a231258c74652d08b0eca97589f6309b4"
+      "sha256": "ac7e2423c7858c2c9e3f008bb78a3d7f18c102e73fff0d433e36246934028c8e"
     },
     "custom_components/eufy_sdk/manifest_reads.py": {
-      "bytes": 8065,
-      "sha256": "3e0766765b9487a30db08f3a79e998648604acbe95be9d3e740b76126a965c9e"
+      "bytes": 8472,
+      "sha256": "b47b0efb5f4ee3a38a72b8e93e266a41ed81f668dca563a4d00c852580a76b5d"
     },
     "custom_components/eufy_sdk/media_source.py": {
       "bytes": 20522,
@@ -244,8 +248,8 @@
       "sha256": "1df2fd0363b44b62e12e807899fc6b1630f154a6a906ee841752f47b922e3009"
     },
     "custom_components/eufy_sdk/person_identification.py": {
-      "bytes": 5273,
-      "sha256": "81e9501fc9e1d765fa7b557a987d38bf84e308c2c01dedd4d51a70d16e01e218"
+      "bytes": 5271,
+      "sha256": "7464e271fd4b8870a2cb85ebcfef10d2940dc9727c7c3de1ffecece09b774ea8"
     },
     "custom_components/eufy_sdk/preload.py": {
       "bytes": 2274,
@@ -255,13 +259,17 @@
       "bytes": 6953,
       "sha256": "e4857526048011e013df4211e62d52f44a4b60031ebfe3f88ff3f3770d3d0c20"
     },
+    "custom_components/eufy_sdk/privacy.py": {
+      "bytes": 4639,
+      "sha256": "483880183f1a502561eab0bbf07935759d1f4cfa39ad9664497d895475f557c3"
+    },
     "custom_components/eufy_sdk/property_entities.py": {
-      "bytes": 12042,
-      "sha256": "69b5787caa1e50f62c5dc2933468ab7ce27636c77d46bbb0862a33443a62e1b9"
+      "bytes": 12943,
+      "sha256": "5146d6d77381dbb2223300eedae6d6520ecc745b635f0ddf4177274471df3ec8"
     },
     "custom_components/eufy_sdk/property_sync.py": {
-      "bytes": 2966,
-      "sha256": "dcb6225195e5c8364a1ecc0caef2d07741b3f7471a193bf4bdfeac594fcefc36"
+      "bytes": 4561,
+      "sha256": "57b33c4fe699a7ad1d6ac6c1f775102f5e6cb91b78cd3ece51b2ffca0df44afb"
     },
     "custom_components/eufy_sdk/pushmap.py": {
       "bytes": 4470,
@@ -304,8 +312,8 @@
       "sha256": "9edd53f3d593f44d0a285ec122d97f156c1915e33ec8cc466fee0d8f865023d8"
     },
     "custom_components/eufy_sdk/sensor.py": {
-      "bytes": 42651,
-      "sha256": "60d241f6c39522bbcbc448d64baf5525dfaa3ff66309ba7b27c24721d48d4421"
+      "bytes": 43064,
+      "sha256": "3d327d407bf3d56260f394fcb631f4bd2391d5c7ea1a81b464ecd26dc0d1d7b7"
     },
     "custom_components/eufy_sdk/services.yaml": {
       "bytes": 1087,
@@ -328,8 +336,8 @@
       "sha256": "82ead2c2e8b4355770172700e63f7c0b1af6ca1239931494deedf501b794bad2"
     },
     "custom_components/eufy_sdk/switch.py": {
-      "bytes": 13127,
-      "sha256": "8e2000f00a7dfbe6ea81478041f52a344f2f41de7917912339394a56b05a7c9d"
+      "bytes": 17051,
+      "sha256": "d97ac56bb3df8f5f1df36f2ee1219864ba3f9dd895c0cd8aec85db7a5d5339d6"
     },
     "custom_components/eufy_sdk/translations/en.json": {
       "bytes": 9995,
@@ -344,8 +352,8 @@
       "sha256": "35a27fdca6d999370b5ec1a6d2fd6b8d59c7017ec05649b1b230092b53e3c64b"
     },
     "docs/EXPERIMENTAL16_ENTITY_CHANGES.md": {
-      "bytes": 21442,
-      "sha256": "68f8b918b8d88c10d89420e874997c837ed8cae71df9af27f66923a247af959a"
+      "bytes": 22754,
+      "sha256": "86d9e4dfd5040af60f27277b9aa7f240b2f4572089ee13a74d082cd57928aa01"
     },
     "docs/EXPERIMENTAL16_VALIDATION.md": {
       "bytes": 6918,
@@ -407,6 +415,14 @@
       "bytes": 1251,
       "sha256": "1626b0b1a4642ec1d79c3128de0e650c2492760c39c3cb0e30486d54dee40d3d"
     },
+    "tests/fixtures/doorbell_health_manifest.json": {
+      "bytes": 6340,
+      "sha256": "b19b9fa045f9775892771921a64b2706c5969bd37e8107fceb6181e515c19911"
+    },
+    "tests/fixtures/generate_doorbell_health.mjs": {
+      "bytes": 2796,
+      "sha256": "1e8d9f70e3ba01c86f50dcecb7d313646be07d8b7c08fed3951d929a5c526336"
+    },
     "tests/fixtures/generate_light_route.mjs": {
       "bytes": 4896,
       "sha256": "4c10248fddb8b9b17b7e1e892cf0ca60b47ef6a80f9c91a7e3b90c71bdc057b1"
@@ -414,6 +430,10 @@
     "tests/fixtures/generate_manifest_readings.py": {
       "bytes": 37180,
       "sha256": "febda4adc8e1a8100b97d832eacfba06d3a2769634fbb673be4d24b5d9c589a5"
+    },
+    "tests/fixtures/homebase_battery_manifest.json": {
+      "bytes": 17150,
+      "sha256": "29ebdbfa4d64e991f38332654aff6ed57acc2191dbc1be495d8c879c5f5d43f0"
     },
     "tests/fixtures/light_route_manifest.json": {
       "bytes": 42408,
@@ -511,9 +531,17 @@
       "bytes": 10040,
       "sha256": "8d9c7420fc75585fde9b0b26f14b31c42bb22e94596daf88b4d00c3f021d39fd"
     },
+    "tests/test_device_registry.py": {
+      "bytes": 2292,
+      "sha256": "adcf3c965571e6f7c432589042f68e7584b85e25de0c597469011a5f3066cd89"
+    },
     "tests/test_doorbell_events.py": {
       "bytes": 7975,
       "sha256": "526a729f885e6f9152f9059663e7b5cfbf0fb4193fa6653a7f73008890c3f5a6"
+    },
+    "tests/test_doorbell_health.py": {
+      "bytes": 4691,
+      "sha256": "445a177da1c64973324af8dc1bee16d9388622c4498cca953eff53d3fc8c2c18"
     },
     "tests/test_doorbell_package.py": {
       "bytes": 2606,
@@ -548,16 +576,16 @@
       "sha256": "5d0aa63aaaa77634bf028c1e1b414f6137ab760ad1b4a18d6f676db7ff2b87b2"
     },
     "tests/test_guard_confirmation.py": {
-      "bytes": 28003,
-      "sha256": "f11a1e489c65838322d314a072a64d6e3b0f4ce2759808a495b70f0a0396e6f9"
+      "bytes": 28190,
+      "sha256": "1f3bcab00adc82c69e87b69b26da759700ec22303cdb27d7f4c4a13b2391463a"
     },
     "tests/test_guard_mode_timeout.py": {
       "bytes": 9628,
       "sha256": "e98600f5214ca7ae16b19ffc2eb64eff1da7f0c4517f1712fc9d46432e30acd8"
     },
     "tests/test_guard_reconciliation.py": {
-      "bytes": 32186,
-      "sha256": "d4082cb44d4645a1d57811623456e132853e55206f459cfbc173e3cc7687b278"
+      "bytes": 32201,
+      "sha256": "c448b12994e85a281dae4366081b8f6ff4a3a4899458efc361aee3e20ba16e37"
     },
     "tests/test_health_receipt_ownership.py": {
       "bytes": 4663,
@@ -566,6 +594,10 @@
     "tests/test_health_revisions.py": {
       "bytes": 16693,
       "sha256": "bdcee5f814404309d349275efeddbaad120621608331e62a640750baa3ba459a"
+    },
+    "tests/test_homebase_battery.py": {
+      "bytes": 4773,
+      "sha256": "e720e5b96d6a31b236b43db52ed913eefeabe7f408a1268a1736c6a8781c0bb0"
     },
     "tests/test_image_refresh_triggers.py": {
       "bytes": 8857,
@@ -608,8 +640,8 @@
       "sha256": "2f4e5267452ddc43a34968ae3efc7999451ef65f466658466a4b99968c08cccb"
     },
     "tests/test_motion_light_timer.py": {
-      "bytes": 7205,
-      "sha256": "36445e6ad6188ec6ec0b19debb8f23eeb5288e61d5c3f3265c0fc34a2a73a11d"
+      "bytes": 7036,
+      "sha256": "c2c02febbca2eb10476ee007ce5bd2c1bd2e5d8f34755674297696f5b8a75e2e"
     },
     "tests/test_native_webrtc.py": {
       "bytes": 25553,
@@ -624,8 +656,8 @@
       "sha256": "b0e55bd17f1da1a7b488bf1d57cb5e502cc75d1130371f6a47db8b9c78dd4edb"
     },
     "tests/test_observation_receipts.py": {
-      "bytes": 2853,
-      "sha256": "06f2cd76a0a7b02bf199a777e217c59676e785c49bba67c8eaca25f9bb0d058b"
+      "bytes": 2646,
+      "sha256": "ecda40e5d0fd1532d9319b869680b464f8ca1313519d006ef3334c58d5493caf"
     },
     "tests/test_off_stuck_escalation.py": {
       "bytes": 29643,
@@ -636,8 +668,8 @@
       "sha256": "9b4ae0ff203545edcab5799ca9ba3423037ae89b5c98c26ba776f0dcb6238855"
     },
     "tests/test_person_identification.py": {
-      "bytes": 19695,
-      "sha256": "db5c002e20e0e23184ddac9e97df593421bd907c3059e5ddb2506001443d46af"
+      "bytes": 19846,
+      "sha256": "9ef7234453b38e84dd1ae044e32455c4cd0fec8f230f5478f5efd8421a358ec8"
     },
     "tests/test_person_name_routing.py": {
       "bytes": 4081,
@@ -663,13 +695,17 @@
       "bytes": 13868,
       "sha256": "969c2120e1cb51b27d1a41c9a7bfaffdfa7dff9e64a4cc250b40f6605df1c76f"
     },
+    "tests/test_privacy_binary_sensor.py": {
+      "bytes": 22914,
+      "sha256": "5167e628a92c3909ca4357b5e7f55d66d78837b0306d07a8edbe9621d14c6738"
+    },
     "tests/test_property_entities.py": {
       "bytes": 30828,
       "sha256": "92858a0ada87291b411ebc9d2d5ed3e3fbfb1e7a5eb79bd2a4fb551f89dfcfeb"
     },
     "tests/test_property_realtime.py": {
-      "bytes": 3336,
-      "sha256": "4b7828b546cfe2d31f9e32a82dbff2f15aa5b5a4a8c61016333fd53a7ebd52f8"
+      "bytes": 3092,
+      "sha256": "e277a3de3df1087a9a693373114cea9f9445640ddd27223d4fd3d82a297a802d"
     },
     "tests/test_property_reconciliation_edges.py": {
       "bytes": 15008,
@@ -716,8 +752,8 @@
       "sha256": "06f0b6199b3cc34fe485081806f970922d12ca2305229116034368b6fea940bb"
     },
     "tests/test_recordings_playback.py": {
-      "bytes": 47028,
-      "sha256": "414821e8d637a3eafded274dd3e79fe6bc8cf54f7b549b870254deda8e3e1df2"
+      "bytes": 45962,
+      "sha256": "abc32b25a231c0950bea3985c1b92ffff403aa7fedf605cda801879edb8e465e"
     },
     "tests/test_recordings_privacy.py": {
       "bytes": 9841,
@@ -752,8 +788,8 @@
       "sha256": "ef2e5ca4e98216f2256fe6a534e3e722b0f7e935dc292a207926df6ad9de8397"
     },
     "tests/test_setup_events.py": {
-      "bytes": 16031,
-      "sha256": "3bd88c99754cdc43c4fb8104d3111182df219643995dfe683dab88b895540877"
+      "bytes": 15636,
+      "sha256": "037f173d78872071ed724eee4b07d18f7760b7b84637467618559369c4b3328b"
     },
     "tests/test_siren_actions.py": {
       "bytes": 9420,
@@ -799,9 +835,13 @@
       "bytes": 20018,
       "sha256": "1c4bd126aeb3949d60325651ff47edc4e4ea4d2676fae61393ec89888c4de63f"
     },
+    "tests/test_switch_observation_scope.py": {
+      "bytes": 5210,
+      "sha256": "a134cb7c8117e3d962fe753ef34eb407d06fcec8ac33e75a3d674fbbee0ff3d6"
+    },
     "tests/test_t9000_settings.py": {
-      "bytes": 23845,
-      "sha256": "5d97d915d171297cf3853d64ad37e87cd670779b92adf27f811589b33961f97b"
+      "bytes": 25063,
+      "sha256": "140217af993ff51b8b92648aca9125c381a3f071220dbd447db83eee81a1f9b5"
     },
     "tests/test_webrtc_capability.py": {
       "bytes": 7314,
@@ -813,7 +853,7 @@
     },
     "tools/build_integration_zip.py": {
       "bytes": 4276,
-      "sha256": "ee4dba1d32e8f48583d9455cbb95de01da0994de98081fd1838afbadd941f57a"
+      "sha256": "51ed9854e25a8af693b0b69b31bbcca5a024add48ba3256e9471c8f5c07f522b"
     },
     "tools/check_refresh_recovery_mutations.py": {
       "bytes": 2376,

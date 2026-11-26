@@ -1,0 +1,566 @@
+{
+  "cases": [
+    {
+      "model": "T9000",
+      "params": {
+        "1198": "12",
+        "1313": "86400",
+        "1314": "97"
+      },
+      "health": 97,
+      "life": 86400,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+                },
+                {
+                  "accessor": "lifeEstimate",
+                  "property": "batteryLifeEstimate",
+                  "type": "number",
+                  "kind": "seconds",
+                  "unit": "s",
+                  "min": 0,
+                  "step": 1,
+                  "writable": false,
+                  "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {
+        "batteryHealth": 97,
+        "batteryLifeEstimate": 86400
+      }
+    },
+    {
+      "model": "T9000A",
+      "params": {
+        "1313": "86400",
+        "1314": "97"
+      },
+      "health": 97,
+      "life": 86400,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+                },
+                {
+                  "accessor": "lifeEstimate",
+                  "property": "batteryLifeEstimate",
+                  "type": "number",
+                  "kind": "seconds",
+                  "unit": "s",
+                  "min": 0,
+                  "step": 1,
+                  "writable": false,
+                  "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {
+        "batteryHealth": 97,
+        "batteryLifeEstimate": 86400
+      }
+    },
+    {
+      "model": "T9000",
+      "params": {},
+      "health": null,
+      "life": null,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {}
+    },
+    {
+      "model": "T9000",
+      "params": {
+        "1198": "89"
+      },
+      "health": null,
+      "life": null,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {}
+    },
+    {
+      "model": "T9000",
+      "params": {
+        "1313": "0",
+        "1314": "0"
+      },
+      "health": 0,
+      "life": 0,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+                },
+                {
+                  "accessor": "lifeEstimate",
+                  "property": "batteryLifeEstimate",
+                  "type": "number",
+                  "kind": "seconds",
+                  "unit": "s",
+                  "min": 0,
+                  "step": 1,
+                  "writable": false,
+                  "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {
+        "batteryHealth": 0,
+        "batteryLifeEstimate": 0
+      }
+    },
+    {
+      "model": "T9000",
+      "params": {
+        "1313": "-1",
+        "1314": "101"
+      },
+      "health": null,
+      "life": null,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          },
+          {
+            "name": "batteryLifeEstimate",
+            "type": "number",
+            "unit": "s",
+            "kind": "seconds",
+            "min": 0,
+            "step": 1,
+            "writable": false,
+            "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+                },
+                {
+                  "accessor": "lifeEstimate",
+                  "property": "batteryLifeEstimate",
+                  "type": "number",
+                  "kind": "seconds",
+                  "unit": "s",
+                  "min": 0,
+                  "step": 1,
+                  "writable": false,
+                  "description": "Estimated battery life in seconds (1313): live cloud read, owner-app matched 2026-11-17."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {}
+    },
+    {
+      "model": "T8134",
+      "params": {
+        "1198": "89",
+        "1313": "86400",
+        "1314": "97"
+      },
+      "health": 89,
+      "life": null,
+      "reply": {
+        "properties": [
+          {
+            "name": "batteryHealth",
+            "type": "number",
+            "unit": "%",
+            "kind": "percent",
+            "min": 0,
+            "max": 100,
+            "writable": false,
+            "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+          }
+        ],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                },
+                {
+                  "accessor": "health",
+                  "property": "batteryHealth",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "min": 0,
+                  "max": 100,
+                  "writable": false,
+                  "description": "Battery health 0-100 (1198 APP_CMD_DEV_BATTERY_HEALTHY_V2; T9000 uses 1314, live cloud read, owner-app matched 2026-11-17)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {
+        "batteryHealth": 89
+      }
+    },
+    {
+      "model": "T8214",
+      "params": {
+        "1198": "0",
+        "1313": "86400",
+        "1314": "97"
+      },
+      "health": null,
+      "life": null,
+      "reply": {
+        "properties": [],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {}
+    },
+    {
+      "model": "T8217",
+      "params": {
+        "1198": "0",
+        "1313": "86400",
+        "1314": "97"
+      },
+      "health": null,
+      "life": null,
+      "reply": {
+        "properties": [],
+        "decodedProperties": {
+          "bound": true,
+          "details": [
+            {
+              "capability": "battery",
+              "accessor": "battery",
+              "reads": [
+                {
+                  "accessor": "level",
+                  "property": "battery",
+                  "type": "number",
+                  "kind": "percent",
+                  "unit": "%",
+                  "writable": false,
+                  "description": "Battery level 0-100 (verified: param 1101)."
+                }
+              ],
+              "actions": [],
+              "undescribedActions": []
+            }
+          ]
+        }
+      },
+      "state": {}
+    }
+  ]
+}

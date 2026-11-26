@@ -24,6 +24,7 @@ from .entity import (
     has_capability,
     solix_device_info,
 )
+from .privacy import is_homebase_s1_camera
 from .pushmap import (
     MOTION_EVENTS,
     PACKAGE_CLEARED_EVENT,
@@ -70,6 +71,7 @@ async def async_setup_entry(
         for sn in coordinator.data
         for spec in entry.runtime_data.properties.get(sn, [])
         if classify(spec) == "binary_sensor"
+        and (spec["name"] != "privacy" or not is_homebase_s1_camera(coordinator, sn))
     ]
     # Push-driven sensors (motion / person / ringing): flipped ON in real time by the
     # SDK's push channel, then auto-OFF (push has no "cleared" signal). Gated on

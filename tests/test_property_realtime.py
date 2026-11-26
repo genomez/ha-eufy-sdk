@@ -1,15 +1,9 @@
-# ruff: noqa: ANN201, D100, D101, D102, INP001, PT009, S101
+# ruff: noqa: ANN201, D100, D101, D102, INP001, PT009
 
-import importlib.util
 import unittest
-from pathlib import Path
 from unittest.mock import Mock
 
-_PATH = Path(__file__).parents[1] / "custom_components/eufy_sdk/property_sync.py"
-_SPEC = importlib.util.spec_from_file_location("property_sync", _PATH)
-_MODULE = importlib.util.module_from_spec(_SPEC)
-assert _SPEC.loader is not None
-_SPEC.loader.exec_module(_MODULE)
+from custom_components.eufy_sdk import property_sync
 
 
 class PropertyRealtimeTests(unittest.TestCase):
@@ -20,7 +14,7 @@ class PropertyRealtimeTests(unittest.TestCase):
                     data={"camera": {"state": {"battery": 20, "motion": True}}}
                 )
                 self.assertTrue(
-                    _MODULE.apply_property_event(
+                    property_sync.apply_property_event(
                         coordinator,
                         {
                             "event": "propertyChanged",
@@ -40,7 +34,7 @@ class PropertyRealtimeTests(unittest.TestCase):
     def test_newly_observed_property_does_not_require_a_previous_value(self):
         coordinator = Mock(data={"camera": {}})
         self.assertTrue(
-            _MODULE.apply_property_event(
+            property_sync.apply_property_event(
                 coordinator,
                 {
                     "event": "propertyChanged",
@@ -73,11 +67,11 @@ class PropertyRealtimeTests(unittest.TestCase):
         ]
         for value in invalid:
             coordinator = Mock(data={"camera": {"state": {"battery": 20}}})
-            self.assertFalse(_MODULE.apply_property_event(coordinator, value))
+            self.assertFalse(property_sync.apply_property_event(coordinator, value))
             self.assertEqual(coordinator.data, {"camera": {"state": {"battery": 20}}})
             coordinator.async_update_listeners.assert_not_called()
         coordinator = Mock(data=None)
-        self.assertFalse(_MODULE.apply_property_event(coordinator, event))
+        self.assertFalse(property_sync.apply_property_event(coordinator, event))
         coordinator.async_update_listeners.assert_not_called()
 
 

@@ -1,18 +1,11 @@
 # ruff: noqa: ANN201, ANN001, D101, D102, INP001, PT009
 """Device receipts remain independent of optimistic and cached state."""
 
-import importlib.util
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-spec = importlib.util.spec_from_file_location(
-    "receipts",
-    Path(__file__).parents[1] / "custom_components/eufy_sdk/property_sync.py",
-)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+from custom_components.eufy_sdk import property_sync as module
 
 
 class Receipts(unittest.TestCase):
