@@ -5,7 +5,7 @@ Update the add-on and integration together, then restart Home Assistant after th
 | Component | Version |
 | --- | --- |
 | Add-on | 0.4.1-s1.experimental.17 |
-| Bridge | 0.4.1-s1.experimental.17 |
+| Bridge | 0.3.1-s1.experimental.17 |
 | Home Assistant integration | 0.3.1-s1.experimental.17 |
 | SDK | 0.2.1-s1.experimental.17 |
 
