@@ -1,3 +1,31 @@
+# S1 experimental.17 — Install or upgrade the integration
+
+Pair add-on `0.4.1-s1.experimental.17`, integration `0.3.1-s1.experimental.17`, bridge `0.3.1-s1.experimental.17`, and SDK `0.2.1-s1.experimental.17`.
+
+[Runtime release](https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.17) · [Integration release](https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.17)
+
+Back up the existing integration and add-on. Install add-on `0.4.1-s1.experimental.17` from the Add-on Store repository `https://github.com/genomez/ha-eufy-sdk-addon#s1-experimental` on amd64. Keep one bridge using the account. For a migration, reconfigure the existing integration entry if the bridge hostname changes.
+
+### HACS
+
+Add `https://github.com/genomez/ha-eufy-sdk` as a custom repository of type **Integration**. In the repository's download or redownload dialog, choose the exact prerelease `0.3.1-s1.experimental.17`. Enable prerelease selection if required by your HACS version. If the exact version is unavailable, wait for it or use the verified manual ZIP. HACS installs from the tagged repository tree.
+
+### Manual ZIP
+
+1. Download `eufy-sdk-s1-0.3.1-s1.experimental.17.zip` and its `.sha256` sidecar from the [integration release](https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.17). Verify the ZIP's SHA-256 against the sidecar.
+2. Extract the ZIP to a staging directory and stop Home Assistant Core. Retain a backup of any existing `custom_components/eufy_sdk` directory. Install the extracted `custom_components/eufy_sdk` directory under the Home Assistant configuration directory.
+3. With the paired add-on running, start Home Assistant Core and verify the integration version and existing entry. For rollback, restore the previous paired versions and backups.
+
+See the [release notes](RELEASE_NOTES.md) for known limits.
+
+## Upgrade
+
+Update the add-on and integration together. Restart Home Assistant after the add-on is running.
+
+On T8416 cameras paired with HomeBase S1, a Privacy switch replaces the read-only Privacy binary sensor. Update automations and dashboards that referenced `binary_sensor.<camera>_privacy` to use the new Privacy switch. Check the switch's entity ID in Home Assistant.
+
+## Earlier releases
+
 # S1 experimental.15
 
 Pair: add-on **0.4.1-s1.experimental.15**, integration/bridge **0.3.1-s1.experimental.15**, SDK **0.2.1-s1.experimental.15**.

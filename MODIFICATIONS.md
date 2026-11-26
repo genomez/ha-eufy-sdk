@@ -4,11 +4,14 @@ Modified by genomez on 2026-11-25. Adds the T8416 Privacy switch with station re
 
 Changed paths since experimental.16
 
+- `CORE_COMPATIBILITY.md`
 - `EXPERIMENTAL.md`
+- `INSTALL.md`
 - `INTEGRATION_NOTICES.md`
 - `INTEGRATION_PACKAGE.json`
 - `MODIFICATIONS.md`
 - `PUBLICATION.json`
+- `README.md`
 - `RELEASE_NOTES.md`
 - `SOURCE_MANIFEST.json`
 - `custom_components/eufy_sdk/__init__.py`

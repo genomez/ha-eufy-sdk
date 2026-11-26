@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "CORE_COMPATIBILITY.md",
-      "sha256": "f44db18ccffa9e280394148afe6745d693331781f8ac663efcc06f7394a48cad"
+      "sha256": "4a4bf8a02f1ecb253d32b386c4db6f869010e560545f4f0a2ffdb910c999e782"
     },
     {
       "path": "EXPERIMENTAL.md",
@@ -16,7 +16,7 @@
     },
     {
       "path": "INSTALL.md",
-      "sha256": "c9c827512691edf68ab1d897c57beb3e32d8ac901dc43cc892be7a0e0242e00f"
+      "sha256": "34d2885c021fab9ea6219370e9fd9fb9135c8ac9bc750f924013739ac7b09bdd"
     },
     {
       "path": "INTEGRATION_NOTICES.md",
@@ -28,11 +28,11 @@
     },
     {
       "path": "MODIFICATIONS.md",
-      "sha256": "300e88493c354fee0d1b480969e8b50beb1fa0a0b738c84ba912fc6f6a4b943f"
+      "sha256": "6e74839dabbb58b57049cc19b6de1af2c040492be1dd8022f224fa97449e949f"
     },
     {
       "path": "README.md",
-      "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
+      "sha256": "be14d2ecc042ac415d4586a19a7feeb951903996df8abd55e50ebc65e52132cb"
     },
     {
       "path": "RELEASE_NOTES.md",

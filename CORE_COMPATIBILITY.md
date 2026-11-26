@@ -1,3 +1,19 @@
+# S1 experimental.17 — Home Assistant compatibility
+
+Pair add-on `0.4.1-s1.experimental.17`, integration `0.3.1-s1.experimental.17`, bridge `0.3.1-s1.experimental.17`, and SDK `0.2.1-s1.experimental.17`.
+
+[Runtime release](https://github.com/genomez/ha-eufy-sdk-addon/releases/tag/s1-runtime-0.4.1.experimental.17) · [Integration release](https://github.com/genomez/ha-eufy-sdk/releases/tag/0.3.1-s1.experimental.17)
+
+The integration declares Home Assistant 2026.6.4 and HACS 2.0.5 as HACS metadata floors. Offline regression tests cover Home Assistant 2026.7.0. Compatibility with other Home Assistant versions, HACS installation, and live-device behavior require separate verification. See the [installation guide](INSTALL.md) and [release notes](RELEASE_NOTES.md).
+
+## Upgrade
+
+Update the add-on and integration together. Restart Home Assistant after the add-on is running.
+
+On T8416 cameras paired with HomeBase S1, a Privacy switch replaces the read-only Privacy binary sensor. Update automations and dashboards that referenced `binary_sensor.<camera>_privacy` to use the new Privacy switch. Check the switch's entity ID in Home Assistant.
+
+## Earlier releases
+
 # S1 experimental.15
 
 Pair: add-on **0.4.1-s1.experimental.15**, integration/bridge **0.3.1-s1.experimental.15**, SDK **0.2.1-s1.experimental.15**.

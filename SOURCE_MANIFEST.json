@@ -16,16 +16,16 @@
       "sha256": "dc85e4da889f7714d53c946ede780108ab32f31ce538f9fe5885d6ababa9dbcd"
     },
     "CORE_COMPATIBILITY.md": {
-      "bytes": 18097,
-      "sha256": "f44db18ccffa9e280394148afe6745d693331781f8ac663efcc06f7394a48cad"
+      "bytes": 19267,
+      "sha256": "4a4bf8a02f1ecb253d32b386c4db6f869010e560545f4f0a2ffdb910c999e782"
     },
     "EXPERIMENTAL.md": {
       "bytes": 57120,
       "sha256": "82d9eb38d89296cc39cb2423ecd12fe08f6b5be95634e03ae952536023a36159"
     },
     "INSTALL.md": {
-      "bytes": 46310,
-      "sha256": "c9c827512691edf68ab1d897c57beb3e32d8ac901dc43cc892be7a0e0242e00f"
+      "bytes": 48607,
+      "sha256": "34d2885c021fab9ea6219370e9fd9fb9135c8ac9bc750f924013739ac7b09bdd"
     },
     "INTEGRATION_NOTICES.md": {
       "bytes": 37123,
@@ -33,15 +33,15 @@
     },
     "INTEGRATION_PACKAGE.json": {
       "bytes": 12492,
-      "sha256": "7d417e851c54ac711b2be570486a95ccf40c27d56003043a10a6cca1c57a72a8"
+      "sha256": "14ceaf91aa94e0e39356a84201e6243e089c8c33b4a42563600d06302aabd7a6"
     },
     "LICENSE": {
       "bytes": 1065,
       "sha256": "f72e5aaf9090373b8eb25d5ef0d9bf4ba750150886254ecd2ad2c426068dd156"
     },
     "MODIFICATIONS.md": {
-      "bytes": 43903,
-      "sha256": "300e88493c354fee0d1b480969e8b50beb1fa0a0b738c84ba912fc6f6a4b943f"
+      "bytes": 43958,
+      "sha256": "6e74839dabbb58b57049cc19b6de1af2c040492be1dd8022f224fa97449e949f"
     },
     "POST_REPACK_BUILD.json": {
       "bytes": 6587,
@@ -56,8 +56,8 @@
       "sha256": "1fd2e67f603c09518fe8464166e8b3f86c7a879d80e1dc8eb323a8565faaa6d6"
     },
     "README.md": {
-      "bytes": 31612,
-      "sha256": "6b084d2d74ae105bb9b764c0716ec0692f4547d3a35456a3bc4784b48397116b"
+      "bytes": 32692,
+      "sha256": "be14d2ecc042ac415d4586a19a7feeb951903996df8abd55e50ebc65e52132cb"
     },
     "RELEASE_NOTES.md": {
       "bytes": 2150,
